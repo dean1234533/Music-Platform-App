@@ -3,10 +3,16 @@ import { precacheAndRoute } from 'workbox-precaching'
 import { registerRoute } from 'workbox-routing'
 import { CacheFirst } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
+import { clientsClaim } from 'workbox-core'
 import { initializeApp } from 'firebase/app'
 import { getMessaging, onBackgroundMessage } from 'firebase/messaging/sw'
 
 declare const self: ServiceWorkerGlobalScope
+
+// Without these, a new deploy installs but stays "waiting" until every open
+// tab is fully closed, so users keep getting the stale cached app shell.
+self.skipWaiting()
+clientsClaim()
 
 // App-shell precaching, generated at build time by vite-plugin-pwa (injectManifest).
 precacheAndRoute(self.__WB_MANIFEST)
