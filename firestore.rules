@@ -173,7 +173,7 @@ service cloud.firestore {
     // track lists for a set). Kept as a separate collection so fan playlist
     // queries and DJ crate queries never conflate.
     match /crates/{crateId} {
-      allow read: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow read: if isSignedIn() && (resource == null || resource.data.ownerId == request.auth.uid);
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid && hasRole('dj');
       allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
     }
@@ -206,7 +206,12 @@ service cloud.firestore {
     // Doc ID is `${userId}_${role}` — a user can hold up to 3 concurrent
     // subscriptions, one per role, so ownership is a field check, not an ID check.
     match /subscriptions/{subId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      // No doc exists for a user on a role's free/default tier (the common
+      // case) — resource == null must short-circuit before dereferencing
+      // resource.data, or reading your own absent subscription throws
+      // "missing or insufficient permissions" instead of just returning
+      // not-found.
+      allow read: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
       allow write: if false; // Stripe webhook only
     }
 
