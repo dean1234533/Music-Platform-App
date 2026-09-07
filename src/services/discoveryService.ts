@@ -31,8 +31,8 @@ export async function listRisingArtists(count = 12): Promise<ArtistProfile[]> {
  * Tracks open for DJ promotion. Used both by the fan-facing Discover page
  * (public only — leave includeDjOnly false) and the DJ Discover page (DJs
  * may also see dj_only tracks — pass includeDjOnly true there).
- * `filters`/`includeProPlusOnly` are only meaningful for DJ Pro
- * (advancedFiltering) / Pro+ (privatePromoPools) — pass neither otherwise.
+ * Filters are available to every DJ. `includeProPlusOnly` retains visibility
+ * for legacy tracks that used the retired creator-plan audience marker.
  * See listDJPromotionTracksFiltered in trackService.ts.
  */
 export async function listArtistsSeekingDJExposure(

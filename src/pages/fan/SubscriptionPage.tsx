@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Check, CreditCard, Sparkles } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { listActiveSubscriptionPlansForRole } from '@/services/platformSettingsService'
+import { getPlatformSettings, listActiveSubscriptionPlansForRole } from '@/services/platformSettingsService'
 import { openBillingPortal, subscribeToOwnSubscription, subscribeToPlan } from '@/services/subscriptionService'
 import { subscribeSupportAllocations, updateSupportAllocations } from '@/services/supportService'
 import { listFollowedArtistIds } from '@/services/followService'
@@ -10,7 +10,7 @@ import { getArtistProfile } from '@/services/artistService'
 import { Button } from '@/components/common/Button'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import { formatCurrency } from '@/utils/format'
-import type { SubscriptionPlan } from '@/types/platformSettings'
+import type { PlatformSettings, SubscriptionPlan } from '@/types/platformSettings'
 import type { SubscriptionDoc, SupportAllocationDoc } from '@/types/subscription'
 import type { ArtistProfile } from '@/types/artist'
 
@@ -37,14 +37,16 @@ export function SubscriptionPage() {
   const [subscription, setSubscription] = useState<SubscriptionDoc | null | undefined>(undefined)
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
+  const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null)
 
   useEffect(() => {
     void listActiveSubscriptionPlansForRole('fan').then(setPlans)
+    void getPlatformSettings().then(setPlatformSettings)
   }, [])
 
   useEffect(() => {
     if (!firebaseUser) return
-    return subscribeToOwnSubscription(firebaseUser.uid, 'fan', setSubscription)
+    return subscribeToOwnSubscription(firebaseUser.uid, setSubscription)
   }, [firebaseUser])
 
   const isActive = subscription?.status === 'active' || subscription?.status === 'trialing'
@@ -54,7 +56,7 @@ export function SubscriptionPage() {
     setCheckoutLoading(planId)
     setCheckoutError(null)
     try {
-      await subscribeToPlan(planId, 'fan')
+      await subscribeToPlan(planId)
     } catch (err) {
       setCheckoutError(err instanceof Error ? err.message : 'Could not start checkout. Please try again.')
     } finally {
@@ -150,10 +152,15 @@ export function SubscriptionPage() {
         </>
       )}
 
-      {isActive && activePlan ? (
+      {isActive && activePlan && platformSettings ? (
         <AllocationEditor
           fanId={firebaseUser!.uid}
-          planCapMinor={activePlan.limits?.supportAllocationCapMinor ?? activePlan.priceMinor}
+          planCapMinor={Math.min(
+            activePlan.limits?.supportAllocationCapMinor && activePlan.limits.supportAllocationCapMinor > 0
+              ? activePlan.limits.supportAllocationCapMinor
+              : activePlan.priceMinor,
+            Math.round(activePlan.priceMinor * (platformSettings.artistAllocationPercent / 100)),
+          )}
           currency={activePlan.currency}
         />
       ) : null}
@@ -223,8 +230,8 @@ function AllocationEditor({ fanId, planCapMinor, currency }: { fanId: string; pl
     <div>
       <h2 className="mb-1 text-lg font-semibold text-ink-0">Your artist support this month</h2>
       <p className="mb-4 text-sm text-ink-2">
-        Split your subscription across the artists you follow. Unallocated amounts stay with the
-        platform this cycle.
+        Split the artist share of your subscription across the artists you follow. The amounts below
+        are what artists receive; unallocated funds remain with the platform this cycle.
       </p>
 
       {artists.length === 0 ? (

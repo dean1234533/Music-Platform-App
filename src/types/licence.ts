@@ -64,6 +64,9 @@ export interface LicenceAgreementDoc {
   expiryDate: string | null
   licenceFeeMinor: number
   currency: string
+  platformFeePercent?: number
+  platformFeeMinor?: number
+  artistNetMinor?: number
   attributionRequirements: string
   recordingPermission: boolean
   streamingPermission: boolean

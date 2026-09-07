@@ -3,9 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Modal } from '@/components/common/Modal'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
-import { UpgradePrompt } from '@/components/common/UpgradePrompt'
 import { submitLicenceRequest } from '@/services/licenceService'
-import { useCanRequestDjLicence } from '@/hooks/useEntitlements'
 import type { IntendedUse } from '@/types/licence'
 
 const USE_OPTIONS: { value: IntendedUse; label: string }[] = [
@@ -20,7 +18,6 @@ const USE_OPTIONS: { value: IntendedUse; label: string }[] = [
 
 export function RequestDjAccessModal({ trackId, onClose }: { trackId: string; onClose: () => void }) {
   const navigate = useNavigate()
-  const { allowed: canRequest, remaining, loading: limitLoading } = useCanRequestDjLicence()
   const [intendedUse, setIntendedUse] = useState<IntendedUse>('dj_set')
   const [territory, setTerritory] = useState('')
   const [expectedDate, setExpectedDate] = useState('')
@@ -45,14 +42,6 @@ export function RequestDjAccessModal({ trackId, onClose }: { trackId: string; on
   return (
     <Modal title="Request DJ access" onClose={onClose}>
       <div className="flex flex-col gap-4">
-        {!limitLoading && !canRequest ? (
-          <UpgradePrompt
-            role="dj"
-            reason="You've used your DJ requests for this month."
-            cta="Upgrade to DJ Pro"
-          />
-        ) : null}
-        <fieldset disabled={!limitLoading && !canRequest} className="contents">
         <div>
           <Label>Intended use</Label>
           <select
@@ -89,10 +78,6 @@ export function RequestDjAccessModal({ trackId, onClose }: { trackId: string; on
         <Button onClick={handleSubmit} loading={submitting}>
           Send request
         </Button>
-        </fieldset>
-        {!limitLoading && canRequest && remaining !== -1 ? (
-          <p className="text-xs text-ink-3">{remaining} request{remaining === 1 ? '' : 's'} remaining this month.</p>
-        ) : null}
       </div>
     </Modal>
   )

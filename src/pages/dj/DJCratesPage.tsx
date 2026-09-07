@@ -9,7 +9,6 @@ import {
   subscribeOwnCrates,
   updateCrateDetails,
 } from '@/services/crateService'
-import { useEntitlement } from '@/hooks/useEntitlements'
 import { Button } from '@/components/common/Button'
 import { Input } from '@/components/common/Input'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
@@ -17,9 +16,6 @@ import type { CrateDoc } from '@/types/crate'
 
 export function DJCratesPage() {
   const { firebaseUser } = useAuth()
-  const { hasFeature } = useEntitlement('dj')
-  const canUseAdvanced = hasFeature('advancedCrates')
-
   const [crates, setCrates] = useState<CrateDoc[] | null>(null)
   const [newTitle, setNewTitle] = useState('')
   const [creating, setCreating] = useState(false)
@@ -115,8 +111,7 @@ export function DJCratesPage() {
                 </Button>
               </div>
 
-              {canUseAdvanced ? (
-                <div className="mt-3 grid gap-2 border-t border-surface-border pt-3 sm:grid-cols-2">
+              <div className="mt-3 grid gap-2 border-t border-surface-border pt-3 sm:grid-cols-2">
                   <div>
                     <label className="text-xs text-ink-3">Notes</label>
                     <textarea
@@ -138,8 +133,7 @@ export function DJCratesPage() {
                       className="mt-1 w-full rounded-lg border border-surface-border bg-surface-2 px-2 py-1.5 text-xs text-ink-0 outline-none focus:border-brand-500"
                     />
                   </div>
-                </div>
-              ) : null}
+              </div>
             </div>
           ))}
         </div>

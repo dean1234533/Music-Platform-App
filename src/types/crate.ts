@@ -5,9 +5,9 @@ export interface CrateDoc {
   ownerId: string
   title: string
   trackIds: string[]
-  /** Pro+ ("advanced crates") — free-text notes, e.g. set order/cue notes. */
+  /** Free-text notes, e.g. set order or cue notes. */
   notes: string | null
-  /** Pro+ ("advanced crates") — free-form tags, e.g. "warm-up", "peak-time". */
+  /** Free-form tags, e.g. "warm-up", "peak-time". */
   tags: string[]
   createdAt: Timestamp | null
   updatedAt: Timestamp | null

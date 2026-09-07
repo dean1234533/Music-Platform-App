@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Play, Pause, Radio, Flag } from 'lucide-react'
 import { subscribeTrack } from '@/services/trackService'
 import { usePlayer } from '@/contexts/PlayerContext'
@@ -11,12 +11,15 @@ import { RequestDjAccessModal } from '@/components/track/RequestDjAccessModal'
 import { ReportTrackModal } from '@/components/track/ReportTrackModal'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import { Button } from '@/components/common/Button'
+import { ShareButton } from '@/components/common/ShareButton'
 import { formatDuration } from '@/utils/format'
+import { trackShareUrl } from '@/utils/shareLinks'
 import type { TrackDoc } from '@/types/track'
 import type { PlaylistDoc } from '@/types/playlist'
 
 export function TrackPage() {
-  const { trackId } = useParams<{ trackId: string }>()
+  const { trackId } = useParams<{ trackId: string; slug?: string }>()
+  const navigate = useNavigate()
   const [track, setTrack] = useState<TrackDoc | null | undefined>(undefined)
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer()
   const artist = useArtistSummary(track?.artistId ?? null)
@@ -34,6 +37,16 @@ export function TrackPage() {
     if (!firebaseUser) return
     return subscribeOwnPlaylists(firebaseUser.uid, setPlaylists)
   }, [firebaseUser])
+
+  // Upgrade the flat /track/:trackId address bar to the canonical nested
+  // /artist/:slug/track/:trackId form once the artist resolves — flat links
+  // already out in the wild (and the OG worker) keep working either way.
+  useEffect(() => {
+    if (!artist || !trackId) return
+    if (window.location.pathname === `/track/${trackId}`) {
+      navigate(`/artist/${artist.slug}/track/${trackId}`, { replace: true })
+    }
+  }, [artist, trackId, navigate])
 
   if (track === undefined) return <LoadingState label="Loading track…" />
   if (track === null) return <EmptyState title="Track not found" />
@@ -62,6 +75,13 @@ export function TrackPage() {
               {isCurrent && isPlaying ? <Pause className="h-5 w-5" fill="currentColor" /> : <Play className="h-5 w-5 translate-x-0.5" fill="currentColor" />}
             </button>
             {artist ? <FollowButton artistId={artist.artistId} /> : null}
+            {artist ? (
+              <ShareButton
+                url={trackShareUrl(artist.slug, track.trackId)}
+                title={track.title}
+                text={`Listen to "${track.title}" by ${artist.name} on Wavelength`}
+              />
+            ) : null}
             {track.djPromotion ? (
               <span className="flex items-center gap-1.5 rounded-full bg-dj-500/15 px-3 py-2 text-xs font-medium text-dj-400">
                 <Radio className="h-3.5 w-3.5" />

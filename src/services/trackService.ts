@@ -81,9 +81,9 @@ export interface CreateTrackInput {
   djPromotion: boolean
   djLicenceMode: LicenceMode
   djFixedPrice: number | null
-  /** Artist Pro+ only — UI should only expose this control when the artist has the bulkDjOutreach/teamAccess-tier feature. */
+  /** Legacy audience marker; new uploads use `all`. */
   djPromoTier: 'all' | 'pro_plus_only'
-  /** Artist Pro+ only ("release embargo dates"). */
+  /** Optional release embargo. */
   embargoUntil: Date | null
 }
 
@@ -169,7 +169,7 @@ export interface DjTrackFilters {
 }
 
 /**
- * DJ Pro/Pro+ discovery filtering. Only `genre` is pushed into the Firestore
+ * DJ discovery filtering. Only `genre` is pushed into the Firestore
  * query (the one equality field worth an index at this app's scale) — the
  * rest are applied client-side over a bounded page. Not a scalable search
  * solution; fine for the catalogue sizes this app runs at today.
@@ -204,9 +204,9 @@ export async function listDJPromotionTracksFiltered(
     .filter((t) => filters.bpmMax == null || (t.bpm != null && t.bpm <= filters.bpmMax))
 }
 
-/** DJ Free — unfiltered discovery, still embargo/promo-tier-respecting. */
+/** Convenience query for DJ discovery. */
 export async function listDJPromotionTracks(count = 20): Promise<TrackDoc[]> {
-  return listDJPromotionTracksFiltered({}, { includeProPlusOnly: false, includeDjOnly: true, count })
+  return listDJPromotionTracksFiltered({}, { includeProPlusOnly: true, includeDjOnly: true, count })
 }
 
 /** Server-side play counting keeps playCount out of reach of client tampering. */

@@ -7,22 +7,22 @@ export interface PlatformSettings {
   minimumPayoutMinor: number
 }
 
-const DEFAULTS: PlatformSettings = {
-  platformFeePercent: 15,
-  artistAllocationPercent: 85,
-  djServiceFeePercent: 10,
-  minimumPayoutMinor: 2000,
-}
-
-/**
- * Single admin-configured document (`platformSettings/default`). Falls back
- * to sane defaults if an admin hasn't published settings yet, so revenue
- * calculations never crash — but the *values* actually used always come
- * from here, never a hard-coded constant scattered through the codebase.
- */
+/** Single source of truth for every revenue split. Billing stops safely if it is not configured. */
 export async function getPlatformSettings(): Promise<PlatformSettings> {
   const snap = await db.collection('platformSettings').doc('default').get()
-  if (!snap.exists) return DEFAULTS
+  if (!snap.exists) throw new Error('platformSettings/default must be configured before payments can be processed.')
   const data = snap.data() ?? {}
-  return { ...DEFAULTS, ...data }
+  const settings = {
+    platformFeePercent: data.platformFeePercent,
+    artistAllocationPercent: data.artistAllocationPercent,
+    djServiceFeePercent: data.djServiceFeePercent,
+    minimumPayoutMinor: data.minimumPayoutMinor,
+  }
+  if (Object.values(settings).some((value) => typeof value !== 'number' || !Number.isFinite(value))) {
+    throw new Error('platformSettings/default contains missing or invalid payment settings.')
+  }
+  if (settings.platformFeePercent + settings.artistAllocationPercent !== 100) {
+    throw new Error('Fan revenue platform and artist percentages must total 100.')
+  }
+  return settings as PlatformSettings
 }

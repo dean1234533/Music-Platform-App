@@ -2,13 +2,12 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
 import { userHasRole } from '../roles.js'
-import { hasFeature } from '../entitlements.js'
 
 const MAX_MESSAGE_LENGTH = 1000
 const BATCH_SIZE = 500
 
 /**
- * Artist Pro+ bulk DJ outreach. The anti-spam mechanism is the query itself:
+ * Artist bulk DJ outreach. The anti-spam mechanism is the query itself:
  * only djProfiles with bulkOutreachOptIn==true are ever notified — there is
  * no path to message a DJ who hasn't explicitly opted in.
  */
@@ -18,10 +17,6 @@ export const sendBulkDjOutreach = onCall(async (request) => {
   if (!(await userHasRole(artistId, 'artist'))) {
     throw new HttpsError('permission-denied', 'An artist profile is required.')
   }
-  if (!(await hasFeature(artistId, 'artist', 'bulkDjOutreach'))) {
-    throw new HttpsError('permission-denied', 'Bulk DJ outreach requires Artist Pro+.')
-  }
-
   const { trackId, message } = request.data ?? {}
   if (!trackId || typeof trackId !== 'string') throw new HttpsError('invalid-argument', 'trackId is required.')
   if (!message || typeof message !== 'string' || !message.trim()) {

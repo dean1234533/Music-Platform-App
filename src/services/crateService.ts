@@ -57,7 +57,7 @@ export async function removeTrackFromCrate(crateId: string, trackId: string): Pr
   await updateDoc(crateRef(crateId), { trackIds: arrayRemove(trackId), updatedAt: serverTimestamp() })
 }
 
-/** Pro+ ("advanced crates") — notes/tags editing. UI should only expose this when the DJ has the advancedCrates feature. */
+/** Notes and tags are included for every DJ crate. */
 export async function updateCrateDetails(crateId: string, data: { notes?: string | null; tags?: string[] }): Promise<void> {
   await updateDoc(crateRef(crateId), { ...data, updatedAt: serverTimestamp() })
 }

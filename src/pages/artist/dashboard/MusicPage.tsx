@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { Megaphone, Plus } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeArtistTracks } from '@/services/artistService'
-import { useEntitlement } from '@/hooks/useEntitlements'
 import { Button } from '@/components/common/Button'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import { BulkDjOutreachModal } from '@/components/track/BulkDjOutreachModal'
@@ -20,7 +19,6 @@ const VISIBILITY_LABEL: Record<TrackDoc['visibility'], string> = {
 
 export function MusicPage() {
   const { firebaseUser } = useAuth()
-  const { hasFeature } = useEntitlement('artist')
   const [tracks, setTracks] = useState<TrackDoc[] | null>(null)
   const [outreachTrack, setOutreachTrack] = useState<TrackDoc | null>(null)
 
@@ -62,7 +60,7 @@ export function MusicPage() {
               {track.djPromotion ? (
                 <span className="shrink-0 rounded-full bg-dj-500/15 px-2.5 py-1 text-xs text-dj-400">DJ promo</span>
               ) : null}
-              {track.djPromotion && hasFeature('bulkDjOutreach') ? (
+              {track.djPromotion ? (
                 <button
                   type="button"
                   onClick={() => setOutreachTrack(track)}

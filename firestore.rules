@@ -63,19 +63,14 @@ service cloud.firestore {
       allow create: if isSelf(artistId)
         && request.resource.data.artistId == artistId
         && request.resource.data.get('trackCount', 0) == 0;
-      // trackCount/trackLimit/planTier are server-mirrored (Cloud Functions
-      // only) — trackLimit in particular gates the tracks/{trackId} create
-      // rule below, so a client must never be able to raise it. perks is
-      // artist-writable (free-text, not platform-enforced).
+      // trackCount is server-maintained. Perks are artist-writable.
       allow update: if isSelf(artistId)
         && request.resource.data.artistId == resource.data.artistId
         && request.resource.data.slug == resource.data.slug
         && request.resource.data.followerCount == resource.data.followerCount
         && request.resource.data.supporterCount == resource.data.supporterCount
         && request.resource.data.verified == resource.data.verified
-        && request.resource.data.get('trackCount', 0) == resource.data.get('trackCount', 0)
-        && request.resource.data.get('trackLimit', 0) == resource.data.get('trackLimit', 0)
-        && request.resource.data.get('planTier', 'free') == resource.data.get('planTier', 'free');
+        && request.resource.data.get('trackCount', 0) == resource.data.get('trackCount', 0);
       allow delete: if false;
     }
 
@@ -90,15 +85,10 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isSelf(djId) && request.resource.data.djId == djId
         && request.resource.data.verificationStatus == 'unverified';
-      // requestsThisMonth/requestsMonthResetAt/planTier are server-mirrored
-      // (the monthly request counter is maintained inside submitLicenceRequest's
-      // transaction). bulkOutreachOptIn is DJ-writable — it's their own opt-in.
+      // Verification is server-maintained. bulkOutreachOptIn is DJ-writable.
       allow update: if isSelf(djId)
         && request.resource.data.djId == resource.data.djId
-        && request.resource.data.verificationStatus == resource.data.verificationStatus
-        && request.resource.data.get('requestsThisMonth', 0) == resource.data.get('requestsThisMonth', 0)
-        && request.resource.data.get('requestsMonthResetAt', null) == resource.data.get('requestsMonthResetAt', null)
-        && request.resource.data.get('planTier', 'free') == resource.data.get('planTier', 'free');
+        && request.resource.data.verificationStatus == resource.data.verificationStatus;
       allow delete: if false;
     }
 
@@ -109,24 +99,24 @@ service cloud.firestore {
     // takenDown are frozen from client writes.
     // ---------------------------------------------------------------------
     match /tracks/{trackId} {
+      // A shared track link must work for a legitimately-entitled viewer, not
+      // just the public/dj_only/owner/admin cases — mirrors artistPosts'
+      // existence-check pattern. early_access has no dedicated relationship
+      // collection yet, so it's treated as follower-equivalent for now.
       allow read: if resource.data.visibility == 'public'
         || (resource.data.visibility == 'dj_only' && hasRole('dj'))
         || (isSignedIn() && resource.data.artistId == request.auth.uid)
+        || ((resource.data.visibility == 'followers' || resource.data.visibility == 'early_access') && isSignedIn() &&
+            exists(/databases/$(database)/documents/follows/$(request.auth.uid + '_' + resource.data.artistId)))
+        || (resource.data.visibility == 'supporters' && isSignedIn() &&
+            exists(/databases/$(database)/documents/supportRelationships/$(request.auth.uid + '_' + resource.data.artistId)))
         || isAdmin();
 
-      // Track-count limit: rules never resolve a plan — they only compare the
-      // two integers Cloud Functions already mirrored onto artistProfiles
-      // (trackLimit == -1 means unlimited).
       allow create: if isSignedIn()
         && request.resource.data.artistId == request.auth.uid
         && hasRole('artist')
         && request.resource.data.rightsConfirmed == true
-        && request.resource.data.playCount == 0
-        && (
-          get(/databases/$(database)/documents/artistProfiles/$(request.auth.uid)).data.trackLimit == -1
-          || get(/databases/$(database)/documents/artistProfiles/$(request.auth.uid)).data.trackCount
-             < get(/databases/$(database)/documents/artistProfiles/$(request.auth.uid)).data.trackLimit
-        );
+        && request.resource.data.playCount == 0;
 
       allow update: if isSignedIn()
         && resource.data.artistId == request.auth.uid

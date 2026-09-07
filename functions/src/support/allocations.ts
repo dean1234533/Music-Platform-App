@@ -1,6 +1,7 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
+import { getPlatformSettings } from '../platformSettings.js'
 
 interface AllocationInput {
   artistId: string
@@ -29,13 +30,15 @@ export const updateSupportAllocations = onCall(async (request) => {
   }
 
   const planId = subSnap.data()?.planId as string | undefined
-  let capMinor = Number.POSITIVE_INFINITY
+  const settings = await getPlatformSettings()
+  let capMinor = 0
   if (planId) {
     const planSnap = await db.collection('subscriptionPlans').doc(planId).get()
     if (planSnap.exists) {
       const plan = planSnap.data()!
+      const configuredShare = Math.round((plan.priceMinor as number) * (settings.artistAllocationPercent / 100))
       const limitCap = plan.limits?.supportAllocationCapMinor as number | undefined
-      capMinor = typeof limitCap === 'number' ? limitCap : (plan.priceMinor as number)
+      capMinor = typeof limitCap === 'number' && limitCap > 0 ? Math.min(limitCap, configuredShare) : configuredShare
     }
   }
 
@@ -45,7 +48,7 @@ export const updateSupportAllocations = onCall(async (request) => {
 
   const total = cleaned.reduce((sum, a) => sum + a.amountMinor, 0)
   if (total > capMinor) {
-    throw new HttpsError('invalid-argument', 'Total allocation exceeds your subscription amount.')
+    throw new HttpsError('invalid-argument', 'Total allocation exceeds the artist share of your subscription.')
   }
 
   const allocationMap: Record<string, number> = {}

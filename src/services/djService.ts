@@ -16,10 +16,7 @@ export interface CreateDJProfileInput {
 
 export async function createDJProfile(djId: string, input: CreateDJProfileInput): Promise<void> {
   // Idempotent: a retried/queued call (e.g. a write that was offline when
-  // first submitted, replaying later) must not attempt to overwrite an
-  // already-created profile — Firestore rules would reject the mismatched
-  // frozen fields (verificationStatus/requestsThisMonth/planTier may have
-  // moved on since creation).
+  // first submitted, replaying later) must not overwrite an existing profile.
   const existing = await getDoc(djRef(djId))
   if (existing.exists()) return
 
@@ -37,9 +34,6 @@ export async function createDJProfile(djId: string, input: CreateDJProfileInput)
     website: null,
     socialLinks: {},
     verificationStatus: 'unverified',
-    requestsThisMonth: 0,
-    requestsMonthResetAt: null,
-    planTier: 'free',
     bulkOutreachOptIn: false,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

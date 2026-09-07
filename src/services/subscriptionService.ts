@@ -2,25 +2,18 @@ import { doc, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { callable } from '@/lib/callable'
 import type { SubscriptionDoc } from '@/types/subscription'
-import type { PlanRole } from '@/types/entitlements'
 
-const startCheckout = callable<{ planId: string; role: PlanRole; successUrl: string; cancelUrl: string }, { url: string }>(
+const startCheckout = callable<{ planId: string; role: 'fan'; successUrl: string; cancelUrl: string }, { url: string }>(
   'createCheckoutSession',
 )
 const startBillingPortal = callable<{ returnUrl: string }, { url: string }>('createBillingPortalSession')
 
-const RETURN_PATH: Record<PlanRole, string> = {
-  fan: '/app/subscription',
-  artist: '/dashboard/artist/plan',
-  dj: '/dj/plan',
-}
-
-export async function subscribeToPlan(planId: string, role: PlanRole): Promise<void> {
+export async function subscribeToPlan(planId: string): Promise<void> {
   const origin = window.location.origin
-  const returnPath = RETURN_PATH[role]
+  const returnPath = '/app/subscription'
   const { url } = await startCheckout({
     planId,
-    role,
+    role: 'fan',
     successUrl: `${origin}${returnPath}?checkout=success`,
     cancelUrl: `${origin}${returnPath}?checkout=cancelled`,
   })
@@ -34,10 +27,9 @@ export async function openBillingPortal(): Promise<void> {
 
 export function subscribeToOwnSubscription(
   uid: string,
-  role: PlanRole,
   onChange: (sub: SubscriptionDoc | null) => void,
 ) {
-  return onSnapshot(doc(db, 'subscriptions', `${uid}_${role}`), (snap) => {
+  return onSnapshot(doc(db, 'subscriptions', `${uid}_fan`), (snap) => {
     onChange(snap.exists() ? (snap.data() as SubscriptionDoc) : null)
   })
 }

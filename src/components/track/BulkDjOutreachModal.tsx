@@ -4,7 +4,7 @@ import { Button } from '@/components/common/Button'
 import { TextArea } from '@/components/common/Input'
 import { sendBulkDjOutreach } from '@/services/messagingService'
 
-/** Artist Pro+ only — the server enforces the entitlement and the opted-in-DJs-only allowlist; this is just the UI. */
+/** Sends only to DJs who have explicitly opted in to artist outreach. */
 export function BulkDjOutreachModal({ trackId, trackTitle, onClose }: { trackId: string; trackTitle: string; onClose: () => void }) {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)

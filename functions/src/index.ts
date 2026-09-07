@@ -31,9 +31,7 @@ export { blockSuspendedSignIn } from './admin/enforceSuspension.js'
 export { submitReport, adminResolveReport } from './admin/reports.js'
 export { adminUpsertSubscriptionPlan, adminUpdatePlatformSettings } from './admin/settings.js'
 
-// Tiered Fan/Artist/DJ entitlements.
+// Free creator workflows and fan supporter subscriptions.
 export { onTrackCreate, onTrackDelete } from './tracks/triggers.js'
-export { onArtistProfileCreate, onDjProfileCreate } from './profiles/triggers.js'
 export { adminSeedSubscriptionPlans } from './admin/seedPlans.js'
-export { adminBackfillEntitlements } from './admin/backfillEntitlements.js'
 export { sendBulkDjOutreach } from './messaging/bulkOutreach.js'

@@ -12,7 +12,9 @@ import { TrackCard } from '@/components/music/TrackCard'
 import { ErrorState, LoadingState } from '@/components/common/StateViews'
 import { UpgradePrompt } from '@/components/common/UpgradePrompt'
 import { BrandMark } from '@/components/common/BrandMark'
+import { ShareButton } from '@/components/common/ShareButton'
 import { formatCount } from '@/utils/format'
+import { artistShareUrl } from '@/utils/shareLinks'
 import type { ArtistProfile, ArtistPost } from '@/types/artist'
 import type { TrackDoc } from '@/types/track'
 
@@ -130,6 +132,11 @@ export function ArtistPublicProfilePage() {
           <div className="flex shrink-0 gap-2 self-stretch sm:self-auto">
             <FollowButton artistId={artist.artistId} />
             <SupportButton />
+            <ShareButton
+              url={artistShareUrl(artist.slug)}
+              title={artist.name}
+              text={`Check out ${artist.name} on Wavelength`}
+            />
           </div>
           </div>
         </section>

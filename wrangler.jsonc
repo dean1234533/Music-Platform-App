@@ -2,11 +2,16 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "music-platform-app",
   "compatibility_date": "2026-09-07",
+  "main": "worker/share-og.ts",
   "observability": {
     "enabled": true
   },
   "assets": {
     "directory": "dist",
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
+    "binding": "ASSETS"
+  },
+  "vars": {
+    "FIREBASE_PROJECT_ID": "music-platform-app-c45ac"
   }
 }

@@ -5,7 +5,7 @@ import type { ConversationDoc, MessageDoc } from '@/types/conversation'
 
 export const sendMessage = callable<{ conversationId: string; text: string }, { messageId: string }>('sendMessage')
 
-/** Artist Pro+ only — server enforces the bulkDjOutreach entitlement and the opted-in-DJs-only allowlist. */
+/** Promotional outreach is restricted to DJs who explicitly opted in. */
 export const sendBulkDjOutreach = callable<{ trackId: string; message: string }, { ok: boolean; sentCount: number }>(
   'sendBulkDjOutreach',
 )

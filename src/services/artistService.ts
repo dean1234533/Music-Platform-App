@@ -87,11 +87,6 @@ export async function createArtistProfile(
       supporterCount: 0,
       djAllowRequests: 'verified_only',
       trackCount: 0,
-      // Safe placeholder — corrected immediately by the onArtistProfileCreate
-      // trigger, which mirrors the artist's actual free-tier limit. Starting
-      // at 0 fails uploads closed (not open) during that brief window.
-      trackLimit: 0,
-      planTier: 'free',
       perks: [],
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),

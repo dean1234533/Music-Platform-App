@@ -38,13 +38,13 @@ export function PriceCard({ index, title, price, suffix, description, features, 
   }, [])
 
   return (
-    <div ref={cardRef} className={`price-card-reveal price-card-delay-${index} ${visible ? 'is-visible' : ''} relative flex min-h-[28rem] flex-col rounded-[1.5rem] p-7 ${featured ? 'bg-brand-500 text-surface-0 shadow-[0_30px_90px_rgba(200,243,63,.12)]' : 'premium-panel'}`}>
-      {featured ? <span className="absolute right-5 top-5 rounded-full bg-black/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em]">Most meaningful</span> : null}
-      <p className={`text-xs font-bold uppercase tracking-[0.16em] ${featured ? 'text-surface-0/60' : 'text-ink-3'}`}>{title}</p>
-      <p className="mt-6 text-5xl font-medium tracking-[-0.055em]">{price}<span className={`ml-1 text-sm font-medium tracking-normal ${featured ? 'text-surface-0/60' : 'text-ink-2'}`}>{suffix}</span></p>
-      <p className={`mt-4 text-sm leading-6 ${featured ? 'text-surface-0/70' : 'text-ink-2'}`}>{description}</p>
+    <div ref={cardRef} className={`price-card-reveal price-card-delay-${index} ${visible ? 'is-visible' : ''} relative flex min-h-[28rem] flex-col rounded-[1.5rem] p-7 ${featured ? 'border border-brand-400/20 bg-[radial-gradient(circle_at_80%_0%,rgba(200,243,63,.14),transparent_18rem),linear-gradient(145deg,#182016,#0d120c)] text-ink-0 shadow-[0_30px_90px_rgba(200,243,63,.07)] md:border-0 md:bg-brand-500 md:text-surface-0 md:shadow-[0_30px_90px_rgba(200,243,63,.12)]' : 'premium-panel'}`}>
+      {featured ? <span className="absolute right-5 top-5 rounded-full bg-brand-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-brand-400 md:bg-black/10 md:text-surface-0">Most meaningful</span> : null}
+      <p className={`text-xs font-bold uppercase tracking-[0.16em] ${featured ? 'text-brand-400/75 md:text-surface-0/60' : 'text-ink-3'}`}>{title}</p>
+      <p className="mt-6 text-5xl font-medium tracking-[-0.055em]">{price}<span className={`ml-1 text-sm font-medium tracking-normal ${featured ? 'text-ink-2 md:text-surface-0/60' : 'text-ink-2'}`}>{suffix}</span></p>
+      <p className={`mt-4 text-sm leading-6 ${featured ? 'text-ink-2 md:text-surface-0/70' : 'text-ink-2'}`}>{description}</p>
       <ul className="mt-8 space-y-3">{features.map((feature) => <li key={feature} className="flex items-center gap-3 text-sm"><Check className="h-4 w-4 shrink-0" />{feature}</li>)}</ul>
-      <Link to={to} className={`mt-auto block rounded-full px-5 py-3 text-center text-sm font-semibold transition ${featured ? 'bg-surface-0 text-ink-0 hover:bg-surface-2' : 'bg-ink-0 text-surface-0 hover:bg-brand-400'}`}>{cta}</Link>
+      <Link to={to} className={`mt-auto block rounded-full px-5 py-3 text-center text-sm font-semibold transition ${featured ? 'bg-brand-500 text-surface-0 hover:bg-brand-400 md:bg-surface-0 md:text-ink-0 md:hover:bg-surface-2' : 'bg-ink-0 text-surface-0 hover:bg-brand-400'}`}>{cta}</Link>
     </div>
   )
 }

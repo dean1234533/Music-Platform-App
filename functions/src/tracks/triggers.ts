@@ -4,7 +4,7 @@ import { db } from '../admin.js'
 
 /**
  * trackCount is denormalised onto artistProfiles so the tracks/{trackId}
- * create rule can compare it against trackLimit without resolving a plan.
+ * artist dashboards can show an accurate active-track count.
  * Exact mirror of the followerCount pattern in follows.ts.
  */
 export const onTrackCreate = onDocumentCreated('tracks/{trackId}', async (event) => {

@@ -12,10 +12,10 @@ export interface SubscriptionPlan {
   /** Null for free plans — there's no Stripe Price for a £0 tier. */
   stripePriceId: string | null
   active: boolean
-  /** Exactly one plan per role should have this set — the entitlement fallback when no active subscription exists. */
+  /** The Free Listener fallback when no active supporter subscription exists. */
   isDefaultFree: boolean
   features: Partial<Record<PlanFeatureKey, boolean>>
-  /** -1 means unlimited (see UNLIMITED sentinel in types/entitlements.ts). */
+  /** Optional cap for monthly artist allocation, bounded by the configured artist share. */
   limits: Partial<Record<PlanLimitKey, number>>
   displayOrder: number
   recommended: boolean

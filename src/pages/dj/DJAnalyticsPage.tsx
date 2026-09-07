@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeRequestsForDj, listDjAgreements, listDjDownloadLogs } from '@/services/licenceService'
-import { TierRoute } from '@/components/auth/TierRoute'
 import { LoadingState } from '@/components/common/StateViews'
 import { formatCurrency } from '@/utils/format'
 import type { DownloadLogDoc, LicenceAgreementDoc, LicenceRequestDoc } from '@/types/licence'
@@ -119,9 +118,5 @@ function BarList({ rows }: { rows: [string, number][] }) {
 }
 
 export function DJAnalyticsPage() {
-  return (
-    <TierRoute role="dj" requiredFeature="professionalAnalytics" reason="Professional analytics is a DJ Pro+ feature." cta="Upgrade to DJ Pro+">
-      <DJAnalyticsContent />
-    </TierRoute>
-  )
+  return <DJAnalyticsContent />
 }

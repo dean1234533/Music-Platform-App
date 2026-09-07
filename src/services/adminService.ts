@@ -4,7 +4,7 @@ import { callable } from '@/lib/callable'
 import type { UserProfile } from '@/types/user'
 import type { CopyrightClaimDoc, ReportDoc, VerificationRequestDoc } from '@/types/moderation'
 import type { SubscriptionPlan } from '@/types/platformSettings'
-import type { PlanFeatureKey, PlanLimitKey, PlanRole, PlanTier } from '@/types/entitlements'
+import type { PlanFeatureKey, PlanLimitKey, PlanTier } from '@/types/entitlements'
 
 export async function listUsers(count = 50): Promise<UserProfile[]> {
   const snap = await getDocs(query(collection(db, 'users'), limit(count)))
@@ -30,7 +30,7 @@ export async function listCopyrightClaims(): Promise<CopyrightClaimDoc[]> {
 }
 
 export async function listAllSubscriptionPlans(): Promise<SubscriptionPlan[]> {
-  const snap = await getDocs(collection(db, 'subscriptionPlans'))
+  const snap = await getDocs(query(collection(db, 'subscriptionPlans'), where('role', '==', 'fan')))
   return snap.docs.map((d) => d.data() as SubscriptionPlan)
 }
 
@@ -54,7 +54,7 @@ export const adminUpsertSubscriptionPlan = callable<
   {
     planId: string
     name: string
-    role: PlanRole
+    role: 'fan'
     tier: PlanTier
     priceMinor: number
     currency: string
@@ -72,10 +72,6 @@ export const adminUpsertSubscriptionPlan = callable<
 export const adminUpdatePlatformSettings = callable<Record<string, unknown>, { ok: boolean }>(
   'adminUpdatePlatformSettings',
 )
-export const adminSeedSubscriptionPlans = callable<void, { ok: boolean; seeded: string[]; skipped: string[] }>(
+export const adminSeedSubscriptionPlans = callable<void, { ok: boolean; seeded: string[]; skipped: string[]; retired: string[] }>(
   'adminSeedSubscriptionPlans',
 )
-export const adminBackfillEntitlements = callable<
-  void,
-  { ok: boolean; artistsUpdated: number; djsUpdated: number; errors: string[] }
->('adminBackfillEntitlements')

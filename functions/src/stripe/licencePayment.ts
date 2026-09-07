@@ -1,6 +1,7 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { db } from '../admin.js'
 import { getStripe, stripeSecretKey } from './client.js'
+import { getPlatformSettings } from '../platformSettings.js'
 
 export const createLicencePaymentSession = onCall({ secrets: [stripeSecretKey] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
@@ -29,6 +30,15 @@ export const createLicencePaymentSession = onCall({ secrets: [stripeSecretKey] }
 
   const trackSnap = await db.collection('tracks').doc(agreement.trackId).get()
   const trackTitle = trackSnap.data()?.title ?? 'Track licence'
+  const settings = await getPlatformSettings()
+  const platformFeeMinor = Math.round(agreement.licenceFeeMinor * (settings.djServiceFeePercent / 100))
+  const artistNetMinor = agreement.licenceFeeMinor - platformFeeMinor
+
+  await agreementRef.update({
+    platformFeePercent: settings.djServiceFeePercent,
+    platformFeeMinor,
+    artistNetMinor,
+  })
 
   const stripe = getStripe()
   const session = await stripe.checkout.sessions.create({

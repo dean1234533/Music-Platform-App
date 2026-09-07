@@ -4,8 +4,6 @@ import { listArtistsSeekingDJExposure } from '@/services/discoveryService'
 import type { DjTrackFilters } from '@/services/trackService'
 import { TrackCard } from '@/components/music/TrackCard'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
-import { UpgradePrompt } from '@/components/common/UpgradePrompt'
-import { useEntitlement } from '@/hooks/useEntitlements'
 import { CAMELOT_KEYS, GENRES, MOODS } from '@/constants/musicTaxonomy'
 import type { LicenceMode, TrackDoc } from '@/types/track'
 
@@ -17,17 +15,12 @@ const LICENCE_OPTIONS: { value: LicenceMode; label: string }[] = [
 ]
 
 export function DJDiscoverPage() {
-  const { hasFeature, status } = useEntitlement('dj')
   const [filters, setFilters] = useState<DjTrackFilters>({})
   const [tracks, setTracks] = useState<TrackDoc[] | null>(null)
 
-  const canFilter = hasFeature('advancedFiltering')
-  const canSeePrivatePools = hasFeature('privatePromoPools')
-
   useEffect(() => {
-    if (status === 'loading') return
-    void listArtistsSeekingDJExposure(30, canFilter ? filters : {}, canSeePrivatePools, true).then(setTracks)
-  }, [filters, canFilter, canSeePrivatePools, status])
+    void listArtistsSeekingDJExposure(30, filters, true, true).then(setTracks)
+  }, [filters])
 
   return (
     <div className="flex flex-col gap-6">
@@ -36,8 +29,7 @@ export function DJDiscoverPage() {
         <p className="mt-1 text-sm text-ink-2">Tracks artists have opened up for DJ promotion.</p>
       </div>
 
-      {canFilter ? (
-        <div className="grid grid-cols-2 gap-3 rounded-xl border border-surface-border bg-surface-1 p-4 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 rounded-xl border border-surface-border bg-surface-1 p-4 sm:grid-cols-3 lg:grid-cols-6">
           <select
             value={filters.genre ?? ''}
             onChange={(e) => setFilters((f) => ({ ...f, genre: e.target.value || undefined }))}
@@ -84,14 +76,7 @@ export function DJDiscoverPage() {
             onChange={(e) => setFilters((f) => ({ ...f, bpmMax: e.target.value ? Number(e.target.value) : undefined }))}
             className="rounded-lg border border-surface-border bg-surface-2 px-3 py-2 text-sm text-ink-0 outline-none focus:border-brand-500"
           />
-        </div>
-      ) : (
-        <UpgradePrompt
-          role="dj"
-          reason="Filter by BPM, key, genre, mood, and licence type."
-          cta="Upgrade to DJ Pro"
-        />
-      )}
+      </div>
 
       {tracks === null ? (
         <LoadingState />

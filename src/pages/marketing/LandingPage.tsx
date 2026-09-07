@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Headphones, Menu, Mic2, Radio, Sparkles, X } from 'lucide-react'
 import { BrandMark } from '@/components/common/BrandMark'
 import { PriceCard } from '@/components/marketing/PriceCard'
+import { listActiveSubscriptionPlansForRole } from '@/services/platformSettingsService'
+import { formatCurrency } from '@/utils/format'
+import type { SubscriptionPlan } from '@/types/platformSettings'
 
 const roles = [
   { icon: Headphones, label: 'Listen', title: 'Find the signal', copy: 'Independent releases, shaped around your taste—not an opaque chart.', to: '/sign-up?role=fan' },
@@ -18,6 +21,13 @@ const steps = [
 
 export function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [supporterPlan, setSupporterPlan] = useState<SubscriptionPlan | null>(null)
+
+  useEffect(() => {
+    void listActiveSubscriptionPlansForRole('fan').then((plans) => {
+      setSupporterPlan(plans.find((plan) => plan.priceMinor > 0) ?? null)
+    })
+  }, [])
 
   return (
     <>
@@ -149,12 +159,12 @@ export function LandingPage() {
           </div>
           <div className="price-grid mx-auto mt-12 grid max-w-5xl gap-3 md:grid-cols-3">
             <PriceCard index={0} title="Listener" price="Free" description="Discover, follow, save, and build playlists." features={['Full discovery catalogue', 'Personal library and playlists', 'Follow independent artists']} cta="Create free account" to="/sign-up?role=fan" />
-            <PriceCard index={1} featured title="Supporter" price="£10" suffix="/month" description="Turn listening into direct artist support." features={['Everything in Listener', 'Allocate support each month', 'Access supporter-only posts']} cta="Become a supporter" to="/sign-up?role=fan" />
+            <PriceCard index={1} featured title={supporterPlan?.name ?? 'Supporter'} price={supporterPlan ? formatCurrency(supporterPlan.priceMinor, supporterPlan.currency) : 'Flexible'} suffix={supporterPlan ? `/${supporterPlan.interval}` : undefined} description="Turn listening into direct artist support." features={['Everything in Listener', 'Allocate support each month', 'Access supporter-only posts']} cta="Become a supporter" to="/sign-up?role=fan" />
             <PriceCard index={2} title="Artist & DJ" price="Free" description="Publish, connect, and agree opportunities directly." features={['Artist profiles and releases', 'DJ discovery and requests', 'Documented licensing flow']} cta="Join the platform" to="/sign-up" />
           </div>
           <p className="mx-auto mt-6 max-w-2xl text-center text-xs leading-5 text-ink-3">Licensing fees are agreed directly between artists and DJs. Applicable platform fees are shown before payment or payout.</p>
           <p className="mt-4 text-center">
-            <Link to="/pricing" className="text-sm font-medium text-brand-400 transition hover:text-brand-300">See full pricing for artists &amp; DJs →</Link>
+            <Link to="/pricing" className="text-sm font-medium text-brand-400 transition hover:text-brand-300">See all pricing →</Link>
           </p>
         </section>
 

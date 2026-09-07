@@ -1,5 +1,4 @@
 import type { Timestamp } from 'firebase/firestore'
-import type { PlanTier } from './entitlements'
 
 export interface SocialLinks {
   website?: string
@@ -31,11 +30,7 @@ export interface ArtistProfile {
   djAllowRequests: DJRequestPolicy
   /** Server-maintained running total (Cloud Function trigger on track create/delete). */
   trackCount: number
-  /** Server-mirrored from the artist's resolved plan limit; -1 means unlimited. Re-mirrored on every subscription lifecycle event. */
-  trackLimit: number
-  /** Server-mirrored from the artist's resolved plan tier. */
-  planTier: PlanTier
-  /** Free-text perks the artist offers Super Supporters (e.g. presale access, merch discount) — not platform-enforced. */
+  /** Free-text benefits the artist offers paying supporters. */
   perks: string[]
   createdAt: Timestamp | null
   updatedAt: Timestamp | null

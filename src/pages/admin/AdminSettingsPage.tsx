@@ -1,54 +1,24 @@
 import { useEffect, useState } from 'react'
 import {
-  adminBackfillEntitlements,
   adminSeedSubscriptionPlans,
   adminUpdatePlatformSettings,
   adminUpsertSubscriptionPlan,
   listAllSubscriptionPlans,
 } from '@/services/adminService'
+import { getPlatformSettings } from '@/services/platformSettingsService'
 import { Button } from '@/components/common/Button'
 import { Input, Label } from '@/components/common/Input'
 import { formatCurrency } from '@/utils/format'
 import type { SubscriptionPlan } from '@/types/platformSettings'
-import { PLAN_ROLES, PLAN_TIERS, type PlanFeatureKey, type PlanLimitKey, type PlanRole, type PlanTier } from '@/types/entitlements'
+import { PLAN_TIERS, type PlanFeatureKey, type PlanLimitKey, type PlanTier } from '@/types/entitlements'
 
-const FEATURE_KEYS_BY_ROLE: Record<PlanRole, PlanFeatureKey[]> = {
-  fan: ['supporterContent', 'earlyAccess', 'polls', 'artistDefinedPerks'],
-  artist: [
-    'unlimitedTracks',
-    'albumsEps',
-    'scheduledReleases',
-    'supporterOnlyTracks',
-    'advancedAnalytics',
-    'fixedCustomDjPricing',
-    'teamAccess',
-    'bulkDjOutreach',
-    'privatePromoReleases',
-    'releaseEmbargoes',
-    'exportableAnalytics',
-  ],
-  dj: [
-    'unlimitedDjRequests',
-    'crates',
-    'verifiedDjEligible',
-    'advancedFiltering',
-    'privatePromoPools',
-    'advancedCrates',
-    'professionalAnalytics',
-    'priorityAccess',
-  ],
-}
-
-const LIMIT_KEYS_BY_ROLE: Record<PlanRole, PlanLimitKey[]> = {
-  fan: ['supportAllocationCapMinor'],
-  artist: ['maxActiveTracks'],
-  dj: ['djRequestsPerMonth'],
-}
+const FAN_FEATURE_KEYS: PlanFeatureKey[] = ['supporterContent', 'earlyAccess', 'polls', 'artistDefinedPerks']
+const FAN_LIMIT_KEYS: PlanLimitKey[] = ['supportAllocationCapMinor']
 
 interface PlanFormState {
   planId: string
   name: string
-  role: PlanRole
+  role: 'fan'
   tier: PlanTier
   price: string
   currency: string
@@ -82,13 +52,21 @@ export function AdminSettingsPage() {
   const [form, setForm] = useState<PlanFormState>(EMPTY_FORM)
   const [savingPlan, setSavingPlan] = useState(false)
   const [seeding, setSeeding] = useState(false)
-  const [backfilling, setBackfilling] = useState(false)
-  const [feeForm, setFeeForm] = useState({ platformFeePercent: '15', artistAllocationPercent: '85', djServiceFeePercent: '10', minimumPayoutMinor: '2000' })
+  const [feeForm, setFeeForm] = useState({ platformFeePercent: '', artistAllocationPercent: '', djServiceFeePercent: '', minimumPayoutMinor: '' })
   const [savingFees, setSavingFees] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)
 
   useEffect(() => {
     void listAllSubscriptionPlans().then((rows) => setPlans(rows.sort((a, b) => a.displayOrder - b.displayOrder)))
+    void getPlatformSettings().then((settings) => {
+      if (!settings) return
+      setFeeForm({
+        platformFeePercent: String(settings.platformFeePercent),
+        artistAllocationPercent: String(settings.artistAllocationPercent),
+        djServiceFeePercent: String(settings.djServiceFeePercent),
+        minimumPayoutMinor: String(settings.minimumPayoutMinor),
+      })
+    })
   }, [])
 
   async function refreshPlans() {
@@ -102,7 +80,7 @@ export function AdminSettingsPage() {
     try {
       const priceMinor = Math.round(Number(form.price) * 100)
       const limits: Partial<Record<PlanLimitKey, number>> = {}
-      for (const key of LIMIT_KEYS_BY_ROLE[form.role]) {
+      for (const key of FAN_LIMIT_KEYS) {
         const raw = form.limits[key]
         if (raw !== undefined && raw !== '') limits[key] = Number(raw)
       }
@@ -136,24 +114,10 @@ export function AdminSettingsPage() {
     setSaved(null)
     try {
       const result = await adminSeedSubscriptionPlans()
-      setSaved(`Seeded ${result.seeded.length} plan(s)${result.skipped.length ? `, skipped ${result.skipped.length} already present` : ''}.`)
+      setSaved(`Synced ${result.seeded.length} fan plan(s) and retired ${result.retired.length} legacy creator plan(s).`)
       await refreshPlans()
     } finally {
       setSeeding(false)
-    }
-  }
-
-  async function handleBackfill() {
-    setBackfilling(true)
-    setSaved(null)
-    try {
-      const result = await adminBackfillEntitlements()
-      setSaved(
-        `Re-synced ${result.artistsUpdated} artist(s) and ${result.djsUpdated} DJ(s)` +
-          (result.errors.length ? ` — ${result.errors.length} error(s), first: ${result.errors[0]}` : '.'),
-      )
-    } finally {
-      setBackfilling(false)
     }
   }
 
@@ -183,29 +147,21 @@ export function AdminSettingsPage() {
           <h2 className="text-lg font-semibold text-ink-0">Subscription plans</h2>
           <div className="flex gap-2">
             <Button size="sm" variant="secondary" onClick={handleSeed} loading={seeding}>
-              Seed default 9 plans
-            </Button>
-            <Button size="sm" variant="secondary" onClick={handleBackfill} loading={backfilling}>
-              Re-sync existing artist/DJ limits
+              Sync fan plan templates
             </Button>
           </div>
         </div>
         <p className="mb-3 text-xs text-ink-3">
-          Run "Seed" first if plans don't exist yet, then "Re-sync" to fix any artist/DJ profile
-          created before entitlements were added (their track/request limits won't update on their
-          own — new profiles do this automatically).
+          Only listener subscriptions are billed. Artist and DJ accounts have full core access without a recurring fee.
         </p>
 
-        {PLAN_ROLES.map((role) => (
-          <div key={role} className="mb-4">
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-3">{role}</h3>
+          <div className="mb-4">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-3">Fan subscriptions</h3>
             <div className="flex flex-col divide-y divide-surface-border rounded-xl border border-surface-border">
-              {plans.filter((p) => p.role === role).length === 0 ? (
+              {plans.length === 0 ? (
                 <p className="px-4 py-3 text-sm text-ink-3">No plans yet.</p>
               ) : (
-                plans
-                  .filter((p) => p.role === role)
-                  .map((plan) => (
+                plans.map((plan) => (
                     <div key={plan.planId} className="flex items-center justify-between px-4 py-3 text-sm">
                       <span className="text-ink-0">
                         {plan.name}
@@ -221,22 +177,9 @@ export function AdminSettingsPage() {
               )}
             </div>
           </div>
-        ))}
 
         <div className="flex flex-col gap-4 rounded-xl border border-surface-border bg-surface-1 p-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div>
-              <Label>Role</Label>
-              <select
-                value={form.role}
-                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as PlanRole, features: {}, limits: {} }))}
-                className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 outline-none focus:border-brand-500"
-              >
-                {PLAN_ROLES.map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </select>
-            </div>
             <div>
               <Label>Tier</Label>
               <select
@@ -291,7 +234,7 @@ export function AdminSettingsPage() {
                 onChange={(e) => setForm((f) => ({ ...f, isDefaultFree: e.target.checked }))}
                 className="h-4 w-4 accent-brand-500"
               />
-              Default free plan for this role
+              Default free listener plan
             </label>
             <label className="flex items-center gap-2 text-sm text-ink-1">
               <input
@@ -307,7 +250,7 @@ export function AdminSettingsPage() {
           <div>
             <Label>Features</Label>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {FEATURE_KEYS_BY_ROLE[form.role].map((key) => (
+              {FAN_FEATURE_KEYS.map((key) => (
                 <label key={key} className="flex items-center gap-2 text-sm text-ink-1">
                   <input
                     type="checkbox"
@@ -324,7 +267,7 @@ export function AdminSettingsPage() {
           <div>
             <Label>Limits (use -1 for unlimited)</Label>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {LIMIT_KEYS_BY_ROLE[form.role].map((key) => (
+              {FAN_LIMIT_KEYS.map((key) => (
                 <div key={key}>
                   <Label>{key}</Label>
                   <Input

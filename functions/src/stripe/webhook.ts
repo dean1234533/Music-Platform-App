@@ -5,13 +5,12 @@ import { FieldValue } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
 import { getPlatformSettings } from '../platformSettings.js'
 import { getStripe, stripeSecretKey, stripeWebhookSecret } from './client.js'
-import { mapSubscriptionStatus, mirrorResolvedLimits, PLAN_ROLES, type PlanRole } from '../entitlements.js'
+import { mapSubscriptionStatus } from '../entitlements.js'
 
-function resolveRole(subscription: Stripe.Subscription): PlanRole {
+function isFanSubscription(subscription: Stripe.Subscription): boolean {
   const role = subscription.metadata?.role
-  // Pre-tiering subscriptions (created before this rollout) have no `role`
-  // metadata — they were always fan subscriptions, so default there.
-  return role && (PLAN_ROLES as readonly string[]).includes(role) ? (role as PlanRole) : 'fan'
+  // Pre-role subscriptions were fan subscriptions. Explicit legacy creator roles are ignored.
+  return !role || role === 'fan'
 }
 
 async function findUidByCustomerId(customerId: string): Promise<string | null> {
@@ -21,6 +20,10 @@ async function findUidByCustomerId(customerId: string): Promise<string | null> {
 }
 
 async function upsertSubscriptionRecord(subscription: Stripe.Subscription) {
+  if (!isFanSubscription(subscription)) {
+    logger.info('Ignoring retired creator subscription', { subscriptionId: subscription.id, role: subscription.metadata?.role })
+    return
+  }
   const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
   const uid = subscription.metadata?.firebaseUid || (await findUidByCustomerId(customerId))
   if (!uid) {
@@ -28,7 +31,7 @@ async function upsertSubscriptionRecord(subscription: Stripe.Subscription) {
     return
   }
 
-  const role = resolveRole(subscription)
+  const role = 'fan'
   const status = mapSubscriptionStatus(subscription.status)
   const item = subscription.items.data[0]
 
@@ -58,16 +61,14 @@ async function upsertSubscriptionRecord(subscription: Stripe.Subscription) {
     })
   }
 
-  // Re-resolves the plan now that the subscription doc above is fresh, and
-  // mirrors trackLimit/planTier (artist) or planTier (dj). Covers upgrades,
-  // downgrades, and cancellations alike, since all three fire this handler.
-  await mirrorResolvedLimits(uid, role)
 }
 
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
   if (!invoice.billing_reason || !['subscription_create', 'subscription_cycle', 'subscription_update'].includes(invoice.billing_reason)) {
     return
   }
+  const subscriptionRole = invoice.parent?.subscription_details?.metadata?.role
+  if (subscriptionRole && subscriptionRole !== 'fan') return
   const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id
   if (!customerId) return
   const uid = await findUidByCustomerId(customerId)
@@ -82,15 +83,18 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   const settings = await getPlatformSettings()
   const batch = db.batch()
 
-  for (const [artistId, grossMinor] of entries) {
+  for (const [artistId, artistNetMinor] of entries) {
     // Idempotency key: retried webhooks for the same invoice/artist must not double-pay.
     const txId = `${invoice.id}_${artistId}`
     const txRef = db.collection('transactions').doc(txId)
     const existing = await txRef.get()
     if (existing.exists) continue
 
-    const platformFeeMinor = Math.round(grossMinor * (settings.platformFeePercent / 100))
-    const netMinor = grossMinor - platformFeeMinor
+    const grossMinor = settings.artistAllocationPercent > 0
+      ? Math.round(artistNetMinor / (settings.artistAllocationPercent / 100))
+      : 0
+    const netMinor = artistNetMinor
+    const platformFeeMinor = Math.max(0, grossMinor - netMinor)
 
     batch.set(txRef, {
       transactionId: txId,
@@ -154,10 +158,11 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   if (!snap.exists || snap.data()?.paidAt) return
   const agreement = snap.data()!
 
-  const settings = await getPlatformSettings()
   const grossMinor = agreement.licenceFeeMinor as number
-  const platformFeeMinor = Math.round(grossMinor * (settings.djServiceFeePercent / 100))
-  const netMinor = grossMinor - platformFeeMinor
+  const platformFeeMinor = typeof agreement.platformFeeMinor === 'number'
+    ? agreement.platformFeeMinor
+    : Math.round(grossMinor * ((await getPlatformSettings()).djServiceFeePercent / 100))
+  const netMinor = typeof agreement.artistNetMinor === 'number' ? agreement.artistNetMinor : grossMinor - platformFeeMinor
   const txId = `licence_${agreementId}`
 
   const batch = db.batch()

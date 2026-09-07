@@ -1,7 +1,6 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { db } from '../admin.js'
-import { userHasRole } from '../roles.js'
-import { PLAN_ROLES, type PlanDoc, type PlanRole } from '../entitlements.js'
+import type { PlanDoc } from '../entitlements.js'
 import { getStripe, stripeSecretKey } from './client.js'
 
 /**
@@ -14,19 +13,13 @@ export const createCheckoutSession = onCall({ secrets: [stripeSecretKey] }, asyn
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   const uid = request.auth.uid
   const planId = request.data?.planId as string | undefined
-  const role = request.data?.role as PlanRole | undefined
+  const role = request.data?.role as string | undefined
   const successUrl = request.data?.successUrl as string | undefined
   const cancelUrl = request.data?.cancelUrl as string | undefined
   if (!planId || !role || !successUrl || !cancelUrl) {
     throw new HttpsError('invalid-argument', 'planId, role, successUrl, and cancelUrl are required.')
   }
-  if (!(PLAN_ROLES as readonly string[]).includes(role)) {
-    throw new HttpsError('invalid-argument', 'Invalid role.')
-  }
-  // The fan role is implicit/always available; artist/dj tiers require the user already holds that role.
-  if (role !== 'fan' && !(await userHasRole(uid, role))) {
-    throw new HttpsError('failed-precondition', `You need a ${role} profile before subscribing to a ${role} plan.`)
-  }
+  if (role !== 'fan') throw new HttpsError('invalid-argument', 'Only fan supporter subscriptions are available.')
 
   const planSnap = await db.collection('subscriptionPlans').doc(planId).get()
   if (!planSnap.exists) throw new HttpsError('not-found', 'Subscription plan not found.')

@@ -33,6 +33,9 @@ export const adminUpsertSubscriptionPlan = onCall(async (request) => {
   if (!(PLAN_ROLES as readonly string[]).includes(role)) {
     throw new HttpsError('invalid-argument', `role must be one of ${PLAN_ROLES.join(', ')}.`)
   }
+  if (priceMinor < 0 || !Number.isInteger(priceMinor)) {
+    throw new HttpsError('invalid-argument', 'priceMinor must be a non-negative integer.')
+  }
   if (!(PLAN_TIERS as readonly string[]).includes(tier)) {
     throw new HttpsError('invalid-argument', `tier must be one of ${PLAN_TIERS.join(', ')}.`)
   }
@@ -90,6 +93,17 @@ export const adminUpdatePlatformSettings = onCall(async (request) => {
     maxUploadSizeMB,
     supportedAudioTypes,
   } = request.data ?? {}
+
+  const percentages = [platformFeePercent, artistAllocationPercent, djServiceFeePercent]
+  if (percentages.some((value) => typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100)) {
+    throw new HttpsError('invalid-argument', 'All fee percentages must be numbers from 0 to 100.')
+  }
+  if (platformFeePercent + artistAllocationPercent !== 100) {
+    throw new HttpsError('invalid-argument', 'Platform share and artist allocation must total 100%.')
+  }
+  if (typeof minimumPayoutMinor !== 'number' || !Number.isInteger(minimumPayoutMinor) || minimumPayoutMinor < 0) {
+    throw new HttpsError('invalid-argument', 'minimumPayoutMinor must be a non-negative integer.')
+  }
 
   const update: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() }
   if (typeof platformFeePercent === 'number') update.platformFeePercent = platformFeePercent

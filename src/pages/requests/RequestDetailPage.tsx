@@ -12,6 +12,7 @@ import {
 } from '@/services/licenceService'
 import { sendMessage, subscribeMessages } from '@/services/messagingService'
 import { getTrack } from '@/services/trackService'
+import { getPlatformSettings } from '@/services/platformSettingsService'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { ProposeAgreementModal } from '@/components/licence/ProposeAgreementModal'
 import { Button } from '@/components/common/Button'
@@ -20,6 +21,7 @@ import { formatCurrency } from '@/utils/format'
 import type { LicenceAgreementDoc, LicenceRequestDoc } from '@/types/licence'
 import type { MessageDoc } from '@/types/conversation'
 import type { TrackDoc } from '@/types/track'
+import type { PlatformSettings } from '@/types/platformSettings'
 
 const STATUS_LABEL: Record<string, string> = {
   submitted: 'New',
@@ -45,6 +47,7 @@ export function RequestDetailPage() {
   const [showProposeModal, setShowProposeModal] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const artist = useArtistSummary(request?.artistId ?? null)
@@ -71,6 +74,8 @@ export function RequestDetailPage() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
   }, [messages])
+
+  useEffect(() => { void getPlatformSettings().then(setPlatformSettings) }, [])
 
   if (request === undefined) return <LoadingState label="Loading request…" />
   if (request === null || !firebaseUser) return <EmptyState title="Request not found" />
@@ -125,6 +130,13 @@ export function RequestDetailPage() {
   }
 
   const hasAcceptedAlready = isArtist ? Boolean(agreement?.artistAcceptedAt) : Boolean(agreement?.djAcceptedAt)
+  const feePercent = agreement?.platformFeePercent ?? platformSettings?.djServiceFeePercent
+  const platformFeeMinor = agreement?.platformFeeMinor ?? (
+    agreement && feePercent !== undefined ? Math.round(agreement.licenceFeeMinor * (feePercent / 100)) : undefined
+  )
+  const artistNetMinor = agreement?.artistNetMinor ?? (
+    agreement && platformFeeMinor !== undefined ? agreement.licenceFeeMinor - platformFeeMinor : undefined
+  )
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
@@ -175,6 +187,18 @@ export function RequestDetailPage() {
             <Field label="Commercial use" value={agreement.commercialUse ? 'Yes' : 'No'} />
           </dl>
           {agreement.additionalTerms ? <p className="mt-3 text-xs text-ink-2">{agreement.additionalTerms}</p> : null}
+
+          {agreement.licenceFeeMinor > 0 && platformFeeMinor !== undefined && artistNetMinor !== undefined ? (
+            <div className="mt-4 rounded-xl border border-white/10 bg-surface-2 p-4 text-sm">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-3">Payment breakdown</p>
+              <div className="space-y-2">
+                <div className="flex justify-between text-ink-1"><span>DJ pays</span><strong>{formatCurrency(agreement.licenceFeeMinor, agreement.currency)}</strong></div>
+                <div className="flex justify-between text-ink-2"><span>Platform transaction fee ({feePercent}%)</span><span>−{formatCurrency(platformFeeMinor, agreement.currency)}</span></div>
+                <div className="flex justify-between border-t border-white/10 pt-2 text-ink-0"><span>Artist receives</span><strong>{formatCurrency(artistNetMinor, agreement.currency)}</strong></div>
+              </div>
+              <p className="mt-3 text-xs leading-5 text-ink-3">The service fee is deducted from the agreed licence amount; the DJ is not charged an extra fee.</p>
+            </div>
+          ) : null}
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {agreement.status === 'pending' && !hasAcceptedAlready ? (

@@ -2,7 +2,6 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
 import { userHasRole } from '../roles.js'
-import { getPlanLimit, hasFeature, isSameCalendarMonth, UNLIMITED } from '../entitlements.js'
 
 const INTENDED_USES = [
   'live_club_performance',
@@ -40,10 +39,6 @@ export const submitLicenceRequest = onCall(async (request) => {
   if (embargoUntil && embargoUntil.toMillis() > Date.now()) {
     throw new HttpsError('failed-precondition', 'This release is under embargo and not yet available for requests.')
   }
-  if (track.djPromoTier === 'pro_plus_only' && !(await hasFeature(djId, 'dj', 'privatePromoPools'))) {
-    throw new HttpsError('permission-denied', 'This release is in a private promo pool — upgrade to DJ Pro+ for access.')
-  }
-
   const artistId = track.artistId as string
   const artistSnap = await db.collection('artistProfiles').doc(artistId).get()
   const policy = (artistSnap.data()?.djAllowRequests as string) ?? 'disabled'
@@ -51,7 +46,6 @@ export const submitLicenceRequest = onCall(async (request) => {
     throw new HttpsError('failed-precondition', 'This artist is not accepting DJ requests right now.')
   }
 
-  const requestLimit = await getPlanLimit(djId, 'dj', 'djRequestsPerMonth')
   const djProfileRef = db.collection('djProfiles').doc(djId)
   const requestRef = db.collection('licenceRequests').doc()
   const conversationRef = db.collection('conversations').doc()
@@ -67,16 +61,6 @@ export const submitLicenceRequest = onCall(async (request) => {
       if (djData.verificationStatus !== 'verified') {
         throw new HttpsError('permission-denied', 'This artist only accepts requests from verified DJs.')
       }
-    }
-
-    const resetAt = (djData.requestsMonthResetAt as Timestamp | null) ?? null
-    const inCurrentMonth = isSameCalendarMonth(resetAt)
-    const effectiveCount = inCurrentMonth ? ((djData.requestsThisMonth as number) ?? 0) : 0
-    if (requestLimit !== UNLIMITED && effectiveCount >= requestLimit) {
-      throw new HttpsError(
-        'resource-exhausted',
-        "You've reached your plan's monthly DJ request limit. Upgrade to DJ Pro for unlimited requests.",
-      )
     }
 
     tx.set(requestRef, {
@@ -111,10 +95,6 @@ export const submitLicenceRequest = onCall(async (request) => {
       linkTo: `/dashboard/artist/dj-requests`,
       read: false,
       createdAt: FieldValue.serverTimestamp(),
-    })
-    tx.update(djProfileRef, {
-      requestsThisMonth: inCurrentMonth ? FieldValue.increment(1) : 1,
-      requestsMonthResetAt: inCurrentMonth ? resetAt : Timestamp.now(),
     })
   })
 
