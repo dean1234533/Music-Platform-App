@@ -5,6 +5,7 @@ import { ProtectedRoute, RequireOnboarding } from '@/components/auth/ProtectedRo
 import { RoleRoute } from '@/components/auth/RoleRoute'
 
 import { LandingPage } from '@/pages/marketing/LandingPage'
+import { LegalPage } from '@/pages/marketing/LegalPage'
 import { SignInPage } from '@/pages/auth/SignInPage'
 import { SignUpPage } from '@/pages/auth/SignUpPage'
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
@@ -60,6 +61,8 @@ function App() {
         <PlayerProvider>
           <Routes>
             <Route path="/" element={<LandingPage />} />
+            <Route path="/terms" element={<LegalPage type="terms" />} />
+            <Route path="/privacy" element={<LegalPage type="privacy" />} />
             <Route path="/sign-in" element={<SignInPage />} />
             <Route path="/sign-up" element={<SignUpPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />

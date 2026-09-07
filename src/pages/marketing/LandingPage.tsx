@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, Headphones, Mic2, Radio, Sparkles } from 'lucide-react'
+import { ArrowRight, Check, Headphones, Mic2, Radio, Sparkles } from 'lucide-react'
 import { BrandMark } from '@/components/common/BrandMark'
 
 const roles = [
@@ -8,12 +8,20 @@ const roles = [
   { icon: Radio, label: 'Select', title: 'Clear it properly', copy: 'Discover early, speak directly, and license tracks without the runaround.', to: '/sign-up?role=dj' },
 ]
 
+const steps = [
+  ['01', 'Discover without the noise', 'Follow artists, save releases, and build a library around music you genuinely care about.'],
+  ['02', 'Put your membership to work', 'Choose which followed artists receive your monthly support. You stay in control of the split.'],
+  ['03', 'Move music forward', 'Artists grow sustainable audiences while DJs clear tracks through a direct, documented workflow.'],
+]
+
 export function LandingPage() {
   return (
     <div className="min-h-svh overflow-hidden bg-surface-0 text-ink-0">
       <header className="relative z-20 mx-auto flex max-w-[1440px] items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
         <BrandMark />
-        <nav className="flex items-center gap-1 sm:gap-3" aria-label="Account">
+        <nav className="flex items-center gap-1 sm:gap-3" aria-label="Primary navigation">
+          <a href="#how-it-works" className="hidden rounded-full px-3 py-2.5 text-sm font-medium text-ink-2 transition hover:text-white md:block">How it works</a>
+          <a href="#pricing" className="hidden rounded-full px-3 py-2.5 text-sm font-medium text-ink-2 transition hover:text-white md:block">Pricing</a>
           <Link to="/sign-in" className="rounded-full px-4 py-2.5 text-sm font-medium text-ink-1 transition hover:text-white">Sign in</Link>
           <Link to="/sign-up" className="rounded-full bg-brand-500 px-5 py-2.5 text-sm font-semibold text-[#090b06] transition hover:bg-brand-400">Join Wavelength</Link>
         </nav>
@@ -66,8 +74,74 @@ export function LandingPage() {
             ))}
           </div>
         </section>
+
+        <section id="how-it-works" className="border-y border-white/[0.08] bg-white/[0.018]">
+          <div className="mx-auto max-w-[1440px] px-5 py-24 sm:px-8 lg:px-12 lg:py-32">
+            <div className="grid gap-12 lg:grid-cols-[0.72fr_1.28fr]">
+              <div>
+                <p className="eyebrow">How it works</p>
+                <h2 className="mt-4 max-w-md text-4xl font-medium leading-[1.04] tracking-[-0.045em] sm:text-5xl">A fairer route from first listen to lasting support.</h2>
+              </div>
+              <div className="divide-y divide-white/[0.08] border-y border-white/[0.08]">
+                {steps.map(([number, title, copy]) => (
+                  <div key={number} className="grid gap-4 py-7 sm:grid-cols-[4rem_1fr_1fr] sm:items-start">
+                    <span className="text-xs tabular-nums text-brand-400">{number}</span>
+                    <h3 className="text-lg font-medium tracking-[-0.02em]">{title}</h3>
+                    <p className="text-sm leading-6 text-ink-2">{copy}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="pricing" className="mx-auto max-w-[1440px] px-5 py-24 sm:px-8 lg:px-12 lg:py-32">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="eyebrow">Simple pricing</p>
+            <h2 className="mt-4 text-4xl font-medium tracking-[-0.045em] sm:text-5xl">Join free. Support when it matters.</h2>
+            <p className="mx-auto mt-5 max-w-xl text-base leading-7 text-ink-2">Explore the platform without a membership. Subscribe when you’re ready to direct meaningful monthly support to artists.</p>
+          </div>
+          <div className="mx-auto mt-12 grid max-w-5xl gap-3 md:grid-cols-3">
+            <PriceCard title="Listener" price="Free" description="Discover, follow, save, and build playlists." features={['Full discovery catalogue', 'Personal library and playlists', 'Follow independent artists']} cta="Create free account" to="/sign-up?role=fan" />
+            <PriceCard featured title="Supporter" price="£10" suffix="/month" description="Turn listening into direct artist support." features={['Everything in Listener', 'Allocate support each month', 'Access supporter-only posts']} cta="Become a supporter" to="/sign-up?role=fan" />
+            <PriceCard title="Artist & DJ" price="Free" description="Publish, connect, and agree opportunities directly." features={['Artist profiles and releases', 'DJ discovery and requests', 'Documented licensing flow']} cta="Join the platform" to="/sign-up" />
+          </div>
+          <p className="mx-auto mt-6 max-w-2xl text-center text-xs leading-5 text-ink-3">Licensing fees are agreed directly between artists and DJs. Applicable platform fees are shown before payment or payout.</p>
+        </section>
+
+        <section className="px-5 pb-24 sm:px-8 lg:px-12 lg:pb-32">
+          <div className="premium-panel mx-auto flex max-w-[1344px] flex-col items-start justify-between gap-8 overflow-hidden rounded-[2rem] px-7 py-10 sm:px-10 lg:flex-row lg:items-center lg:px-14 lg:py-14">
+            <div><p className="eyebrow">Your music, better connected</p><h2 className="mt-3 text-3xl font-medium tracking-[-0.04em] sm:text-4xl">Ready to tune in?</h2></div>
+            <Link to="/sign-up" className="group inline-flex items-center gap-3 rounded-full bg-brand-500 px-6 py-3.5 text-sm font-semibold text-surface-0 transition hover:bg-brand-400">Join Wavelength <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" /></Link>
+          </div>
+        </section>
       </main>
-      <footer className="mx-auto flex max-w-[1440px] flex-col gap-4 border-t border-white/10 px-5 py-8 text-sm text-ink-3 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-12"><BrandMark /><p>© {new Date().getFullYear()} Wavelength. Independent by design.</p></footer>
+      <footer className="border-t border-white/10">
+        <div className="mx-auto grid max-w-[1440px] gap-10 px-5 py-12 sm:grid-cols-2 sm:px-8 lg:grid-cols-[1.4fr_1fr_1fr_1fr] lg:px-12 lg:py-16">
+          <div><BrandMark /><p className="mt-5 max-w-xs text-sm leading-6 text-ink-2">Independent music, direct support, and clearer connections between the people who move culture.</p></div>
+          <FooterGroup title="Platform" links={[['How it works', '/#how-it-works'], ['Pricing', '/#pricing'], ['Sign in', '/sign-in']]} />
+          <FooterGroup title="Join" links={[['For listeners', '/sign-up?role=fan'], ['For artists', '/sign-up?role=artist'], ['For DJs', '/sign-up?role=dj']]} />
+          <FooterGroup title="Legal" links={[['Terms & conditions', '/terms'], ['Privacy policy', '/privacy']]} />
+        </div>
+        <div className="mx-auto flex max-w-[1440px] flex-col gap-2 border-t border-white/[0.07] px-5 py-6 text-xs text-ink-3 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-12"><p>© {new Date().getFullYear()} Wavelength.</p><p>Independent by design.</p></div>
+      </footer>
     </div>
   )
+}
+
+function PriceCard({ title, price, suffix, description, features, cta, to, featured = false }: { title: string; price: string; suffix?: string; description: string; features: string[]; cta: string; to: string; featured?: boolean }) {
+  return (
+    <div className={`relative flex min-h-[28rem] flex-col rounded-[1.5rem] p-7 ${featured ? 'bg-brand-500 text-surface-0 shadow-[0_30px_90px_rgba(200,243,63,.12)]' : 'premium-panel'}`}>
+      {featured ? <span className="absolute right-5 top-5 rounded-full bg-black/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em]">Most meaningful</span> : null}
+      <p className={`text-xs font-bold uppercase tracking-[0.16em] ${featured ? 'text-surface-0/60' : 'text-ink-3'}`}>{title}</p>
+      <p className="mt-6 text-5xl font-medium tracking-[-0.055em]">{price}<span className={`ml-1 text-sm font-medium tracking-normal ${featured ? 'text-surface-0/60' : 'text-ink-2'}`}>{suffix}</span></p>
+      <p className={`mt-4 text-sm leading-6 ${featured ? 'text-surface-0/70' : 'text-ink-2'}`}>{description}</p>
+      <ul className="mt-8 space-y-3">{features.map((feature) => <li key={feature} className="flex items-center gap-3 text-sm"><Check className="h-4 w-4 shrink-0" />{feature}</li>)}</ul>
+      <Link to={to} className={`mt-auto block rounded-full px-5 py-3 text-center text-sm font-semibold transition ${featured ? 'bg-surface-0 text-ink-0 hover:bg-surface-2' : 'bg-ink-0 text-surface-0 hover:bg-brand-400'}`}>{cta}</Link>
+    </div>
+  )
+}
+
+function FooterGroup({ title, links }: { title: string; links: [string, string][] }) {
+  return <div><h2 className="text-xs font-bold uppercase tracking-[0.16em] text-ink-3">{title}</h2><ul className="mt-5 space-y-3">{links.map(([label, to]) => <li key={label}><Link to={to} className="text-sm text-ink-1 transition hover:text-brand-400">{label}</Link></li>)}</ul></div>
 }

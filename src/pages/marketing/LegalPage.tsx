@@ -1,0 +1,44 @@
+import { Link } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
+import { BrandMark } from '@/components/common/BrandMark'
+
+const terms = [
+  ['Using Wavelength', 'You must provide accurate account information, keep your sign-in details secure, and use the platform lawfully. You are responsible for activity carried out through your account.'],
+  ['Subscriptions and payments', 'Paid memberships renew on the stated billing interval until cancelled. Prices and applicable charges are shown before purchase. Cancellation applies at the end of the current billing period unless the checkout terms state otherwise.'],
+  ['Artist content', 'Artists retain ownership of the music and material they upload. Uploading content gives Wavelength the limited permission needed to host, process, preview, and present it through the service. Artists must have the rights required to upload and license their content.'],
+  ['DJ licensing', 'A licence exists only when the relevant artist and DJ have agreed its terms. Payment, permitted uses, territory, duration, and download access are governed by that agreement. Wavelength provides the workflow but is not a party to creative negotiations unless expressly stated.'],
+  ['Acceptable use', 'Do not infringe intellectual property, bypass access controls, scrape the service, upload harmful material, impersonate others, manipulate engagement, or interfere with the platform’s operation.'],
+  ['Suspension and termination', 'We may restrict or close accounts that breach these terms, create risk for other users, or must be acted on for legal or security reasons. You may stop using Wavelength at any time.'],
+  ['Liability', 'Wavelength is provided with reasonable care, but availability is not guaranteed. Nothing in these terms excludes liability that cannot lawfully be excluded.'],
+  ['Changes', 'We may update these terms as the service evolves. Material changes will be communicated through the service or another appropriate channel before they take effect.'],
+]
+
+const privacy = [
+  ['What we collect', 'We collect account details, profile information, content you upload, listening and engagement activity, messages connected to licensing requests, transaction records, device information, and support communications.'],
+  ['How we use information', 'We use information to operate accounts, personalise discovery, play and protect content, process subscriptions and licences, allocate artist support, prevent abuse, provide support, and meet legal obligations.'],
+  ['Payments', 'Payments and payouts are processed by specialist payment providers. Wavelength receives identifiers and transaction status information needed to operate the service, but does not store full payment-card details.'],
+  ['Who receives information', 'Information is shared only where needed with service providers, with artists or DJs as part of a user-requested interaction, for a business transfer, or when law and safety require it. We do not sell personal information.'],
+  ['Retention and security', 'We keep information only for as long as it serves the purposes described here or satisfies legal, accounting, fraud-prevention, and dispute requirements. We use technical and organisational safeguards appropriate to the information involved.'],
+  ['Your choices', 'You can update profile information and notification choices in your account. Depending on where you live, you may also have rights to access, correct, delete, restrict, or export personal information and to object to certain processing.'],
+  ['Cookies and local storage', 'Wavelength uses essential browser storage for sign-in, security, preferences, and reliable service operation. Any optional analytics or marketing technologies should be presented with appropriate controls before use.'],
+  ['Questions and requests', 'Use the support options available inside your account for privacy questions or requests. We may need to verify your identity before completing a request.'],
+]
+
+export function LegalPage({ type }: { type: 'terms' | 'privacy' }) {
+  const isTerms = type === 'terms'
+  const sections = isTerms ? terms : privacy
+  return (
+    <div className="min-h-svh bg-surface-0 text-ink-0">
+      <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-6 sm:px-8"><Link to="/"><BrandMark /></Link><Link to="/" className="flex items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0"><ArrowLeft className="h-4 w-4" /> Back home</Link></header>
+      <main className="mx-auto max-w-5xl px-5 pb-24 pt-16 sm:px-8 sm:pt-24">
+        <p className="eyebrow">Legal</p>
+        <h1 className="mt-4 text-5xl font-medium tracking-[-0.055em] sm:text-7xl">{isTerms ? 'Terms & conditions' : 'Privacy policy'}</h1>
+        <p className="mt-6 text-sm text-ink-3">Last updated 7 September 2026</p>
+        <div className="mt-16 divide-y divide-white/[0.08] border-y border-white/[0.08]">
+          {sections.map(([title, copy], index) => <section key={title} className="grid gap-4 py-8 sm:grid-cols-[3rem_1fr_2fr]"><span className="text-xs text-brand-400">{String(index + 1).padStart(2, '0')}</span><h2 className="text-lg font-medium">{title}</h2><p className="text-base leading-7 text-ink-2">{copy}</p></section>)}
+        </div>
+        <p className="mt-8 text-xs leading-5 text-ink-3">This page is a product-ready general policy template and should be reviewed against the operating company, jurisdiction, payment model, and final data practices before a public launch.</p>
+      </main>
+    </div>
+  )
+}
