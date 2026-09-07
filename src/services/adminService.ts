@@ -7,6 +7,7 @@ import type { RestrictedCapability } from '@/types/track'
 import type { SubscriptionPlan } from '@/types/platformSettings'
 import type { PlanFeatureKey, PlanLimitKey, PlanTier } from '@/types/entitlements'
 import type { DataRetentionSettings } from '@/types/platformSettings'
+import type { SecurityIncidentDoc } from '@/types/security'
 
 export async function listUsers(count = 50): Promise<UserProfile[]> {
   const snap = await getDocs(query(collection(db, 'users'), limit(count)))
@@ -80,6 +81,28 @@ export const adminSeedSubscriptionPlans = callable<void, { ok: boolean; seeded: 
 export const adminUpdateDataRetentionSettings = callable<Partial<DataRetentionSettings>, { ok: boolean }>(
   'adminUpdateDataRetentionSettings',
 )
+export const adminEnableStrongPasswordPolicy = callable<void, { ok: boolean }>('adminEnableStrongPasswordPolicy')
+export const adminCreateSecurityIncident = callable<
+  {
+    incidentType: string
+    affectedSystems?: string[]
+    affectedDataCategories?: string[]
+    estimatedUsersAffected?: number
+    riskAssessment?: string
+    notes?: string
+  },
+  { incidentId: string }
+>('adminCreateSecurityIncident')
+export const adminUpdateSecurityIncident = callable<
+  { incidentId: string; actionTaken?: string; riskAssessment?: string; notificationDecision?: string; notes?: string; containedAt?: boolean; resolvedAt?: boolean },
+  { ok: boolean }
+>('adminUpdateSecurityIncident')
+
+export async function listSecurityIncidents(): Promise<SecurityIncidentDoc[]> {
+  const q = query(collection(db, 'securityIncidents'), orderBy('detectedAt', 'desc'), limit(100))
+  const snap = await getDocs(q)
+  return snap.docs.map((d) => d.data() as SecurityIncidentDoc)
+}
 export const adminSetLegalHold = callable<
   { collection: 'licenceRequests' | 'licenceAgreements' | 'tracks'; docId: string; legalHold: boolean; reason?: string },
   { ok: boolean }

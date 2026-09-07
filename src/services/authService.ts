@@ -44,6 +44,15 @@ export async function requestPasswordReset(email: string): Promise<void> {
 
 export async function signOut(): Promise<void> {
   await firebaseSignOut(auth)
+  // Best-effort: drop the service worker's same-origin image cache so a
+  // different user signing in on the same device/browser never gets served
+  // a cached response tied to the previous session. No-ops in browsers
+  // without Cache Storage support (or if the SW hasn't registered yet).
+  try {
+    if ('caches' in window) await caches.delete('images')
+  } catch {
+    // Non-critical — never block sign-out on this.
+  }
 }
 
 /** True if the signed-in user can reauthenticate with an email/password credential. */

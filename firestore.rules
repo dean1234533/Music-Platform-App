@@ -283,6 +283,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // rateLimits/{key} — Cloud-Function-only abuse-throttle counters
+    // (enforceRateLimit in functions/src/rateLimit.ts). Never client-readable
+    // or writable; the count itself isn't meaningful to expose.
+    match /rateLimits/{key} {
+      allow read, write: if false;
+    }
+
     // ---------------------------------------------------------------------
     // Phase 2 — subscriptions, support allocation, revenue records.
     // ---------------------------------------------------------------------
@@ -404,6 +411,14 @@ service cloud.firestore {
       allow write: if false;
     }
     match /auditLogs/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // securityIncidents/{incidentId} — the breach register described in
+    // SECURITY_INCIDENT_RESPONSE.md. Admin-only, written exclusively via
+    // adminCreateSecurityIncident/adminUpdateSecurityIncident.
+    match /securityIncidents/{docId} {
       allow read: if isAdmin();
       allow write: if false;
     }

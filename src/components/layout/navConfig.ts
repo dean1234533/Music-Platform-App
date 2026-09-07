@@ -20,6 +20,7 @@ import {
   Radar,
   Search,
   Settings,
+  ShieldAlert,
   Sliders,
   Sparkles,
   UploadCloud,
@@ -86,4 +87,5 @@ export const adminNavItems: NavItem[] = [
   { label: 'Reports', to: '/admin/reports', icon: AlertTriangle },
   { label: 'Plans & fees', to: '/admin/settings', icon: Sliders },
   { label: 'Audit log', to: '/admin/audit-log', icon: FileClock },
+  { label: 'Security incidents', to: '/admin/security-incidents', icon: ShieldAlert },
 ]

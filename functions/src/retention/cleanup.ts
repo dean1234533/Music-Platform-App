@@ -241,3 +241,9 @@ export const cleanupOldAuditLogs = onSchedule('every 24 hours', async () => {
   const cutoff = cutoffDaysAgo(auditLogMonths * 30)
   await deleteQueryBatched(db.collection('auditLogs').where('createdAt', '<=', cutoff))
 })
+
+/** rateLimits/* windows are ephemeral counters (see functions/src/rateLimit.ts) — a fixed 7-day sweep keeps the collection bounded. */
+export const cleanupOldRateLimits = onSchedule('every 24 hours', async () => {
+  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
+  await deleteQueryBatched(db.collection('rateLimits').where('windowStart', '<=', cutoff))
+})

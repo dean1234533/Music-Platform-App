@@ -5,13 +5,17 @@ import { updateBasicProfile } from '@/services/userService'
 import { changePassword, hasPasswordProvider, signOut } from '@/services/authService'
 import { exportUserData } from '@/services/accountService'
 import { currentPushPermission, disablePushNotifications, enablePushNotifications } from '@/services/pushNotificationService'
+import { useInstallPrompt } from '@/hooks/useInstallPrompt'
 import { Button } from '@/components/common/Button'
 import { Input, Label } from '@/components/common/Input'
 import { DeleteAccountModal } from '@/components/account/DeleteAccountModal'
+import { PasswordStrengthMeter } from '@/components/auth/PasswordStrengthMeter'
+import { checkPassword, MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 
 export function SettingsPage() {
   const { firebaseUser, profile } = useAuth()
   const navigate = useNavigate()
+  const { canInstall, isStandalone, isIOS, install } = useInstallPrompt()
   const [pushPermission, setPushPermission] = useState<NotificationPermission | 'unsupported'>('default')
   const [pushBusy, setPushBusy] = useState(false)
   const [pushError, setPushError] = useState<string | null>(null)
@@ -70,8 +74,9 @@ export function SettingsPage() {
   async function handleChangePassword() {
     setPasswordError(null)
     setPasswordSuccess(false)
-    if (newPassword.length < 8) {
-      setPasswordError('New password must be at least 8 characters.')
+    const check = checkPassword(newPassword)
+    if (!check.valid) {
+      setPasswordError(check.reasons.join(' '))
       return
     }
     if (newPassword !== confirmPassword) {
@@ -182,7 +187,8 @@ export function SettingsPage() {
             </div>
             <div>
               <Label>New password</Label>
-              <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+              <Input type="password" minLength={MIN_PASSWORD_LENGTH} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+              <PasswordStrengthMeter password={newPassword} />
             </div>
             <div>
               <Label>Confirm new password</Label>
@@ -218,6 +224,23 @@ export function SettingsPage() {
           Sign out
         </Button>
       </section>
+
+      {!isStandalone ? (
+        <section>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Install App</h2>
+          {canInstall ? (
+            <Button size="sm" variant="secondary" onClick={() => void install()}>
+              Install Wavelength
+            </Button>
+          ) : isIOS ? (
+            <p className="text-sm text-ink-2">
+              Tap Share, then "Add to Home Screen" to install Wavelength on this device.
+            </p>
+          ) : (
+            <p className="text-sm text-ink-2">Installation isn't available in this browser yet.</p>
+          )}
+        </section>
+      ) : null}
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Privacy</h2>

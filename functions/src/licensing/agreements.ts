@@ -1,8 +1,20 @@
+import { createHash } from 'node:crypto'
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import type { WriteBatch, DocumentReference, DocumentData } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
 import { writeSystemMessage } from '../messaging/messages.js'
+
+/** Deterministic fingerprint of the agreed terms — a signature records the exact contentHash it was given for, so any (impossible, since writes are server-only) tampering after signing would be independently detectable. */
+function computeContentHash(terms: AgreementTerms): string {
+  const canonical = Object.keys(terms)
+    .sort()
+    .reduce<Record<string, unknown>>((acc, key) => {
+      acc[key] = terms[key as keyof AgreementTerms]
+      return acc
+    }, {})
+  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex')
+}
 
 export interface AgreementTerms {
   permittedUse: string
@@ -55,8 +67,10 @@ export async function writeAgreementVersion(
     }
   }
 
+  const contentHash = computeContentHash(terms)
+
   if (editInPlaceRef) {
-    batch.update(editInPlaceRef, { ...terms, updatedAt: FieldValue.serverTimestamp() })
+    batch.update(editInPlaceRef, { ...terms, contentHash, updatedAt: FieldValue.serverTimestamp() })
     batch.update(requestRef, { status: 'agreement_ready', currentAgreementId: editInPlaceRef.id, updatedAt: FieldValue.serverTimestamp() })
     return { agreementRef: editInPlaceRef, version, editedInPlace: true }
   }
@@ -74,6 +88,7 @@ export async function writeAgreementVersion(
     trackId: licenceRequest.trackId,
     trackVersion: 1,
     ...terms,
+    contentHash,
     agreementVersion: version,
     status: 'pending',
     artistAcceptedAt: null,
@@ -205,6 +220,38 @@ export const signAgreement = onCall(async (request) => {
     throw new HttpsError('failed-precondition', 'This agreement is no longer awaiting signatures.')
   }
 
+  // Integrity check: recompute the content hash from the agreement's current
+  // fields and compare against the hash frozen at generation time. Every
+  // write path is server-only, so this can't be defeated by a client — it's
+  // a last line of defense against a future code change accidentally
+  // mutating terms in place after generation, catching it before a
+  // signature is ever attached to changed content. Older agreements
+  // (created before contentHash existed) have nothing to compare against
+  // and are skipped, not treated as failing the check.
+  if (agreement.contentHash) {
+    const recomputed = computeContentHash({
+      permittedUse: agreement.permittedUse,
+      territory: agreement.territory,
+      startDate: agreement.startDate,
+      expiryDate: agreement.expiryDate,
+      licenceFeeMinor: agreement.licenceFeeMinor,
+      currency: agreement.currency,
+      attributionRequirements: agreement.attributionRequirements,
+      recordingPermission: agreement.recordingPermission,
+      streamingPermission: agreement.streamingPermission,
+      promotionalMixPermission: agreement.promotionalMixPermission,
+      commercialUse: agreement.commercialUse,
+      redistributionAllowed: agreement.redistributionAllowed,
+      resaleAllowed: agreement.resaleAllowed,
+      remixAllowed: agreement.remixAllowed,
+      additionalTerms: agreement.additionalTerms,
+      rightsHolderDeclaration: agreement.rightsHolderDeclaration,
+    })
+    if (recomputed !== agreement.contentHash) {
+      throw new HttpsError('failed-precondition', 'This agreement could not be verified. Please contact support.')
+    }
+  }
+
   const isArtist = agreement.artistId === uid
   const isDj = agreement.djId === uid
   if (!isArtist && !isDj) throw new HttpsError('permission-denied', 'Not a party to this agreement.')
@@ -246,6 +293,7 @@ export const signAgreement = onCall(async (request) => {
     signatureReference,
     authorityConfirmed: true,
     agreementVersion: agreement.agreementVersion,
+    agreementContentHash: agreement.contentHash ?? null,
     // Best-effort — v2 onCall exposes rawRequest, but it may be absent in
     // some execution contexts (e.g. the emulator); never fail signing over it.
     ipAddress: request.rawRequest?.ip ?? null,

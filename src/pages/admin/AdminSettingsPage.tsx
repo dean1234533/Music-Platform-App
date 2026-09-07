@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  adminEnableStrongPasswordPolicy,
   adminSeedSubscriptionPlans,
   adminSetLegalHold,
   adminUpdateDataRetentionSettings,
@@ -82,6 +83,8 @@ export function AdminSettingsPage() {
     reason: string
   }>({ collection: 'licenceAgreements', docId: '', legalHold: true, reason: '' })
   const [savingLegalHold, setSavingLegalHold] = useState(false)
+  const [enablingPasswordPolicy, setEnablingPasswordPolicy] = useState(false)
+  const [passwordPolicyError, setPasswordPolicyError] = useState<string | null>(null)
 
   useEffect(() => {
     void listAllSubscriptionPlans().then((rows) => setPlans(rows.sort((a, b) => a.displayOrder - b.displayOrder)))
@@ -184,6 +187,20 @@ export function AdminSettingsPage() {
     }
   }
 
+  async function handleEnablePasswordPolicy() {
+    setEnablingPasswordPolicy(true)
+    setPasswordPolicyError(null)
+    setSaved(null)
+    try {
+      await adminEnableStrongPasswordPolicy()
+      setSaved('Strong password policy enabled (12+ characters, enforced server-side by Identity Platform).')
+    } catch (err) {
+      setPasswordPolicyError(err instanceof Error ? err.message : 'Could not enable the password policy.')
+    } finally {
+      setEnablingPasswordPolicy(false)
+    }
+  }
+
   async function handleSetLegalHold() {
     setSavingLegalHold(true)
     setSaved(null)
@@ -244,7 +261,7 @@ export function AdminSettingsPage() {
               <select
                 value={form.tier}
                 onChange={(e) => setForm((f) => ({ ...f, tier: e.target.value as PlanTier }))}
-                className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 outline-none focus:border-brand-500"
+                className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-base sm:text-sm text-ink-0 outline-none focus:border-brand-500"
               >
                 {PLAN_TIERS.map((t) => (
                   <option key={t} value={t}>{t}</option>
@@ -264,7 +281,7 @@ export function AdminSettingsPage() {
               <select
                 value={form.interval}
                 onChange={(e) => setForm((f) => ({ ...f, interval: e.target.value as 'month' | 'year' }))}
-                className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 outline-none focus:border-brand-500"
+                className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-base sm:text-sm text-ink-0 outline-none focus:border-brand-500"
               >
                 <option value="month">month</option>
                 <option value="year">year</option>
@@ -399,6 +416,21 @@ export function AdminSettingsPage() {
       </section>
 
       <section>
+        <h2 className="mb-3 text-lg font-semibold text-ink-0">Password policy</h2>
+        <p className="mb-3 text-xs text-ink-3">
+          Client-side length/common-password checks are enforced in the browser only. This enables real server-side
+          enforcement (12+ characters) via Identity Platform — a one-time action. Requires this Firebase project to
+          be upgraded to Identity Platform first (Firebase Console → Authentication → Settings).
+        </p>
+        <div className="rounded-xl border border-surface-border bg-surface-1 p-4">
+          <Button size="sm" onClick={handleEnablePasswordPolicy} loading={enablingPasswordPolicy}>
+            Enable strong password policy
+          </Button>
+          {passwordPolicyError ? <p className="mt-2 text-xs text-danger-500">{passwordPolicyError}</p> : null}
+        </div>
+      </section>
+
+      <section>
         <h2 className="mb-3 text-lg font-semibold text-ink-0">Legal hold</h2>
         <p className="mb-3 text-xs text-ink-3">
           Blocks automatic retention cleanup and revokes nothing on its own — use for an active dispute, investigation, or legal claim.
@@ -409,7 +441,7 @@ export function AdminSettingsPage() {
             <select
               value={legalHoldForm.collection}
               onChange={(e) => setLegalHoldForm((f) => ({ ...f, collection: e.target.value as typeof f.collection }))}
-              className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 outline-none focus:border-brand-500"
+              className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-base sm:text-sm text-ink-0 outline-none focus:border-brand-500"
             >
               <option value="licenceAgreements">licenceAgreements</option>
               <option value="licenceRequests">licenceRequests</option>

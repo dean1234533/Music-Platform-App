@@ -49,6 +49,8 @@ export { onStoryViewCreate, onStoryReactionCreate, onStoryReactionDelete, onStor
 export { deleteAccount } from './account/deleteAccount.js'
 export { exportUserData } from './account/exportUserData.js'
 export { adminUpdateDataRetentionSettings, adminSetLegalHold } from './admin/retentionSettings.js'
+export { adminEnableStrongPasswordPolicy } from './admin/passwordPolicy.js'
+export { adminCreateSecurityIncident, adminUpdateSecurityIncident } from './admin/securityIncidents.js'
 export {
   expireStories,
   cleanupOldNotifications,
@@ -59,4 +61,5 @@ export {
   cleanupExpiredContracts,
   cleanupResolvedCopyrightClaims,
   cleanupOldAuditLogs,
+  cleanupOldRateLimits,
 } from './retention/cleanup.js'

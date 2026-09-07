@@ -126,6 +126,8 @@ export interface LicenceAgreementDoc {
   additionalTerms: string
   rightsHolderDeclaration?: boolean
   agreementVersion: number
+  /** SHA-256 fingerprint of the frozen terms, computed server-side — see functions/src/licensing/agreements.ts. */
+  contentHash?: string
   status: AgreementStatus
   artistAcceptedAt: Timestamp | null
   djAcceptedAt: Timestamp | null
@@ -150,6 +152,7 @@ export interface LicenceAgreementAcceptanceDoc {
   signatureReference: string
   authorityConfirmed: boolean
   agreementVersion: number
+  agreementContentHash?: string | null
   ipAddress: string | null
   userAgent: string | null
   acceptedAt: Timestamp | null

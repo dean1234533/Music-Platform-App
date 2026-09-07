@@ -29,8 +29,13 @@ service firebase.storage {
       return request.resource.size < 8 * 1024 * 1024;
     }
 
+    // Deliberately excludes image/svg+xml: an SVG can carry embedded <script>/
+    // event-handler content, and browsers execute it when an SVG URL is
+    // opened directly (e.g. an admin opening copyright evidence in a new
+    // tab) rather than only when embedded as an <img>. No genuine use case
+    // here (artwork/avatars/story media/evidence) needs vector uploads.
     function isImage() {
-      return request.resource.contentType.matches('image/.*');
+      return request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     }
 
     function isVideo() {
@@ -157,8 +162,19 @@ service firebase.storage {
       allow read: if isSignedIn() &&
         (firestore.get(/databases/(default)/documents/copyrightClaims/$(claimId)).data.reporterId == request.auth.uid
           || ('admin' in firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.roles));
+      // The claim doc is created *after* evidence is uploaded (claimId is a
+      // fresh client-generated ID, same upload-then-reference ordering as
+      // licenceSignatures), so the claim usually doesn't exist yet at write
+      // time — any signed-in user may write into a not-yet-existing claimId
+      // (impractical to target since it's an unguessable fresh ID). Once the
+      // claim exists, only its own reporter may write further evidence into
+      // it — this closes the gap where anyone who learns an existing claimId
+      // (e.g. the named artist, who is allowed to read the claim) could
+      // upload/overwrite files into someone else's evidence folder.
       allow write: if isSignedIn() && underImageUploadLimit() &&
-        (isImage() || request.resource.contentType == 'application/pdf');
+        (isImage() || request.resource.contentType == 'application/pdf') &&
+        (!firestore.exists(/databases/(default)/documents/copyrightClaims/$(claimId))
+          || firestore.get(/databases/(default)/documents/copyrightClaims/$(claimId)).data.reporterId == request.auth.uid);
     }
 
     // licenceSignatures/{agreementId}/{fileName} — drawn e-signature images.

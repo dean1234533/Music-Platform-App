@@ -2,6 +2,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import type { DocumentData, DocumentReference } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
+import { enforceRateLimit } from '../rateLimit.js'
 
 export type MessageKind = 'text' | 'system' | 'offer_card' | 'contract_status' | 'payment_status'
 
@@ -73,6 +74,8 @@ export const sendMessage = onCall(async (request) => {
   if (!participantIds.includes(uid)) {
     throw new HttpsError('permission-denied', 'You are not part of this conversation.')
   }
+
+  await enforceRateLimit(`sendMessage_${uid}`, 30, 60)
 
   const messageRef = conversationRef.collection('messages').doc()
   await db.runTransaction(async (tx) => {
