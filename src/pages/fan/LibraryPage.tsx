@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import { listLikedTrackIds } from '@/services/likeService'
+import { subscribeLikedTrackIds } from '@/services/likeService'
 import { getTrack } from '@/services/trackService'
 import { TrackCard } from '@/components/music/TrackCard'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
@@ -14,14 +14,13 @@ export function LibraryPage() {
   useEffect(() => {
     if (!firebaseUser) return
     let cancelled = false
-    async function load() {
-      const ids = await listLikedTrackIds(firebaseUser!.uid)
+    const unsubscribe = subscribeLikedTrackIds(firebaseUser.uid, async (ids) => {
       const fetched = await Promise.all(ids.map((id) => getTrack(id)))
       if (!cancelled) setTracks(fetched.filter((t): t is TrackDoc => t !== null))
-    }
-    void load()
+    })
     return () => {
       cancelled = true
+      unsubscribe()
     }
   }, [firebaseUser])
 

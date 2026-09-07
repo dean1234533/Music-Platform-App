@@ -4,10 +4,12 @@ import { useAuth } from '@/contexts/AuthContext'
 import { followArtist, subscribeIsFollowing, unfollowArtist } from '@/services/followService'
 import { Button } from '@/components/common/Button'
 import { useNavigate } from 'react-router-dom'
+import { useToast } from '@/contexts/ToastContext'
 
 export function FollowButton({ artistId, size = 'md' }: { artistId: string; size?: 'sm' | 'md' | 'lg' }) {
   const { firebaseUser } = useAuth()
   const navigate = useNavigate()
+  const { notify } = useToast()
   const [isFollowing, setIsFollowing] = useState(false)
   const [pending, setPending] = useState(false)
 
@@ -28,9 +30,13 @@ export function FollowButton({ artistId, size = 'md' }: { artistId: string; size
     try {
       if (isFollowing) {
         await unfollowArtist(firebaseUser.uid, artistId)
+        notify('Artist removed from Following.', 'info')
       } else {
         await followArtist(firebaseUser.uid, artistId)
+        notify('Artist added to Following.')
       }
+    } catch {
+      notify('Could not update Following. Please try again.', 'error')
     } finally {
       setPending(false)
     }

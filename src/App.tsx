@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { PlayerProvider } from '@/contexts/PlayerContext'
+import { ToastProvider } from '@/contexts/ToastContext'
 import { ProtectedRoute, RequireOnboarding } from '@/components/auth/ProtectedRoute'
 import { RoleRoute } from '@/components/auth/RoleRoute'
 import { InstallBanner } from '@/components/pwa/InstallBanner'
@@ -70,9 +71,10 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <PlayerProvider>
-          <InstallBanner />
-          <Routes>
+        <ToastProvider>
+          <PlayerProvider>
+            <InstallBanner />
+            <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/pricing" element={<PricingPage />} />
             <Route path="/terms" element={<LegalPage type="terms" />} />
@@ -230,8 +232,9 @@ function App() {
             </Route>
 
             <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </PlayerProvider>
+            </Routes>
+          </PlayerProvider>
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   )

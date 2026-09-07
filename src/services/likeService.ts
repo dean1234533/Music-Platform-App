@@ -26,3 +26,8 @@ export async function listLikedTrackIds(fanId: string): Promise<string[]> {
   const snap = await getDocs(q)
   return snap.docs.map((d) => d.data().trackId as string)
 }
+
+export function subscribeLikedTrackIds(fanId: string, onChange: (trackIds: string[]) => void) {
+  const q = query(collection(db, 'trackLikes'), where('fanId', '==', fanId))
+  return onSnapshot(q, (snap) => onChange(snap.docs.map((document) => document.data().trackId as string)))
+}

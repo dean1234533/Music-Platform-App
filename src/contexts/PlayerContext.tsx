@@ -31,6 +31,8 @@ const PlayerContext = createContext<PlayerContextValue | undefined>(undefined)
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const queueRef = useRef<TrackDoc[]>([])
+  const currentTrackRef = useRef<TrackDoc | null>(null)
   const [currentTrack, setCurrentTrack] = useState<TrackDoc | null>(null)
   const [queue, setQueue] = useState<TrackDoc[]>([])
   const [isPlaying, setIsPlaying] = useState(false)
@@ -46,7 +48,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     const onTimeUpdate = () => setProgressSec(audio.currentTime)
     const onLoadedMetadata = () => setDurationSec(audio.duration || 0)
-    const onEnded = () => setIsPlaying(false)
+    const onEnded = () => {
+      const current = currentTrackRef.current
+      const currentQueue = queueRef.current
+      const index = current ? currentQueue.findIndex((track) => track.trackId === current.trackId) : -1
+      const nextTrack = currentQueue[index + 1]
+      if (!nextTrack) {
+        setIsPlaying(false)
+        return
+      }
+      setCurrentTrack(nextTrack)
+      void loadAndPlay(nextTrack)
+    }
 
     audio.addEventListener('timeupdate', onTimeUpdate)
     audio.addEventListener('loadedmetadata', onLoadedMetadata)
@@ -60,6 +73,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    queueRef.current = queue
+  }, [queue])
+
+  useEffect(() => {
+    currentTrackRef.current = currentTrack
+  }, [currentTrack])
 
   const loadAndPlay = useCallback(async (track: TrackDoc) => {
     const audio = audioRef.current

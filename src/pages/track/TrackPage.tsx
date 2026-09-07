@@ -5,8 +5,8 @@ import { subscribeTrack } from '@/services/trackService'
 import { usePlayer } from '@/contexts/PlayerContext'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { useAuth } from '@/contexts/AuthContext'
-import { subscribeOwnPlaylists, addTrackToPlaylist } from '@/services/playlistService'
 import { FollowButton } from '@/components/music/FollowButton'
+import { TrackActions } from '@/components/music/TrackActions'
 import { RequestDjAccessModal } from '@/components/track/RequestDjAccessModal'
 import { ReportTrackModal } from '@/components/track/ReportTrackModal'
 import { DealsPanel } from '@/components/licence/DealsPanel'
@@ -16,7 +16,6 @@ import { ShareButton } from '@/components/common/ShareButton'
 import { formatDuration } from '@/utils/format'
 import { trackShareUrl } from '@/utils/shareLinks'
 import type { TrackDoc } from '@/types/track'
-import type { PlaylistDoc } from '@/types/playlist'
 
 export function TrackPage() {
   const { trackId } = useParams<{ trackId: string; slug?: string }>()
@@ -25,7 +24,6 @@ export function TrackPage() {
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer()
   const artist = useArtistSummary(track?.artistId ?? null)
   const { firebaseUser, hasRole } = useAuth()
-  const [playlists, setPlaylists] = useState<PlaylistDoc[]>([])
   const [showDjRequest, setShowDjRequest] = useState(false)
   const [requestDealId, setRequestDealId] = useState<string | null>(null)
   const [showReport, setShowReport] = useState(false)
@@ -34,11 +32,6 @@ export function TrackPage() {
     if (!trackId) return
     return subscribeTrack(trackId, setTrack)
   }, [trackId])
-
-  useEffect(() => {
-    if (!firebaseUser) return
-    return subscribeOwnPlaylists(firebaseUser.uid, setPlaylists)
-  }, [firebaseUser])
 
   // Upgrade the flat /track/:trackId address bar to the canonical nested
   // /artist/:slug/track/:trackId form once the artist resolves — flat links
@@ -80,6 +73,7 @@ export function TrackPage() {
               {isCurrent && isPlaying ? <Pause className="h-5 w-5" fill="currentColor" /> : <Play className="h-5 w-5 translate-x-0.5" fill="currentColor" />}
             </button>
             {artist ? <FollowButton artistId={artist.artistId} /> : null}
+            <TrackActions track={track} labels />
             {artist ? (
               <ShareButton
                 url={trackShareUrl(artist.slug, track.trackId)}
@@ -171,26 +165,6 @@ export function TrackPage() {
       ) : null}
       {showReport ? <ReportTrackModal trackId={track.trackId} onClose={() => setShowReport(false)} /> : null}
 
-      {firebaseUser ? (
-        <div>
-          <p className="mb-2 text-sm font-medium text-ink-0">Add to playlist</p>
-          {playlists.length === 0 ? (
-            <p className="text-sm text-ink-2">Create a playlist first from your Library.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {playlists.map((playlist) => (
-                <button
-                  key={playlist.playlistId}
-                  onClick={() => addTrackToPlaylist(playlist.playlistId, track.trackId)}
-                  className="rounded-full border border-surface-border bg-surface-2 px-3 py-1.5 text-xs text-ink-1 hover:bg-surface-3"
-                >
-                  + {playlist.title}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : null}
     </div>
   )
 }

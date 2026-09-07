@@ -4,9 +4,11 @@ import { Check, Copy, Mail, Share2 } from 'lucide-react'
 import { Modal } from './Modal'
 import { Button } from './Button'
 import { copyToClipboard, emailShareUrl, facebookShareUrl, whatsAppShareUrl, xShareUrl } from '@/utils/shareLinks'
+import { useToast } from '@/contexts/ToastContext'
 
 export function ShareButton({ url, title, text }: { url: string; title: string; text: string }) {
   const [open, setOpen] = useState(false)
+  const { notify } = useToast()
 
   async function handleClick() {
     if (navigator.share) {
@@ -26,12 +28,12 @@ export function ShareButton({ url, title, text }: { url: string; title: string; 
         <Share2 className="h-4 w-4" />
         Share
       </Button>
-      {open ? <ShareModal url={url} title={title} text={text} onClose={() => setOpen(false)} /> : null}
+      {open ? <ShareModal url={url} title={title} text={text} onClose={() => setOpen(false)} onCopied={() => notify('Link copied.')} /> : null}
     </>
   )
 }
 
-function ShareModal({ url, title, text, onClose }: { url: string; title: string; text: string; onClose: () => void }) {
+function ShareModal({ url, title, text, onClose, onCopied }: { url: string; title: string; text: string; onClose: () => void; onCopied: () => void }) {
   const [copied, setCopied] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -45,6 +47,7 @@ function ShareModal({ url, title, text, onClose }: { url: string; title: string;
     const ok = await copyToClipboard(url)
     if (ok) {
       setCopied(true)
+      onCopied()
       setTimeout(() => setCopied(false), 2000)
     }
   }

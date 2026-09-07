@@ -6,6 +6,7 @@ import { createPlaylist, subscribeOwnPlaylists } from '@/services/playlistServic
 import { Button } from '@/components/common/Button'
 import { Input } from '@/components/common/Input'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
+import { useToast } from '@/contexts/ToastContext'
 import type { PlaylistDoc } from '@/types/playlist'
 
 export function PlaylistsPage() {
@@ -13,6 +14,7 @@ export function PlaylistsPage() {
   const [playlists, setPlaylists] = useState<PlaylistDoc[] | null>(null)
   const [newTitle, setNewTitle] = useState('')
   const [creating, setCreating] = useState(false)
+  const { notify } = useToast()
 
   useEffect(() => {
     if (!firebaseUser) return
@@ -23,8 +25,12 @@ export function PlaylistsPage() {
     if (!firebaseUser || !newTitle.trim()) return
     setCreating(true)
     try {
-      await createPlaylist(firebaseUser.uid, newTitle.trim())
+      const title = newTitle.trim()
+      await createPlaylist(firebaseUser.uid, title)
       setNewTitle('')
+      notify(`Created ${title}.`)
+    } catch {
+      notify('Could not create the playlist. Please try again.', 'error')
     } finally {
       setCreating(false)
     }
@@ -36,7 +42,7 @@ export function PlaylistsPage() {
 
       <div className="flex max-w-md gap-2">
         <Input
-          placeholder="New playlist name"
+          placeholder="New playlist or album name"
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleCreate()}

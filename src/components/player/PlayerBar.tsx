@@ -1,39 +1,19 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Heart, Pause, Play, SkipBack, SkipForward, Volume2 } from 'lucide-react'
+import { Pause, Play, SkipBack, SkipForward, Volume2 } from 'lucide-react'
 import { usePlayer } from '@/contexts/PlayerContext'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatDuration } from '@/utils/format'
 import { FollowButton } from '@/components/music/FollowButton'
-import { likeTrack, subscribeIsLiked, unlikeTrack } from '@/services/likeService'
-import { clsx } from 'clsx'
+import { TrackActions } from '@/components/music/TrackActions'
 
 export function PlayerBar() {
   const { currentTrack, isPlaying, isLoading, progressSec, durationSec, volume, togglePlay, seek, next, previous, setVolume } =
     usePlayer()
   const artist = useArtistSummary(currentTrack?.artistId ?? null)
   const { firebaseUser } = useAuth()
-  const [liked, setLiked] = useState(false)
-
-  useEffect(() => {
-    if (!firebaseUser || !currentTrack) {
-      setLiked(false)
-      return
-    }
-    return subscribeIsLiked(firebaseUser.uid, currentTrack.trackId, setLiked)
-  }, [firebaseUser, currentTrack])
 
   if (!currentTrack) return null
-
-  async function toggleLike() {
-    if (!firebaseUser || !currentTrack) return
-    if (liked) {
-      await unlikeTrack(firebaseUser.uid, currentTrack.trackId)
-    } else {
-      await likeTrack(firebaseUser.uid, currentTrack.trackId)
-    }
-  }
 
   return (
     <div className="fixed inset-x-0 bottom-14 z-40 border-t border-white/[0.08] bg-[#090b0d]/90 px-3 py-2 shadow-[0_-20px_50px_rgba(0,0,0,.2)] backdrop-blur-2xl md:bottom-0 md:left-[264px] md:px-6 md:py-3">
@@ -125,13 +105,7 @@ export function PlayerBar() {
         </div>
 
         {firebaseUser ? (
-          <button
-            onClick={toggleLike}
-            className="hidden shrink-0 rounded-full p-2 text-ink-2 hover:bg-surface-2 hover:text-ink-0 sm:block"
-            aria-label={liked ? 'Unlike' : 'Like'}
-          >
-            <Heart className={clsx('h-4 w-4', liked && 'fill-danger-500 text-danger-500')} />
-          </button>
+          <div className="hidden shrink-0 sm:block"><TrackActions track={currentTrack} /></div>
         ) : null}
       </div>
     </div>

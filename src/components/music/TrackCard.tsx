@@ -2,6 +2,7 @@ import { Play } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { usePlayer } from '@/contexts/PlayerContext'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
+import { TrackActions } from '@/components/music/TrackActions'
 import type { TrackDoc } from '@/types/track'
 
 export function TrackCard({ track, queue }: { track: TrackDoc; queue?: TrackDoc[] }) {
@@ -39,16 +40,16 @@ export function TrackCard({ track, queue }: { track: TrackDoc; queue?: TrackDoc[
       >
         {track.title}
       </Link>
-      {artist ? (
-        <Link
-          to={`/artist/${artist.slug}`}
-          className="mt-0.5 block truncate text-[13px] text-ink-2 hover:text-ink-1"
-        >
-          {artist.name}
-        </Link>
-      ) : (
-        <div className="h-4" />
-      )}
+      <div className="mt-1 flex items-center justify-between gap-2">
+        {artist ? (
+          <Link to={`/artist/${artist.slug}`} className="min-w-0 truncate text-[13px] text-ink-2 hover:text-ink-1">
+            {artist.name}
+          </Link>
+        ) : (
+          <div className="h-4" />
+        )}
+        <TrackActions track={track} />
+      </div>
     </div>
   )
 }
