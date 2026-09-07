@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Check, CreditCard, Sparkles } from 'lucide-react'
+import { Check, CreditCard, Music2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { getPlatformSettings, listActiveSubscriptionPlansForRole } from '@/services/platformSettingsService'
 import { openBillingPortal, subscribeToOwnSubscription, subscribeToPlan } from '@/services/subscriptionService'
@@ -116,7 +116,7 @@ export function SubscriptionPage() {
                 >
                   <div className="absolute right-6 top-6 text-xs tabular-nums text-ink-3">0{index + 1}</div>
                   {plan.recommended ? (
-                    <span className="mb-5 flex w-fit items-center gap-1.5 rounded-full bg-brand-500 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.13em] text-[#090b06]"><Sparkles className="h-3 w-3" /> Recommended</span>
+                    <span className="mb-5 flex w-fit items-center gap-1.5 rounded-full bg-brand-500 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.13em] text-[#090b06]"><Music2 className="h-3 w-3" /> Recommended</span>
                   ) : (
                     <span className="mb-5 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-ink-3">Wavelength plan</span>
                   )}
