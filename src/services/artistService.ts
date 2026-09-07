@@ -48,6 +48,15 @@ export async function createArtistProfile(
   const baseSlug = slugify(input.name) || `artist-${artistId.slice(0, 6)}`
 
   return runTransaction(db, async (tx) => {
+    // Idempotent: a retried/queued call (e.g. a write that was offline when
+    // first submitted, replaying later) must not attempt to overwrite an
+    // already-created profile — Firestore rules would reject that as an
+    // update with a mismatched frozen slug. Return the existing slug instead.
+    const existingProfile = await tx.get(artistRef(artistId))
+    if (existingProfile.exists()) {
+      return existingProfile.data().slug as string
+    }
+
     let candidate = baseSlug
     let attempt = 0
     // Try the natural slug first, then append short suffixes on collision.

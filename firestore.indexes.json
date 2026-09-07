@@ -167,6 +167,14 @@
       ]
     },
     {
+      "collectionGroup": "verificationRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "downloadLogs",
       "queryScope": "COLLECTION",
       "fields": [
