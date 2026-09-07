@@ -25,7 +25,6 @@ import {
   Sparkles,
   UploadCloud,
   User,
-  UserCog,
   Users,
   Wallet,
 } from 'lucide-react'
@@ -71,7 +70,6 @@ export const artistDashboardNavItems: NavItem[] = [
   { label: 'Agreements', to: '/agreements', icon: FileText },
   { label: 'Revenue', to: '/dashboard/artist/revenue', icon: Wallet },
   { label: 'Settings', to: '/dashboard/artist/settings', icon: Settings },
-  { label: 'Account', to: '/app/settings', icon: UserCog },
 ]
 
 export const djNavItems: NavItem[] = [
@@ -81,7 +79,6 @@ export const djNavItems: NavItem[] = [
   { label: 'Analytics', to: '/dj/analytics', icon: LineChart },
   { label: 'Agreements', to: '/agreements', icon: FileText },
   { label: 'Profile', to: '/dj/profile', icon: Music4 },
-  { label: 'Account', to: '/app/settings', icon: UserCog },
 ]
 
 export const adminNavItems: NavItem[] = [

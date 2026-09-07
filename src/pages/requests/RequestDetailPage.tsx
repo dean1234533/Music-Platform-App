@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { Download, Send } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Download, Send, ArrowLeft } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   createLicencePaymentSession,
@@ -41,6 +41,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function RequestDetailPage() {
   const { requestId } = useParams<{ requestId: string }>()
+  const navigate = useNavigate()
   const { firebaseUser } = useAuth()
   const [request, setRequest] = useState<LicenceRequestDoc | null | undefined>(undefined)
   const [track, setTrack] = useState<TrackDoc | null>(null)
@@ -140,6 +141,9 @@ export function RequestDetailPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
+      <button onClick={() => navigate(-1)} className="flex w-fit items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0">
+        <ArrowLeft className="h-4 w-4" /> Back
+      </button>
       <div>
         <span className="rounded-full bg-surface-3 px-3 py-1 text-xs font-medium text-ink-1">
           {STATUS_LABEL[request.status] ?? request.status}

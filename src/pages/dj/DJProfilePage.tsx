@@ -8,6 +8,7 @@ import { signOut } from '@/services/authService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
 import { LoadingState, EmptyState } from '@/components/common/StateViews'
+import { AccountSecuritySection } from '@/components/account/AccountSecuritySection'
 import type { DJProfile } from '@/types/dj'
 
 export function DJProfilePage() {
@@ -113,6 +114,8 @@ export function DJProfilePage() {
       <Button onClick={handleSave} loading={saving} className="w-fit">
         Save changes
       </Button>
+
+      <AccountSecuritySection />
 
       <Button
         variant="secondary"

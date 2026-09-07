@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { listArtistAgreements, listDjAgreements } from '@/services/licenceService'
 import { getTrack } from '@/services/trackService'
@@ -18,6 +19,7 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 export function MyAgreementsPage() {
+  const navigate = useNavigate()
   const { firebaseUser, hasRole } = useAuth()
   const [agreements, setAgreements] = useState<LicenceAgreementDoc[] | null>(null)
   const [trackTitles, setTrackTitles] = useState<Record<string, string>>({})
@@ -55,6 +57,9 @@ export function MyAgreementsPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
+      <button onClick={() => navigate(-1)} className="flex w-fit items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0">
+        <ArrowLeft className="h-4 w-4" /> Back
+      </button>
       <h1 className="text-2xl font-semibold text-ink-0">My Agreements</h1>
 
       {agreements === null ? (

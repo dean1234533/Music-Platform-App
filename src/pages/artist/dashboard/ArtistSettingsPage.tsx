@@ -8,6 +8,7 @@ import { signOut } from '@/services/authService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
 import { LoadingState, EmptyState } from '@/components/common/StateViews'
+import { AccountSecuritySection } from '@/components/account/AccountSecuritySection'
 import { validateImageFile } from '@/utils/uploadLimits'
 import type { ArtistProfile, DJRequestPolicy } from '@/types/artist'
 
@@ -247,8 +248,10 @@ export function ArtistSettingsPage() {
         </div>
       </section>
 
+      <AccountSecuritySection />
+
       <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Security</h2>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Session</h2>
         <Button
           variant="secondary"
           onClick={async () => {

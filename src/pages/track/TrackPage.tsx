@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Play, Pause, Radio, Flag, Scale } from 'lucide-react'
+import { Play, Pause, Radio, Flag, Scale, ArrowLeft } from 'lucide-react'
 import { subscribeTrack } from '@/services/trackService'
 import { usePlayer } from '@/contexts/PlayerContext'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
@@ -57,6 +57,9 @@ export function TrackPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-10">
+      <button onClick={() => navigate(-1)} className="flex w-fit items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0">
+        <ArrowLeft className="h-4 w-4" /> Back
+      </button>
       <div className="flex flex-col gap-6 sm:flex-row">
         <div className="h-48 w-48 shrink-0 overflow-hidden rounded-2xl bg-surface-2">
           {track.artworkURL ? <img src={track.artworkURL} alt="" className="h-full w-full object-cover" /> : null}

@@ -1,4 +1,6 @@
 import { useState, type ChangeEvent } from 'react'
+import { Link } from 'react-router-dom'
+import { Settings } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { updateBasicProfile } from '@/services/userService'
 import { uploadUserAvatar } from '@/services/profileMediaService'
@@ -50,7 +52,16 @@ export function ProfilePage() {
 
   return (
     <div className="flex max-w-lg flex-col gap-6">
-      <h1 className="text-2xl font-semibold text-ink-0">Profile</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-ink-0">Profile</h1>
+        <Link
+          to="/app/settings"
+          className="flex items-center gap-1.5 rounded-full border border-surface-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-ink-1 hover:bg-surface-3"
+        >
+          <Settings className="h-3.5 w-3.5" />
+          Settings
+        </Link>
+      </div>
 
       <div className="flex items-center gap-4">
         <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-surface-3 text-xl font-semibold text-ink-1">
