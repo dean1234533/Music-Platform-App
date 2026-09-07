@@ -1,7 +1,8 @@
 import { collection, doc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
+import { db, storage } from '@/lib/firebase'
 import { callable } from '@/lib/callable'
-import type { DownloadLogDoc, IntendedUse, LicenceAgreementDoc, LicenceRequestDoc } from '@/types/licence'
+import type { DownloadLogDoc, IntendedUse, LicenceAgreementDoc, LicenceOfferDoc, LicenceRequestDoc } from '@/types/licence'
 
 export interface SubmitLicenceRequestInput {
   trackId: string
@@ -10,6 +11,11 @@ export interface SubmitLicenceRequestInput {
   expectedDate: string
   venue: string
   message: string
+  dealId?: string
+  requestedStartDate?: string
+  requestedEndDate?: string
+  recordingIntention?: boolean
+  streamingIntention?: boolean
 }
 
 const submitRequestCallable = callable<SubmitLicenceRequestInput, { requestId: string; conversationId: string }>(
@@ -70,9 +76,51 @@ export const proposeAgreement = callable<ProposeAgreementInput, { agreementId: s
   'proposeAgreement',
 )
 
-export const signAgreement = callable<{ agreementId: string; agreedToTerms: boolean }, { ok: boolean; bothAccepted: boolean }>(
-  'signAgreement',
-)
+export interface SignAgreementInput {
+  agreementId: string
+  agreedToTerms: boolean
+  legalName: string
+  signatureType: 'typed' | 'drawn'
+  signatureReference: string
+  authorityConfirmed: boolean
+}
+
+export const signAgreement = callable<SignAgreementInput, { ok: boolean; bothAccepted: boolean }>('signAgreement')
+
+export interface OfferTermsInput {
+  priceMinor: number
+  currency: string
+  permittedUse: string
+  territory: string
+  startDate: string
+  expiryDate: string | null
+  recordingPermission: boolean
+  streamingPermission: boolean
+  promotionalMixPermission: boolean
+  attributionRequirements: string
+  redistributionAllowed: boolean
+  resaleAllowed: boolean
+  remixAllowed: boolean
+  additionalTerms: string
+}
+
+export const sendOffer = callable<{ requestId: string } & OfferTermsInput, { offerId: string }>('sendOffer')
+export const counterOffer = callable<{ requestId: string } & OfferTermsInput, { offerId: string }>('counterOffer')
+export const acceptOffer = callable<{ requestId: string }, { agreementId: string }>('acceptOffer')
+export const withdrawOffer = callable<{ requestId: string }, { ok: boolean }>('withdrawOffer')
+
+/** Uploaded before calling signAgreement, matching copyrightEvidence's upload-then-reference ordering. */
+export async function uploadDrawnSignature(agreementId: string, uid: string, blob: Blob): Promise<string> {
+  const path = `licenceSignatures/${agreementId}/${uid}.png`
+  const snap = await uploadBytes(ref(storage, path), blob)
+  return getDownloadURL(snap.ref)
+}
+
+export function subscribeOffer(offerId: string, onChange: (offer: LicenceOfferDoc | null) => void) {
+  return onSnapshot(doc(db, 'licenceOffers', offerId), (snap) => {
+    onChange(snap.exists() ? (snap.data() as LicenceOfferDoc) : null)
+  })
+}
 
 export const createLicencePaymentSession = callable<
   { agreementId: string; successUrl: string; cancelUrl: string },
@@ -95,4 +143,18 @@ export async function listDjAgreements(djId: string): Promise<LicenceAgreementDo
   const q = query(collection(db, 'licenceAgreements'), where('djId', '==', djId), orderBy('createdAt', 'desc'))
   const snap = await getDocs(q)
   return snap.docs.map((d) => d.data() as LicenceAgreementDoc)
+}
+
+/** Licence history for the signed-in artist. */
+export async function listArtistAgreements(artistId: string): Promise<LicenceAgreementDoc[]> {
+  const q = query(collection(db, 'licenceAgreements'), where('artistId', '==', artistId), orderBy('createdAt', 'desc'))
+  const snap = await getDocs(q)
+  return snap.docs.map((d) => d.data() as LicenceAgreementDoc)
+}
+
+/** Download history for the signed-in artist's tracks. */
+export async function listArtistDownloadLogs(artistId: string): Promise<DownloadLogDoc[]> {
+  const q = query(collection(db, 'downloadLogs'), where('artistId', '==', artistId), orderBy('timestamp', 'desc'))
+  const snap = await getDocs(q)
+  return snap.docs.map((d) => d.data() as DownloadLogDoc)
 }

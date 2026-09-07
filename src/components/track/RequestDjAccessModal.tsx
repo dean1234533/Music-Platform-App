@@ -16,13 +16,25 @@ const USE_OPTIONS: { value: IntendedUse; label: string }[] = [
   { value: 'other', label: 'Other' },
 ]
 
-export function RequestDjAccessModal({ trackId, onClose }: { trackId: string; onClose: () => void }) {
+export function RequestDjAccessModal({
+  trackId,
+  dealId,
+  onClose,
+}: {
+  trackId: string
+  dealId?: string | null
+  onClose: () => void
+}) {
   const navigate = useNavigate()
   const [intendedUse, setIntendedUse] = useState<IntendedUse>('dj_set')
   const [territory, setTerritory] = useState('')
   const [expectedDate, setExpectedDate] = useState('')
   const [venue, setVenue] = useState('')
   const [message, setMessage] = useState('')
+  const [requestedStartDate, setRequestedStartDate] = useState('')
+  const [requestedEndDate, setRequestedEndDate] = useState('')
+  const [recordingIntention, setRecordingIntention] = useState(false)
+  const [streamingIntention, setStreamingIntention] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -30,7 +42,19 @@ export function RequestDjAccessModal({ trackId, onClose }: { trackId: string; on
     setSubmitting(true)
     setError(null)
     try {
-      const { requestId } = await submitLicenceRequest({ trackId, intendedUse, territory, expectedDate, venue, message })
+      const { requestId } = await submitLicenceRequest({
+        trackId,
+        intendedUse,
+        territory,
+        expectedDate,
+        venue,
+        message,
+        dealId: dealId ?? undefined,
+        requestedStartDate: requestedStartDate || undefined,
+        requestedEndDate: requestedEndDate || undefined,
+        recordingIntention,
+        streamingIntention,
+      })
       navigate(`/requests/${requestId}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not submit your request.')
@@ -40,7 +64,7 @@ export function RequestDjAccessModal({ trackId, onClose }: { trackId: string; on
   }
 
   return (
-    <Modal title="Request DJ access" onClose={onClose}>
+    <Modal title={dealId ? 'Request this deal' : 'Request DJ access'} onClose={onClose}>
       <div className="flex flex-col gap-4">
         <div>
           <Label>Intended use</Label>
@@ -66,9 +90,29 @@ export function RequestDjAccessModal({ trackId, onClose }: { trackId: string; on
             <Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
           </div>
         </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Requested start date</Label>
+            <Input type="date" value={requestedStartDate} onChange={(e) => setRequestedStartDate(e.target.value)} />
+          </div>
+          <div>
+            <Label>Requested end date</Label>
+            <Input type="date" value={requestedEndDate} onChange={(e) => setRequestedEndDate(e.target.value)} />
+          </div>
+        </div>
         <div>
           <Label>Venue (if relevant)</Label>
           <Input value={venue} onChange={(e) => setVenue(e.target.value)} />
+        </div>
+        <div className="flex gap-4">
+          <label className="flex items-center gap-2 text-sm text-ink-1">
+            <input type="checkbox" checked={recordingIntention} onChange={(e) => setRecordingIntention(e.target.checked)} className="h-4 w-4" />
+            I intend to record this
+          </label>
+          <label className="flex items-center gap-2 text-sm text-ink-1">
+            <input type="checkbox" checked={streamingIntention} onChange={(e) => setStreamingIntention(e.target.checked)} className="h-4 w-4" />
+            I intend to stream this
+          </label>
         </div>
         <div>
           <Label>Message to the artist</Label>

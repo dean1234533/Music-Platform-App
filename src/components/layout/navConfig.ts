@@ -7,6 +7,8 @@ import {
   CreditCard,
   Disc3,
   FileClock,
+  FileText,
+  Handshake,
   Heart,
   Home,
   Layers,
@@ -63,6 +65,8 @@ export const artistDashboardNavItems: NavItem[] = [
   { label: 'Stories', to: '/dashboard/artist/stories', icon: Sparkles },
   { label: 'Community', to: '/dashboard/artist/community', icon: Users },
   { label: 'DJ Requests', to: '/dashboard/artist/dj-requests', icon: MessageSquare },
+  { label: 'DJ Deals', to: '/dashboard/artist/deals', icon: Handshake },
+  { label: 'Agreements', to: '/agreements', icon: FileText },
   { label: 'Revenue', to: '/dashboard/artist/revenue', icon: Wallet },
   { label: 'Settings', to: '/dashboard/artist/settings', icon: Settings },
 ]
@@ -72,6 +76,7 @@ export const djNavItems: NavItem[] = [
   { label: 'Requests', to: '/dj/requests', icon: MessageSquare },
   { label: 'Crates', to: '/dj/crates', icon: Layers },
   { label: 'Analytics', to: '/dj/analytics', icon: LineChart },
+  { label: 'Agreements', to: '/agreements', icon: FileText },
   { label: 'Profile', to: '/dj/profile', icon: Music4 },
 ]
 

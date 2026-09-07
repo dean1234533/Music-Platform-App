@@ -2,6 +2,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
 import { userHasRole } from '../roles.js'
+import { writeSystemMessage } from '../messaging/messages.js'
 
 const INTENDED_USES = [
   'live_club_performance',
@@ -25,7 +26,19 @@ export const submitLicenceRequest = onCall(async (request) => {
     throw new HttpsError('permission-denied', 'A DJ profile is required to request tracks.')
   }
 
-  const { trackId, intendedUse, territory, expectedDate, venue, message } = request.data ?? {}
+  const {
+    trackId,
+    intendedUse,
+    territory,
+    expectedDate,
+    venue,
+    message,
+    dealId,
+    requestedStartDate,
+    requestedEndDate,
+    recordingIntention,
+    streamingIntention,
+  } = request.data ?? {}
   if (!trackId || typeof trackId !== 'string') throw new HttpsError('invalid-argument', 'trackId is required.')
   if (!INTENDED_USES.includes(intendedUse)) throw new HttpsError('invalid-argument', 'Invalid intendedUse.')
 
@@ -34,6 +47,15 @@ export const submitLicenceRequest = onCall(async (request) => {
   const track = trackSnap.data()!
   if (!track.djPromotion || track.djLicenceMode === 'not_available') {
     throw new HttpsError('failed-precondition', 'This track is not open for DJ requests.')
+  }
+  const dealSettings = track.djDealSettings as
+    | { acceptDjRequests: boolean; allowedDealIds: string[]; verifiedDjsOnly: boolean }
+    | undefined
+  if (dealSettings && !dealSettings.acceptDjRequests) {
+    throw new HttpsError('failed-precondition', 'This track is not open for DJ requests.')
+  }
+  if (dealId && (!dealSettings || !dealSettings.allowedDealIds.includes(dealId))) {
+    throw new HttpsError('invalid-argument', 'That deal is not available on this track.')
   }
   const embargoUntil = track.embargoUntil as Timestamp | null
   if (embargoUntil && embargoUntil.toMillis() > Date.now()) {
@@ -47,6 +69,8 @@ export const submitLicenceRequest = onCall(async (request) => {
   }
 
   const djProfileRef = db.collection('djProfiles').doc(djId)
+  const djUserSnap = await db.collection('users').doc(djId).get()
+  const djName = (djUserSnap.data()?.displayName as string) || 'A DJ'
   const requestRef = db.collection('licenceRequests').doc()
   const conversationRef = db.collection('conversations').doc()
 
@@ -54,10 +78,12 @@ export const submitLicenceRequest = onCall(async (request) => {
     const djSnap = await tx.get(djProfileRef)
     const djData = djSnap.data() ?? {}
 
-    if (policy === 'verified_only' || policy === 'approved_only') {
-      // NOTE: 'approved_only' currently enforces the same bar as 'verified_only'
-      // (a verified DJ badge). A per-artist DJ allowlist is a follow-up beyond
-      // this MVP — artists can still reject individual requests manually.
+    const requireVerified = policy === 'verified_only' || policy === 'approved_only' || dealSettings?.verifiedDjsOnly
+    if (requireVerified) {
+      // NOTE: artist-level 'approved_only' currently enforces the same bar as
+      // 'verified_only' (a verified DJ badge). A per-artist DJ allowlist is a
+      // follow-up beyond this MVP — artists can still reject individual
+      // requests manually.
       if (djData.verificationStatus !== 'verified') {
         throw new HttpsError('permission-denied', 'This artist only accepts requests from verified DJs.')
       }
@@ -74,8 +100,14 @@ export const submitLicenceRequest = onCall(async (request) => {
       expectedDate: expectedDate ?? null,
       venue: venue ?? null,
       message: message ?? '',
+      dealId: dealId ?? null,
+      requestedStartDate: requestedStartDate ?? null,
+      requestedEndDate: requestedEndDate ?? null,
+      recordingIntention: Boolean(recordingIntention),
+      streamingIntention: Boolean(streamingIntention),
       status: 'submitted',
       conversationId: conversationRef.id,
+      legalHold: false,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     })
@@ -87,6 +119,7 @@ export const submitLicenceRequest = onCall(async (request) => {
       lastMessageAt: FieldValue.serverTimestamp(),
       createdAt: FieldValue.serverTimestamp(),
     })
+    writeSystemMessage(tx, conversationRef, djId, 'system', `${djName} requested access to "${track.title}".`)
     tx.set(db.collection('notifications').doc(), {
       userId: artistId,
       type: 'dj_request',

@@ -1,6 +1,54 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
+import type { DocumentData, DocumentReference } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
+
+export type MessageKind = 'text' | 'system' | 'offer_card' | 'contract_status' | 'payment_status'
+
+/**
+ * Minimal shape shared by Transaction and WriteBatch for the two methods
+ * used here. A plain `Transaction | WriteBatch` union isn't callable in TS
+ * (their overloaded `set`/`update` signatures don't unify across the
+ * union), so callers pass either and this structural type accepts both.
+ */
+interface BatchLikeWriter {
+  set(ref: DocumentReference, data: DocumentData): unknown
+  update(ref: DocumentReference, data: DocumentData): unknown
+}
+
+/**
+ * Posts a platform-generated message into a conversation as part of the
+ * caller's own transaction/batch — never exposed as its own callable, so a
+ * client can never forge a system/offer/contract-status message (the
+ * `messages` subcollection is `allow write: if false` for every path).
+ * `actingUserId` is recorded as senderId for audit purposes only; the UI
+ * never renders a system message as "from" that user.
+ */
+export function writeSystemMessage(
+  writer: BatchLikeWriter,
+  conversationRef: DocumentReference,
+  actingUserId: string,
+  kind: MessageKind,
+  text: string,
+  extra: { offerId?: string; agreementId?: string } = {},
+) {
+  const messageRef = conversationRef.collection('messages').doc()
+  writer.set(messageRef, {
+    messageId: messageRef.id,
+    conversationId: conversationRef.id,
+    senderId: actingUserId,
+    kind,
+    text,
+    offerId: extra.offerId ?? null,
+    agreementId: extra.agreementId ?? null,
+    readBy: [],
+    createdAt: FieldValue.serverTimestamp(),
+  })
+  writer.update(conversationRef, {
+    lastMessageAt: FieldValue.serverTimestamp(),
+    lastMessagePreview: text.slice(0, 140),
+  })
+}
 
 const MAX_MESSAGE_LENGTH = 4000
 
@@ -32,7 +80,10 @@ export const sendMessage = onCall(async (request) => {
       messageId: messageRef.id,
       conversationId,
       senderId: uid,
+      kind: 'text',
       text: text.trim(),
+      offerId: null,
+      agreementId: null,
       readBy: [uid],
       createdAt: FieldValue.serverTimestamp(),
     })

@@ -18,7 +18,7 @@ export const createLicencePaymentSession = onCall({ secrets: [stripeSecretKey] }
   if (agreement.djId !== request.auth.uid) {
     throw new HttpsError('permission-denied', 'Only the requesting DJ can pay for this licence.')
   }
-  if (agreement.status !== 'signed') {
+  if (agreement.status !== 'awaiting_payment') {
     throw new HttpsError('failed-precondition', 'Both parties must sign before payment.')
   }
   if (agreement.paidAt) {

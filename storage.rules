@@ -160,5 +160,19 @@ service firebase.storage {
       allow write: if isSignedIn() && underImageUploadLimit() &&
         (isImage() || request.resource.contentType == 'application/pdf');
     }
+
+    // licenceSignatures/{agreementId}/{fileName} — drawn e-signature images.
+    // Uploaded by whichever party is signing, before calling signAgreement
+    // (same upload-then-reference ordering as copyrightEvidence). Only the
+    // two parties on the agreement (or an admin) can read them back.
+    function isPartyToAgreement(agreementId) {
+      let agreement = firestore.get(/databases/(default)/documents/licenceAgreements/$(agreementId)).data;
+      return request.auth.uid == agreement.artistId || request.auth.uid == agreement.djId;
+    }
+    match /licenceSignatures/{agreementId}/{fileName} {
+      allow read: if isSignedIn() &&
+        (isPartyToAgreement(agreementId) || ('admin' in firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.roles));
+      allow write: if isSignedIn() && isPartyToAgreement(agreementId) && underImageUploadLimit() && isImage();
+    }
   }
 }

@@ -33,8 +33,11 @@ export const getSecureDownloadUrl = onCall(async (request) => {
   if (agreement.djId !== djId) {
     throw new HttpsError('permission-denied', 'This agreement does not belong to you.')
   }
-  if (agreement.status !== 'signed') {
-    throw new HttpsError('failed-precondition', 'Agreement is not fully signed.')
+  if (agreement.status !== 'active') {
+    throw new HttpsError('failed-precondition', 'Agreement is not active.')
+  }
+  if (agreement.legalHold) {
+    throw new HttpsError('permission-denied', 'This agreement is under legal hold.')
   }
   if (agreement.downloadRevoked) {
     throw new HttpsError('permission-denied', 'Download access has been revoked.')

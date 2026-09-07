@@ -128,7 +128,8 @@ service cloud.firestore {
         && request.resource.data.get('mimeType', null) == resource.data.get('mimeType', null)
         && request.resource.data.get('hashCheckedAt', null) == resource.data.get('hashCheckedAt', null)
         && request.resource.data.get('possibleDuplicateOfTrackId', null) == resource.data.get('possibleDuplicateOfTrackId', null)
-        && request.resource.data.get('restrictedCapabilities', []) == resource.data.get('restrictedCapabilities', []);
+        && request.resource.data.get('restrictedCapabilities', []) == resource.data.get('restrictedCapabilities', [])
+        && request.resource.data.get('legalHold', false) == resource.data.get('legalHold', false);
 
       allow delete: if isSignedIn() && resource.data.artistId == request.auth.uid;
     }
@@ -244,6 +245,22 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // djDeals/{dealId} — artist-created reusable licence deal templates.
+    // Public read (DJs need to see terms on the track page), owner write.
+    // Not security-sensitive like licenceAgreements (no money/signature
+    // attached until a request references one), so direct client writes are
+    // fine here — mirrors artistProfiles/artistPosts rather than the fully
+    // callable-only agreement pipeline.
+    match /djDeals/{dealId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.artistId == request.auth.uid
+        && request.resource.data.dealId == dealId;
+      allow update: if isSignedIn() && resource.data.artistId == request.auth.uid
+        && request.resource.data.artistId == resource.data.artistId
+        && request.resource.data.dealId == resource.data.dealId;
+      allow delete: if isSignedIn() && resource.data.artistId == request.auth.uid;
+    }
+
     // subscriptionPlans/{planId} — admin-configured pricing, public read only.
     match /subscriptionPlans/{planId} {
       allow read: if true;
@@ -312,6 +329,13 @@ service cloud.firestore {
       allow write: if false;
     }
     match /licenceAgreements/{docId} {
+      allow read: if isSignedIn() && (resource.data.djId == request.auth.uid || resource.data.artistId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+    // licenceOffers/{offerId} — versioned offer/counter-offer history.
+    // Never overwritten by clients — every new offer or counter is a new
+    // doc written by sendOffer/counterOffer/acceptOffer/withdrawOffer.
+    match /licenceOffers/{docId} {
       allow read: if isSignedIn() && (resource.data.djId == request.auth.uid || resource.data.artistId == request.auth.uid || isAdmin());
       allow write: if false;
     }

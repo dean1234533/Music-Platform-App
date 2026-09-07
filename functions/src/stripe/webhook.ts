@@ -6,6 +6,7 @@ import { db } from '../admin.js'
 import { getPlatformSettings } from '../platformSettings.js'
 import { getStripe, stripeSecretKey, stripeWebhookSecret } from './client.js'
 import { mapSubscriptionStatus } from '../entitlements.js'
+import { writeSystemMessage } from '../messaging/messages.js'
 
 function isFanSubscription(subscription: Stripe.Subscription): boolean {
   const role = subscription.metadata?.role
@@ -165,12 +166,23 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   const netMinor = typeof agreement.artistNetMinor === 'number' ? agreement.artistNetMinor : grossMinor - platformFeeMinor
   const txId = `licence_${agreementId}`
 
+  const requestRef = db.collection('licenceRequests').doc(agreement.licenceRequestId)
+  const requestSnap = await requestRef.get()
+  const conversationRef = requestSnap.exists
+    ? db.collection('conversations').doc(requestSnap.data()!.conversationId as string)
+    : null
+
   const batch = db.batch()
-  batch.update(agreementRef, { paidAt: FieldValue.serverTimestamp() })
-  batch.update(db.collection('licenceRequests').doc(agreement.licenceRequestId), {
+  batch.update(agreementRef, { paidAt: FieldValue.serverTimestamp(), status: 'active' })
+  batch.update(requestRef, {
     status: 'approved',
     updatedAt: FieldValue.serverTimestamp(),
   })
+  if (conversationRef) {
+    writeSystemMessage(batch, conversationRef, agreement.djId, 'payment_status', 'Payment completed — track access unlocked.', {
+      agreementId,
+    })
+  }
   batch.set(db.collection('transactions').doc(txId), {
     transactionId: txId,
     type: 'dj_licence_income',

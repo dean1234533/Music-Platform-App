@@ -6,7 +6,6 @@ import {
   createLicencePaymentSession,
   getSecureDownloadUrl,
   respondToLicenceRequest,
-  signAgreement,
   subscribeAgreement,
   subscribeLicenceRequest,
 } from '@/services/licenceService'
@@ -14,11 +13,13 @@ import { sendMessage, subscribeMessages } from '@/services/messagingService'
 import { getTrack } from '@/services/trackService'
 import { getPlatformSettings } from '@/services/platformSettingsService'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
-import { ProposeAgreementModal } from '@/components/licence/ProposeAgreementModal'
+import { OfferFormModal } from '@/components/licence/OfferFormModal'
+import { OfferCard } from '@/components/licence/OfferCard'
+import { SignAgreementModal } from '@/components/licence/SignAgreementModal'
 import { Button } from '@/components/common/Button'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import { formatCurrency } from '@/utils/format'
-import type { LicenceAgreementDoc, LicenceRequestDoc } from '@/types/licence'
+import type { LicenceAgreementDoc, LicenceOfferDoc, LicenceRequestDoc } from '@/types/licence'
 import type { MessageDoc } from '@/types/conversation'
 import type { TrackDoc } from '@/types/track'
 import type { PlatformSettings } from '@/types/platformSettings'
@@ -27,6 +28,8 @@ const STATUS_LABEL: Record<string, string> = {
   submitted: 'New',
   artist_review: 'Under review',
   negotiating: 'In discussion',
+  offer_sent: 'Offer sent',
+  counter_offer: 'Counter-offer',
   agreement_ready: 'Awaiting agreement',
   awaiting_signatures: 'Awaiting signatures',
   awaiting_payment: 'Awaiting payment',
@@ -44,7 +47,8 @@ export function RequestDetailPage() {
   const [agreement, setAgreement] = useState<LicenceAgreementDoc | null>(null)
   const [messages, setMessages] = useState<MessageDoc[]>([])
   const [messageText, setMessageText] = useState('')
-  const [showProposeModal, setShowProposeModal] = useState(false)
+  const [offerModal, setOfferModal] = useState<{ mode: 'send' | 'counter'; previousOffer: LicenceOfferDoc | null } | null>(null)
+  const [showSignModal, setShowSignModal] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null)
@@ -103,11 +107,6 @@ export function RequestDetailPage() {
     await runAction(() => sendMessage({ conversationId: request!.conversationId, text }))
   }
 
-  async function handleSign() {
-    if (!agreement) return
-    await runAction(() => signAgreement({ agreementId: agreement.agreementId, agreedToTerms: true }))
-  }
-
   async function handlePay() {
     if (!agreement) return
     const origin = window.location.origin
@@ -137,6 +136,7 @@ export function RequestDetailPage() {
   const artistNetMinor = agreement?.artistNetMinor ?? (
     agreement && platformFeeMinor !== undefined ? agreement.licenceFeeMinor - platformFeeMinor : undefined
   )
+  const canOffer = ['submitted', 'negotiating', 'offer_sent', 'counter_offer', 'agreement_ready'].includes(request.status)
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
@@ -171,9 +171,9 @@ export function RequestDetailPage() {
         </Button>
       ) : null}
 
-      {isArtist && ['negotiating', 'agreement_ready'].includes(request.status) ? (
-        <Button size="sm" onClick={() => setShowProposeModal(true)} className="w-fit">
-          {agreement ? 'Update licence terms' : 'Propose licence terms'}
+      {isArtist && canOffer && !request.currentOfferId ? (
+        <Button size="sm" onClick={() => setOfferModal({ mode: 'send', previousOffer: null })} className="w-fit">
+          Send offer
         </Button>
       ) : null}
 
@@ -207,45 +207,70 @@ export function RequestDetailPage() {
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {agreement.status === 'pending' && !hasAcceptedAlready ? (
-              <Button size="sm" loading={busy} onClick={handleSign}>
+              <Button size="sm" loading={busy} onClick={() => setShowSignModal(true)}>
                 Sign agreement
               </Button>
             ) : agreement.status === 'pending' ? (
               <p className="text-xs text-ink-2">Waiting for the other party to sign.</p>
             ) : null}
 
-            {agreement.status === 'signed' && isDj && agreement.licenceFeeMinor > 0 && !agreement.paidAt ? (
+            {agreement.status === 'awaiting_payment' && isDj && agreement.licenceFeeMinor > 0 ? (
               <Button size="sm" loading={busy} onClick={handlePay}>
                 Pay {formatCurrency(agreement.licenceFeeMinor, agreement.currency)}
               </Button>
             ) : null}
 
-            {request.status === 'approved' && isDj ? (
+            {agreement.status === 'active' && isDj ? (
               <Button size="sm" loading={busy} onClick={handleDownload}>
                 <Download className="h-4 w-4" />
                 Download full-quality track
               </Button>
             ) : null}
+
+            <Link to={`/agreements/${agreement.agreementId}`} className="text-xs font-medium text-brand-400 hover:underline">
+              View full contract →
+            </Link>
           </div>
         </div>
       ) : null}
 
       <div>
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-3">Messages</h2>
-        <div ref={scrollRef} className="flex max-h-80 flex-col gap-2 overflow-y-auto rounded-xl border border-surface-border bg-surface-1 p-4">
+        <div ref={scrollRef} className="flex max-h-96 flex-col gap-2 overflow-y-auto rounded-xl border border-surface-border bg-surface-1 p-4">
           {messages.length === 0 ? (
             <p className="text-sm text-ink-2">No messages yet.</p>
           ) : (
-            messages.map((m) => (
-              <div
-                key={m.messageId}
-                className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
-                  m.senderId === firebaseUser.uid ? 'self-end bg-brand-500 text-white' : 'self-start bg-surface-3 text-ink-0'
-                }`}
-              >
-                {m.text}
-              </div>
-            ))
+            messages.map((m) => {
+              const kind = m.kind ?? 'text'
+              if (kind === 'offer_card' && m.offerId) {
+                return (
+                  <OfferCard
+                    key={m.messageId}
+                    offerId={m.offerId}
+                    requestId={request.requestId}
+                    uid={firebaseUser.uid}
+                    onCounter={(offer) => setOfferModal({ mode: 'counter', previousOffer: offer })}
+                  />
+                )
+              }
+              if (kind === 'system' || kind === 'contract_status' || kind === 'payment_status') {
+                return (
+                  <p key={m.messageId} className="self-center text-center text-xs text-ink-3">
+                    {m.text}
+                  </p>
+                )
+              }
+              return (
+                <div
+                  key={m.messageId}
+                  className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
+                    m.senderId === firebaseUser.uid ? 'self-end bg-brand-500 text-white' : 'self-start bg-surface-3 text-ink-0'
+                  }`}
+                >
+                  {m.text}
+                </div>
+              )
+            })
           )}
         </div>
         <div className="mt-2 flex gap-2">
@@ -262,8 +287,22 @@ export function RequestDetailPage() {
         </div>
       </div>
 
-      {showProposeModal ? (
-        <ProposeAgreementModal requestId={request.requestId} onClose={() => setShowProposeModal(false)} onProposed={() => {}} />
+      {offerModal ? (
+        <OfferFormModal
+          requestId={request.requestId}
+          mode={offerModal.mode}
+          previousOffer={offerModal.previousOffer}
+          onClose={() => setOfferModal(null)}
+        />
+      ) : null}
+
+      {showSignModal && agreement ? (
+        <SignAgreementModal
+          agreementId={agreement.agreementId}
+          uid={firebaseUser.uid}
+          onClose={() => setShowSignModal(false)}
+          onSigned={() => {}}
+        />
       ) : null}
     </div>
   )

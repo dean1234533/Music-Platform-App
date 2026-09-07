@@ -36,6 +36,7 @@ import { OverviewPage } from '@/pages/artist/dashboard/OverviewPage'
 import { MusicPage } from '@/pages/artist/dashboard/MusicPage'
 import { UploadTrackPage } from '@/pages/artist/dashboard/UploadTrackPage'
 import { StoriesPage } from '@/pages/artist/dashboard/StoriesPage'
+import { DjDealsPage } from '@/pages/artist/dashboard/DjDealsPage'
 import { StoryAnalyticsPage } from '@/pages/artist/dashboard/StoryAnalyticsPage'
 import { CommunityPage } from '@/pages/artist/dashboard/CommunityPage'
 import { DJRequestsPage as ArtistDJRequestsPage } from '@/pages/artist/dashboard/DJRequestsPage'
@@ -51,6 +52,8 @@ import { DJAnalyticsPage } from '@/pages/dj/DJAnalyticsPage'
 
 import { TrackPage } from '@/pages/track/TrackPage'
 import { RequestDetailPage } from '@/pages/requests/RequestDetailPage'
+import { MyAgreementsPage } from '@/pages/agreements/MyAgreementsPage'
+import { ContractPage } from '@/pages/agreements/ContractPage'
 
 import { AdminDashboardLayout } from '@/pages/admin/AdminDashboardLayout'
 import { AdminUsersPage } from '@/pages/admin/AdminUsersPage'
@@ -119,6 +122,22 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/agreements"
+              element={
+                <ProtectedRoute>
+                  <MyAgreementsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/agreements/:agreementId"
+              element={
+                <ProtectedRoute>
+                  <ContractPage />
+                </ProtectedRoute>
+              }
+            />
 
             <Route
               path="/app"
@@ -163,6 +182,7 @@ function App() {
               <Route path="stories/analytics" element={<StoryAnalyticsPage />} />
               <Route path="community" element={<CommunityPage />} />
               <Route path="dj-requests" element={<ArtistDJRequestsPage />} />
+              <Route path="deals" element={<DjDealsPage />} />
               <Route path="revenue" element={<RevenuePage />} />
               <Route path="plan" element={<Navigate replace to="/dashboard/artist" />} />
               <Route path="settings" element={<ArtistSettingsPage />} />

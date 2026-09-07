@@ -12,6 +12,7 @@ export { onSupportRelationshipCreate, onSupportRelationshipDelete } from './supp
 
 // Phase 3 — DJ discovery, licence requests, messaging.
 export { submitLicenceRequest, respondToLicenceRequest } from './licensing/requests.js'
+export { sendOffer, counterOffer, acceptOffer, withdrawOffer } from './licensing/offers.js'
 export { sendMessage } from './messaging/messages.js'
 
 // Phase 4 — digital agreements, DJ licence payments, secure downloads.

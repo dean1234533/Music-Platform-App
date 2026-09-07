@@ -9,6 +9,7 @@ import { subscribeOwnPlaylists, addTrackToPlaylist } from '@/services/playlistSe
 import { FollowButton } from '@/components/music/FollowButton'
 import { RequestDjAccessModal } from '@/components/track/RequestDjAccessModal'
 import { ReportTrackModal } from '@/components/track/ReportTrackModal'
+import { DealsPanel } from '@/components/licence/DealsPanel'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import { Button } from '@/components/common/Button'
 import { ShareButton } from '@/components/common/ShareButton'
@@ -26,6 +27,7 @@ export function TrackPage() {
   const { firebaseUser, hasRole } = useAuth()
   const [playlists, setPlaylists] = useState<PlaylistDoc[]>([])
   const [showDjRequest, setShowDjRequest] = useState(false)
+  const [requestDealId, setRequestDealId] = useState<string | null>(null)
   const [showReport, setShowReport] = useState(false)
 
   useEffect(() => {
@@ -140,7 +142,30 @@ export function TrackPage() {
         </div>
       ) : null}
 
-      {showDjRequest ? <RequestDjAccessModal trackId={track.trackId} onClose={() => setShowDjRequest(false)} /> : null}
+      {hasRole('dj') && track.djDealSettings?.acceptDjRequests ? (
+        <DealsPanel
+          dealSettings={track.djDealSettings}
+          onSelectDeal={(dealId) => {
+            setRequestDealId(dealId)
+            setShowDjRequest(true)
+          }}
+          onCustomDeal={() => {
+            setRequestDealId(null)
+            setShowDjRequest(true)
+          }}
+        />
+      ) : null}
+
+      {showDjRequest ? (
+        <RequestDjAccessModal
+          trackId={track.trackId}
+          dealId={requestDealId}
+          onClose={() => {
+            setShowDjRequest(false)
+            setRequestDealId(null)
+          }}
+        />
+      ) : null}
       {showReport ? <ReportTrackModal trackId={track.trackId} onClose={() => setShowReport(false)} /> : null}
 
       {firebaseUser ? (

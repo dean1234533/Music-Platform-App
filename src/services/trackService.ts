@@ -10,12 +10,14 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  updateDoc,
   where,
 } from 'firebase/firestore'
 import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions, storage } from '@/lib/firebase'
 import type { LicenceMode, TrackCredits, TrackDoc, TrackVisibility } from '@/types/track'
+import type { TrackDjDealSettings } from '@/types/deal'
 
 function trackRef(trackId: string) {
   return doc(db, 'tracks', trackId)
@@ -174,6 +176,10 @@ export function subscribeTrack(trackId: string, onChange: (track: TrackDoc | nul
   return onSnapshot(trackRef(trackId), (snap) => {
     onChange(snap.exists() ? (snap.data() as TrackDoc) : null)
   })
+}
+
+export async function updateTrackDealSettings(trackId: string, settings: TrackDjDealSettings): Promise<void> {
+  await updateDoc(trackRef(trackId), { djDealSettings: settings, updatedAt: serverTimestamp() })
 }
 
 export async function getPreviewPlaybackURL(track: TrackDoc): Promise<string> {

@@ -1,4 +1,5 @@
 import type { Timestamp } from 'firebase/firestore'
+import type { TrackDjDealSettings } from './deal'
 
 export type TrackVisibility =
   | 'public'
@@ -68,6 +69,10 @@ export interface TrackDoc {
   rightsMetadata?: TrackRightsMetadata
   /** Capabilities temporarily withheld by an admin during a copyright review — never all-or-nothing like takenDown. */
   restrictedCapabilities?: RestrictedCapability[]
+  /** Finer-grained DJ deal configuration layered on top of djPromotion/djLicenceMode. */
+  djDealSettings?: TrackDjDealSettings
+  /** Admin/backend-only: blocks automatic retention cleanup from touching this track. */
+  legalHold?: boolean
 }
 
 export type RestrictedCapability = 'dj_licensing' | 'discovery' | 'streaming'

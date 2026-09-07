@@ -1,6 +1,101 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
+import type { WriteBatch, DocumentReference, DocumentData } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
+import { writeSystemMessage } from '../messaging/messages.js'
+
+export interface AgreementTerms {
+  permittedUse: string
+  territory: string
+  startDate: string
+  expiryDate: string | null
+  licenceFeeMinor: number
+  currency: string
+  attributionRequirements: string
+  recordingPermission: boolean
+  streamingPermission: boolean
+  promotionalMixPermission: boolean
+  commercialUse: boolean
+  redistributionAllowed: boolean
+  resaleAllowed: boolean
+  remixAllowed: boolean
+  additionalTerms: string
+  rightsHolderDeclaration: boolean
+}
+
+/**
+ * Shared "create or version" logic for turning agreed terms into a contract
+ * record — used by both the legacy proposeAgreement (freeform artist edit)
+ * and acceptOffer (sourced from an accepted offer's frozen fields). If the
+ * request's current agreement hasn't been accepted by anyone yet, it's
+ * edited in place; otherwise a new version is created and the old one is
+ * marked superseded. Signed agreements are never mutated by this path.
+ */
+export async function writeAgreementVersion(
+  batch: WriteBatch,
+  requestRef: DocumentReference,
+  licenceRequest: DocumentData,
+  terms: AgreementTerms,
+): Promise<{ agreementRef: DocumentReference; version: number; editedInPlace: boolean }> {
+  let version = 1
+  let previousRef: DocumentReference | null = null
+  let editInPlaceRef: DocumentReference | null = null
+
+  if (licenceRequest.currentAgreementId) {
+    previousRef = db.collection('licenceAgreements').doc(licenceRequest.currentAgreementId)
+    const previousSnap = await previousRef.get()
+    if (previousSnap.exists) {
+      const previous = previousSnap.data()!
+      if (!previous.artistAcceptedAt && !previous.djAcceptedAt) {
+        editInPlaceRef = previousRef
+        version = previous.agreementVersion
+      } else {
+        version = previous.agreementVersion + 1
+      }
+    }
+  }
+
+  if (editInPlaceRef) {
+    batch.update(editInPlaceRef, { ...terms, updatedAt: FieldValue.serverTimestamp() })
+    batch.update(requestRef, { status: 'agreement_ready', currentAgreementId: editInPlaceRef.id, updatedAt: FieldValue.serverTimestamp() })
+    return { agreementRef: editInPlaceRef, version, editedInPlace: true }
+  }
+
+  const agreementRef = db.collection('licenceAgreements').doc()
+  if (previousRef) {
+    batch.update(previousRef, { status: 'superseded', updatedAt: FieldValue.serverTimestamp() })
+  }
+
+  batch.set(agreementRef, {
+    agreementId: agreementRef.id,
+    licenceRequestId: requestRef.id,
+    artistId: licenceRequest.artistId,
+    djId: licenceRequest.djId,
+    trackId: licenceRequest.trackId,
+    trackVersion: 1,
+    ...terms,
+    agreementVersion: version,
+    status: 'pending',
+    artistAcceptedAt: null,
+    djAcceptedAt: null,
+    artistLegalName: null,
+    djLegalName: null,
+    paidAt: null,
+    downloadRevoked: false,
+    downloadCount: 0,
+    legalHold: false,
+    createdAt: FieldValue.serverTimestamp(),
+    finalisedAt: null,
+  })
+
+  batch.update(requestRef, {
+    status: 'agreement_ready',
+    currentAgreementId: agreementRef.id,
+    updatedAt: FieldValue.serverTimestamp(),
+  })
+
+  return { agreementRef, version, editedInPlace: false }
+}
 
 interface ProposeAgreementInput {
   requestId: string
@@ -20,9 +115,10 @@ interface ProposeAgreementInput {
 }
 
 /**
- * Only the artist proposes terms. Once either party has accepted a version,
- * a change creates a brand new agreement doc (agreementVersion + 1) rather
- * than mutating signed terms — signed agreements are immutable per the spec.
+ * Legacy freeform "artist edits terms directly" path — kept working but no
+ * longer surfaced in the UI, which now goes through the offer/counter-offer
+ * flow (sendOffer/counterOffer/acceptOffer in offers.ts) that funnels into
+ * the same writeAgreementVersion() helper above.
  */
 export const proposeAgreement = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
@@ -41,53 +137,8 @@ export const proposeAgreement = onCall(async (request) => {
     throw new HttpsError('failed-precondition', 'This request is already finalised.')
   }
 
-  let version = 1
-  let previousRef: FirebaseFirestore.DocumentReference | null = null
-
-  if (licenceRequest.currentAgreementId) {
-    previousRef = db.collection('licenceAgreements').doc(licenceRequest.currentAgreementId)
-    const previousSnap = await previousRef.get()
-    if (previousSnap.exists) {
-      const previous = previousSnap.data()!
-      if (!previous.artistAcceptedAt && !previous.djAcceptedAt) {
-        // Nobody has accepted yet — safe to edit this version in place.
-        await previousRef.update({
-          permittedUse: input.permittedUse,
-          territory: input.territory,
-          startDate: input.startDate,
-          expiryDate: input.expiryDate,
-          licenceFeeMinor: input.licenceFeeMinor,
-          currency: input.currency,
-          attributionRequirements: input.attributionRequirements,
-          recordingPermission: input.recordingPermission,
-          streamingPermission: input.streamingPermission,
-          commercialUse: input.commercialUse,
-          redistributionAllowed: input.redistributionAllowed,
-          resaleAllowed: input.resaleAllowed,
-          additionalTerms: input.additionalTerms,
-          updatedAt: FieldValue.serverTimestamp(),
-        })
-        await requestRef.update({ status: 'agreement_ready', updatedAt: FieldValue.serverTimestamp() })
-        return { agreementId: previousRef.id, agreementVersion: previous.agreementVersion }
-      }
-      version = previous.agreementVersion + 1
-    }
-  }
-
-  const agreementRef = db.collection('licenceAgreements').doc()
   const batch = db.batch()
-
-  if (previousRef) {
-    batch.update(previousRef, { status: 'superseded', updatedAt: FieldValue.serverTimestamp() })
-  }
-
-  batch.set(agreementRef, {
-    agreementId: agreementRef.id,
-    licenceRequestId: input.requestId,
-    artistId: licenceRequest.artistId,
-    djId: licenceRequest.djId,
-    trackId: licenceRequest.trackId,
-    trackVersion: 1,
+  const { agreementRef, version } = await writeAgreementVersion(batch, requestRef, licenceRequest, {
     permittedUse: input.permittedUse,
     territory: input.territory,
     startDate: input.startDate,
@@ -97,25 +148,13 @@ export const proposeAgreement = onCall(async (request) => {
     attributionRequirements: input.attributionRequirements,
     recordingPermission: input.recordingPermission,
     streamingPermission: input.streamingPermission,
+    promotionalMixPermission: false,
     commercialUse: input.commercialUse,
     redistributionAllowed: input.redistributionAllowed,
     resaleAllowed: input.resaleAllowed,
+    remixAllowed: false,
     additionalTerms: input.additionalTerms,
-    agreementVersion: version,
-    status: 'pending',
-    artistAcceptedAt: null,
-    djAcceptedAt: null,
-    paidAt: null,
-    downloadRevoked: false,
-    downloadCount: 0,
-    createdAt: FieldValue.serverTimestamp(),
-    finalisedAt: null,
-  })
-
-  batch.update(requestRef, {
-    status: 'agreement_ready',
-    currentAgreementId: agreementRef.id,
-    updatedAt: FieldValue.serverTimestamp(),
+    rightsHolderDeclaration: true,
   })
 
   batch.set(db.collection('notifications').doc(), {
@@ -141,9 +180,21 @@ export const proposeAgreement = onCall(async (request) => {
 export const signAgreement = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   const uid = request.auth.uid
-  const { agreementId, agreedToTerms } = request.data ?? {}
+  const { agreementId, agreedToTerms, legalName, signatureType, signatureReference, authorityConfirmed } = request.data ?? {}
   if (!agreementId || typeof agreementId !== 'string') throw new HttpsError('invalid-argument', 'agreementId is required.')
   if (agreedToTerms !== true) throw new HttpsError('invalid-argument', 'You must confirm you agree to the terms.')
+  if (!legalName || typeof legalName !== 'string' || !legalName.trim()) {
+    throw new HttpsError('invalid-argument', 'Your full legal name is required.')
+  }
+  if (signatureType !== 'typed' && signatureType !== 'drawn') {
+    throw new HttpsError('invalid-argument', 'Invalid signatureType.')
+  }
+  if (!signatureReference || typeof signatureReference !== 'string') {
+    throw new HttpsError('invalid-argument', 'signatureReference is required.')
+  }
+  if (authorityConfirmed !== true) {
+    throw new HttpsError('invalid-argument', 'You must confirm you have authority to enter into this agreement.')
+  }
 
   const agreementRef = db.collection('licenceAgreements').doc(agreementId)
   const snap = await agreementRef.get()
@@ -160,12 +211,24 @@ export const signAgreement = onCall(async (request) => {
   if (isArtist && agreement.artistAcceptedAt) throw new HttpsError('failed-precondition', 'Already signed.')
   if (isDj && agreement.djAcceptedAt) throw new HttpsError('failed-precondition', 'Already signed.')
 
+  const requestRef = db.collection('licenceRequests').doc(agreement.licenceRequestId)
+  const requestSnap = await requestRef.get()
+  const conversationRef = requestSnap.exists
+    ? db.collection('conversations').doc(requestSnap.data()!.conversationId as string)
+    : null
+
   const now = FieldValue.serverTimestamp()
   const acceptanceLogRef = db.collection('licenceAgreementAcceptances').doc()
 
   const update: Record<string, unknown> = { updatedAt: now }
-  if (isArtist) update.artistAcceptedAt = now
-  if (isDj) update.djAcceptedAt = now
+  if (isArtist) {
+    update.artistAcceptedAt = now
+    update.artistLegalName = legalName.trim()
+  }
+  if (isDj) {
+    update.djAcceptedAt = now
+    update.djLegalName = legalName.trim()
+  }
 
   const bothWillBeAccepted = isArtist
     ? Boolean(agreement.djAcceptedAt)
@@ -178,14 +241,27 @@ export const signAgreement = onCall(async (request) => {
     agreementId,
     userId: uid,
     role: isArtist ? 'artist' : 'dj',
+    legalName: legalName.trim(),
+    signatureType,
+    signatureReference,
+    authorityConfirmed: true,
     agreementVersion: agreement.agreementVersion,
+    // Best-effort — v2 onCall exposes rawRequest, but it may be absent in
+    // some execution contexts (e.g. the emulator); never fail signing over it.
+    ipAddress: request.rawRequest?.ip ?? null,
+    userAgent: request.rawRequest?.get?.('user-agent') ?? null,
     acceptedAt: now,
   })
 
+  if (conversationRef) {
+    writeSystemMessage(batch, conversationRef, uid, 'contract_status', `${isArtist ? 'Artist' : 'DJ'} signed the agreement.`, {
+      agreementId,
+    })
+  }
+
   if (bothWillBeAccepted) {
-    batch.update(agreementRef, { status: 'signed', finalisedAt: now })
-    const requestRef = db.collection('licenceRequests').doc(agreement.licenceRequestId)
     const requiresPayment = (agreement.licenceFeeMinor ?? 0) > 0
+    batch.update(agreementRef, { status: requiresPayment ? 'awaiting_payment' : 'active', finalisedAt: now })
     batch.update(requestRef, {
       status: requiresPayment ? 'awaiting_payment' : 'approved',
       updatedAt: now,
@@ -202,6 +278,16 @@ export const signAgreement = onCall(async (request) => {
       read: false,
       createdAt: now,
     })
+    if (conversationRef) {
+      writeSystemMessage(
+        batch,
+        conversationRef,
+        uid,
+        'contract_status',
+        requiresPayment ? 'Contract fully signed — payment required.' : 'Contract fully signed — track access unlocked.',
+        { agreementId },
+      )
+    }
   }
 
   await batch.commit()

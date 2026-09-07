@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Megaphone, Plus } from 'lucide-react'
+import { Handshake, Megaphone, Plus } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeArtistTracks } from '@/services/artistService'
 import { subscribeArtistCopyrightClaims } from '@/services/moderationService'
@@ -8,6 +8,7 @@ import { Button } from '@/components/common/Button'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import { BulkDjOutreachModal } from '@/components/track/BulkDjOutreachModal'
 import { CopyrightClaimBanner } from '@/components/track/CopyrightClaimBanner'
+import { TrackDealSettingsModal } from '@/components/licence/TrackDealSettingsModal'
 import type { TrackDoc } from '@/types/track'
 import { OPEN_CLAIM_STATUSES, type CopyrightClaimDoc } from '@/types/moderation'
 
@@ -25,6 +26,7 @@ export function MusicPage() {
   const [tracks, setTracks] = useState<TrackDoc[] | null>(null)
   const [claims, setClaims] = useState<CopyrightClaimDoc[]>([])
   const [outreachTrack, setOutreachTrack] = useState<TrackDoc | null>(null)
+  const [dealsTrack, setDealsTrack] = useState<TrackDoc | null>(null)
 
   useEffect(() => {
     if (!firebaseUser) return
@@ -101,6 +103,14 @@ export function MusicPage() {
                   <Megaphone className="h-4 w-4" />
                 </button>
               ) : null}
+              <button
+                type="button"
+                onClick={() => setDealsTrack(track)}
+                className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-surface-3 hover:text-ink-0"
+                title="DJ deals"
+              >
+                <Handshake className="h-4 w-4" />
+              </button>
             </div>
           ))}
         </div>
@@ -109,6 +119,7 @@ export function MusicPage() {
       {outreachTrack ? (
         <BulkDjOutreachModal trackId={outreachTrack.trackId} trackTitle={outreachTrack.title} onClose={() => setOutreachTrack(null)} />
       ) : null}
+      {dealsTrack ? <TrackDealSettingsModal track={dealsTrack} onClose={() => setDealsTrack(null)} /> : null}
     </div>
   )
 }
