@@ -11,7 +11,12 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      injectRegister: 'auto',
+      // Registered manually in src/main.tsx instead: the auto-injected
+      // registerSW.js registers the worker but never reloads an already-open
+      // tab once a new one takes control, so users could keep running a
+      // stale bundle indefinitely after a deploy despite skipWaiting()/
+      // clientsClaim() in sw-src/sw.ts already handing it control.
+      injectRegister: false,
       strategies: 'injectManifest',
       srcDir: 'sw-src',
       filename: 'sw.ts',
