@@ -1,33 +1,39 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { db } from '../admin.js'
+import { userHasRole } from '../roles.js'
+import { PLAN_ROLES, type PlanDoc, type PlanRole } from '../entitlements.js'
 import { getStripe, stripeSecretKey } from './client.js'
 
-interface SubscriptionPlanDoc {
-  planId: string
-  stripePriceId: string
-  active: boolean
-}
-
 /**
- * Creates a Stripe Checkout Session for a platform subscription plan. The
- * client only ever receives back a redirect URL — no Stripe secret key, no
- * price/amount trust decisions happen here beyond looking up the plan the
- * admin actually configured.
+ * Creates a Stripe Checkout Session for a subscription plan. The client only
+ * ever receives back a redirect URL — no Stripe secret key, no price/amount
+ * trust decisions happen here beyond looking up the plan the admin actually
+ * configured for the requested role.
  */
 export const createCheckoutSession = onCall({ secrets: [stripeSecretKey] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   const uid = request.auth.uid
   const planId = request.data?.planId as string | undefined
+  const role = request.data?.role as PlanRole | undefined
   const successUrl = request.data?.successUrl as string | undefined
   const cancelUrl = request.data?.cancelUrl as string | undefined
-  if (!planId || !successUrl || !cancelUrl) {
-    throw new HttpsError('invalid-argument', 'planId, successUrl, and cancelUrl are required.')
+  if (!planId || !role || !successUrl || !cancelUrl) {
+    throw new HttpsError('invalid-argument', 'planId, role, successUrl, and cancelUrl are required.')
+  }
+  if (!(PLAN_ROLES as readonly string[]).includes(role)) {
+    throw new HttpsError('invalid-argument', 'Invalid role.')
+  }
+  // The fan role is implicit/always available; artist/dj tiers require the user already holds that role.
+  if (role !== 'fan' && !(await userHasRole(uid, role))) {
+    throw new HttpsError('failed-precondition', `You need a ${role} profile before subscribing to a ${role} plan.`)
   }
 
   const planSnap = await db.collection('subscriptionPlans').doc(planId).get()
   if (!planSnap.exists) throw new HttpsError('not-found', 'Subscription plan not found.')
-  const plan = planSnap.data() as SubscriptionPlanDoc
+  const plan = planSnap.data() as PlanDoc
   if (!plan.active) throw new HttpsError('failed-precondition', 'This plan is no longer available.')
+  if (plan.role !== role) throw new HttpsError('invalid-argument', 'Plan does not match the requested role.')
+  if (!plan.stripePriceId) throw new HttpsError('failed-precondition', 'This plan has no billing configured yet.')
 
   const stripe = getStripe()
   const userRef = db.collection('users').doc(uid)
@@ -50,8 +56,8 @@ export const createCheckoutSession = onCall({ secrets: [stripeSecretKey] }, asyn
     line_items: [{ price: plan.stripePriceId, quantity: 1 }],
     success_url: successUrl,
     cancel_url: cancelUrl,
-    subscription_data: { metadata: { firebaseUid: uid, planId } },
-    metadata: { firebaseUid: uid, planId },
+    subscription_data: { metadata: { firebaseUid: uid, planId, role } },
+    metadata: { firebaseUid: uid, planId, role },
   })
 
   return { url: session.url }

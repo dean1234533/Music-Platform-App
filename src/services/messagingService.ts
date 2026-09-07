@@ -5,6 +5,11 @@ import type { ConversationDoc, MessageDoc } from '@/types/conversation'
 
 export const sendMessage = callable<{ conversationId: string; text: string }, { messageId: string }>('sendMessage')
 
+/** Artist Pro+ only — server enforces the bulkDjOutreach entitlement and the opted-in-DJs-only allowlist. */
+export const sendBulkDjOutreach = callable<{ trackId: string; message: string }, { ok: boolean; sentCount: number }>(
+  'sendBulkDjOutreach',
+)
+
 export function subscribeConversation(conversationId: string, onChange: (conversation: ConversationDoc | null) => void) {
   return onSnapshot(doc(db, 'conversations', conversationId), (snap) => {
     onChange(snap.exists() ? (snap.data() as ConversationDoc) : null)

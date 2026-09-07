@@ -1,11 +1,15 @@
-import { useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { createTrack, newTrackId, uploadTrackAssets } from '@/services/trackService'
+import { getArtistProfile } from '@/services/artistService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
 import { formatFileSize, MAX_AUDIO_MB, MAX_IMAGE_MB, validateAudioFile, validateImageFile } from '@/utils/uploadLimits'
 import type { LicenceMode, TrackVisibility } from '@/types/track'
+import { CAMELOT_KEYS, GENRES, MOODS } from '@/constants/musicTaxonomy'
+import { useCanUploadTrack, useEntitlement } from '@/hooks/useEntitlements'
+import { UpgradePrompt } from '@/components/common/UpgradePrompt'
 
 const VISIBILITY_OPTIONS: { value: TrackVisibility; label: string }[] = [
   { value: 'public', label: 'Public stream' },
@@ -28,11 +32,16 @@ export function UploadTrackPage() {
   const { firebaseUser } = useAuth()
   const navigate = useNavigate()
 
+  const { hasFeature } = useEntitlement('artist')
+  const { allowed: canUpload, trackCount, trackLimit, loading: uploadLimitLoading } = useCanUploadTrack()
+
   const [title, setTitle] = useState('')
-  const [genre, setGenre] = useState('')
+  const [genre, setGenre] = useState<string>(GENRES[0])
   const [subgenre, setSubgenre] = useState('')
   const [bpm, setBpm] = useState('')
   const [mood, setMood] = useState('')
+  const [trackKey, setTrackKey] = useState('')
+  const [artistLocation, setArtistLocation] = useState<string | null>(null)
   const [description, setDescription] = useState('')
   const [explicit, setExplicit] = useState(false)
   const [songwriters, setSongwriters] = useState('')
@@ -44,6 +53,13 @@ export function UploadTrackPage() {
   const [djPromotion, setDjPromotion] = useState(false)
   const [djLicenceMode, setDjLicenceMode] = useState<LicenceMode>('not_available')
   const [djFixedPrice, setDjFixedPrice] = useState('')
+  const [djPromoTier, setDjPromoTier] = useState<'all' | 'pro_plus_only'>('all')
+  const [embargoDate, setEmbargoDate] = useState('')
+
+  useEffect(() => {
+    if (!firebaseUser) return
+    getArtistProfile(firebaseUser.uid).then((profile) => setArtistLocation(profile?.location ?? null))
+  }, [firebaseUser])
 
   const [previewFile, setPreviewFile] = useState<File | null>(null)
   const [originalFile, setOriginalFile] = useState<File | null>(null)
@@ -97,6 +113,8 @@ export function UploadTrackPage() {
         subgenre: subgenre || null,
         bpm: bpm ? Number(bpm) : null,
         mood: mood || null,
+        key: trackKey || null,
+        location: artistLocation,
         description,
         explicit,
         albumId: null,
@@ -111,6 +129,8 @@ export function UploadTrackPage() {
         djPromotion,
         djLicenceMode,
         djFixedPrice: djLicenceMode === 'fixed_price' && djFixedPrice ? Math.round(Number(djFixedPrice) * 100) : null,
+        djPromoTier: hasFeature('privatePromoReleases') ? djPromoTier : 'all',
+        embargoUntil: hasFeature('releaseEmbargoes') && embargoDate ? new Date(embargoDate) : null,
       })
       navigate('/dashboard/artist/music')
     } catch (err) {
@@ -127,26 +147,66 @@ export function UploadTrackPage() {
         The original file stays private — only your configured preview is ever public.
       </p>
 
+      {!uploadLimitLoading && !canUpload ? (
+        <UpgradePrompt
+          role="artist"
+          reason={`You've reached your Starter track limit (${trackCount}/${trackLimit}).`}
+          cta="Upgrade to Artist Pro"
+          className="mt-4"
+        />
+      ) : null}
+
       <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-6">
+        <fieldset disabled={!uploadLimitLoading && !canUpload} className="contents">
         <Field label="Track title">
           <Input required value={title} onChange={(e) => setTitle(e.target.value)} />
         </Field>
 
         <div className="grid grid-cols-2 gap-4">
           <Field label="Genre">
-            <Input required value={genre} onChange={(e) => setGenre(e.target.value)} />
+            <select
+              required
+              value={genre}
+              onChange={(e) => setGenre(e.target.value)}
+              className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 outline-none focus:border-brand-500"
+            >
+              {GENRES.map((g) => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
           </Field>
           <Field label="Subgenre">
             <Input value={subgenre} onChange={(e) => setSubgenre(e.target.value)} />
           </Field>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <Field label="BPM">
             <Input type="number" value={bpm} onChange={(e) => setBpm(e.target.value)} />
           </Field>
+          <Field label="Key">
+            <select
+              value={trackKey}
+              onChange={(e) => setTrackKey(e.target.value)}
+              className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 outline-none focus:border-brand-500"
+            >
+              <option value="">Not set</option>
+              {CAMELOT_KEYS.map((k) => (
+                <option key={k} value={k}>{k}</option>
+              ))}
+            </select>
+          </Field>
           <Field label="Mood">
-            <Input value={mood} onChange={(e) => setMood(e.target.value)} />
+            <select
+              value={mood}
+              onChange={(e) => setMood(e.target.value)}
+              className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 outline-none focus:border-brand-500"
+            >
+              <option value="">Not set</option>
+              {MOODS.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
           </Field>
         </div>
 
@@ -270,6 +330,27 @@ export function UploadTrackPage() {
               </Field>
             ) : null}
           </div>
+          {hasFeature('privatePromoReleases') || hasFeature('releaseEmbargoes') ? (
+            <div className="mt-4 grid grid-cols-2 gap-4 border-t border-dj-500/20 pt-4">
+              {hasFeature('privatePromoReleases') ? (
+                <Field label="Promo pool">
+                  <select
+                    value={djPromoTier}
+                    onChange={(e) => setDjPromoTier(e.target.value as 'all' | 'pro_plus_only')}
+                    className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 outline-none focus:border-brand-500"
+                  >
+                    <option value="all">All DJs</option>
+                    <option value="pro_plus_only">DJ Pro+ only (private)</option>
+                  </select>
+                </Field>
+              ) : null}
+              {hasFeature('releaseEmbargoes') ? (
+                <Field label="Embargo until (optional)">
+                  <Input type="date" value={embargoDate} onChange={(e) => setEmbargoDate(e.target.value)} />
+                </Field>
+              ) : null}
+            </div>
+          ) : null}
           <p className="mt-3 text-xs text-ink-2">
             DJ requests, negotiation, digital agreements, and paid licence downloads unlock in a
             later phase — this only controls discoverability for now.
@@ -292,6 +373,7 @@ export function UploadTrackPage() {
         <Button type="submit" loading={submitting} className="w-fit">
           Publish track
         </Button>
+        </fieldset>
       </form>
     </div>
   )

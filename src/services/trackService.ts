@@ -1,4 +1,5 @@
 import {
+  Timestamp,
   collection,
   doc,
   getDoc,
@@ -67,6 +68,9 @@ export interface CreateTrackInput {
   subgenre: string | null
   bpm: number | null
   mood: string | null
+  key: string | null
+  /** Denormalized from the artist's profile at upload time — pass ArtistProfile.location. */
+  location: string | null
   description: string
   explicit: boolean
   albumId: string | null
@@ -77,6 +81,10 @@ export interface CreateTrackInput {
   djPromotion: boolean
   djLicenceMode: LicenceMode
   djFixedPrice: number | null
+  /** Artist Pro+ only — UI should only expose this control when the artist has the bulkDjOutreach/teamAccess-tier feature. */
+  djPromoTier: 'all' | 'pro_plus_only'
+  /** Artist Pro+ only ("release embargo dates"). */
+  embargoUntil: Date | null
 }
 
 export async function createTrack(
@@ -99,6 +107,8 @@ export async function createTrack(
     subgenre: input.subgenre,
     bpm: input.bpm,
     mood: input.mood,
+    key: input.key,
+    location: input.location,
     releaseDate: serverTimestamp(),
     description: input.description,
     explicit: input.explicit,
@@ -112,6 +122,8 @@ export async function createTrack(
     djPromotion: input.djPromotion,
     djLicenceMode: input.djLicenceMode,
     djFixedPrice: input.djFixedPrice,
+    djPromoTier: input.djPromoTier,
+    embargoUntil: input.embargoUntil ? Timestamp.fromDate(input.embargoUntil) : null,
     playCount: 0,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -146,19 +158,48 @@ export async function listNewReleases(count = 20): Promise<TrackDoc[]> {
   return snap.docs.map((d) => d.data() as TrackDoc)
 }
 
-export async function listDJPromotionTracks(count = 20): Promise<TrackDoc[]> {
-  // Constrained to visibilities the tracks rule makes globally readable —
-  // an unconstrained djPromotion query could match a non-public track the
-  // viewer can't read, which fails the whole query under Firestore rules.
-  const q = query(
-    collection(db, 'tracks'),
-    where('djPromotion', '==', true),
-    where('visibility', 'in', ['public', 'dj_only']),
-    orderBy('createdAt', 'desc'),
-    limit(count),
-  )
+export interface DjTrackFilters {
+  genre?: string
+  mood?: string
+  key?: string
+  licenceMode?: LicenceMode
+  location?: string
+  bpmMin?: number
+  bpmMax?: number
+}
+
+/**
+ * DJ Pro/Pro+ discovery filtering. Only `genre` is pushed into the Firestore
+ * query (the one equality field worth an index at this app's scale) — the
+ * rest are applied client-side over a bounded page. Not a scalable search
+ * solution; fine for the catalogue sizes this app runs at today.
+ */
+export async function listDJPromotionTracksFiltered(
+  filters: DjTrackFilters = {},
+  opts: { includeProPlusOnly?: boolean; count?: number } = {},
+): Promise<TrackDoc[]> {
+  const constraints = [where('djPromotion', '==', true), where('visibility', 'in', ['public', 'dj_only'])]
+  if (filters.genre) constraints.push(where('genre', '==', filters.genre))
+
+  const q = query(collection(db, 'tracks'), ...constraints, orderBy('createdAt', 'desc'), limit(opts.count ?? 100))
   const snap = await getDocs(q)
-  return snap.docs.map((d) => d.data() as TrackDoc)
+  const now = Date.now()
+
+  return snap.docs
+    .map((d) => d.data() as TrackDoc)
+    .filter((t) => t.embargoUntil == null || t.embargoUntil.toMillis() <= now)
+    .filter((t) => opts.includeProPlusOnly || t.djPromoTier === 'all')
+    .filter((t) => !filters.mood || t.mood === filters.mood)
+    .filter((t) => !filters.key || t.key === filters.key)
+    .filter((t) => !filters.licenceMode || t.djLicenceMode === filters.licenceMode)
+    .filter((t) => !filters.location || t.location === filters.location)
+    .filter((t) => filters.bpmMin == null || (t.bpm != null && t.bpm >= filters.bpmMin))
+    .filter((t) => filters.bpmMax == null || (t.bpm != null && t.bpm <= filters.bpmMax))
+}
+
+/** DJ Free — unfiltered discovery, still embargo/promo-tier-respecting. */
+export async function listDJPromotionTracks(count = 20): Promise<TrackDoc[]> {
+  return listDJPromotionTracksFiltered({}, { includeProPlusOnly: false, count })
 }
 
 /** Server-side play counting keeps playCount out of reach of client tampering. */

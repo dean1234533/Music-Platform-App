@@ -5,23 +5,13 @@ import { FieldValue } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
 import { getPlatformSettings } from '../platformSettings.js'
 import { getStripe, stripeSecretKey, stripeWebhookSecret } from './client.js'
+import { mapSubscriptionStatus, mirrorResolvedLimits, PLAN_ROLES, type PlanRole } from '../entitlements.js'
 
-function mapSubscriptionStatus(status: Stripe.Subscription.Status): 'active' | 'past_due' | 'canceled' | 'none' {
-  switch (status) {
-    case 'active':
-    case 'trialing':
-      return 'active'
-    case 'past_due':
-    case 'unpaid':
-    case 'incomplete':
-      return 'past_due'
-    case 'canceled':
-    case 'incomplete_expired':
-    case 'paused':
-      return 'canceled'
-    default:
-      return 'none'
-  }
+function resolveRole(subscription: Stripe.Subscription): PlanRole {
+  const role = subscription.metadata?.role
+  // Pre-tiering subscriptions (created before this rollout) have no `role`
+  // metadata — they were always fan subscriptions, so default there.
+  return role && (PLAN_ROLES as readonly string[]).includes(role) ? (role as PlanRole) : 'fan'
 }
 
 async function findUidByCustomerId(customerId: string): Promise<string | null> {
@@ -38,12 +28,14 @@ async function upsertSubscriptionRecord(subscription: Stripe.Subscription) {
     return
   }
 
+  const role = resolveRole(subscription)
   const status = mapSubscriptionStatus(subscription.status)
   const item = subscription.items.data[0]
 
-  await db.collection('subscriptions').doc(uid).set(
+  await db.collection('subscriptions').doc(`${uid}_${role}`).set(
     {
       userId: uid,
+      role,
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscription.id,
       planId: subscription.metadata?.planId ?? null,
@@ -58,10 +50,18 @@ async function upsertSubscriptionRecord(subscription: Stripe.Subscription) {
     { merge: true },
   )
 
-  await db.collection('users').doc(uid).update({
-    subscriptionStatus: status,
-    updatedAt: FieldValue.serverTimestamp(),
-  })
+  // subscriptionStatus on users/{uid} is fan-role-only — see docs/FIRESTORE_SCHEMA.md.
+  if (role === 'fan') {
+    await db.collection('users').doc(uid).update({
+      subscriptionStatus: status,
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+  }
+
+  // Re-resolves the plan now that the subscription doc above is fresh, and
+  // mirrors trackLimit/planTier (artist) or planTier (dj). Covers upgrades,
+  // downgrades, and cancellations alike, since all three fire this handler.
+  await mirrorResolvedLimits(uid, role)
 }
 
 async function handleInvoicePaid(invoice: Stripe.Invoice) {

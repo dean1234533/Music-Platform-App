@@ -10,6 +10,7 @@ import { FollowButton } from '@/components/music/FollowButton'
 import { SupportButton } from '@/components/music/SupportButton'
 import { TrackCard } from '@/components/music/TrackCard'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/StateViews'
+import { UpgradePrompt } from '@/components/common/UpgradePrompt'
 import { formatCount } from '@/utils/format'
 import type { ArtistProfile, ArtistPost } from '@/types/artist'
 import type { TrackDoc } from '@/types/track'
@@ -150,6 +151,15 @@ export function ArtistPublicProfilePage() {
               ))}
             </div>
           </div>
+        ) : null}
+
+        {firebaseUser && !isSupporting ? (
+          <UpgradePrompt
+            role="fan"
+            reason={`Supporter-only posts and exclusive tracks from ${artist.name} are for supporters.`}
+            cta="Become a Supporter"
+            className="mt-10"
+          />
         ) : null}
       </div>
     </div>

@@ -30,3 +30,9 @@ export { adminSetUserSuspension, adminSetTrackTakedown } from './admin/moderatio
 export { blockSuspendedSignIn } from './admin/enforceSuspension.js'
 export { submitReport, adminResolveReport } from './admin/reports.js'
 export { adminUpsertSubscriptionPlan, adminUpdatePlatformSettings } from './admin/settings.js'
+
+// Tiered Fan/Artist/DJ entitlements.
+export { onTrackCreate, onTrackDelete } from './tracks/triggers.js'
+export { onArtistProfileCreate, onDjProfileCreate } from './profiles/triggers.js'
+export { adminSeedSubscriptionPlans } from './admin/seedPlans.js'
+export { sendBulkDjOutreach } from './messaging/bulkOutreach.js'

@@ -60,13 +60,22 @@ service cloud.firestore {
     // ---------------------------------------------------------------------
     match /artistProfiles/{artistId} {
       allow read: if true;
-      allow create: if isSelf(artistId) && request.resource.data.artistId == artistId;
+      allow create: if isSelf(artistId)
+        && request.resource.data.artistId == artistId
+        && request.resource.data.get('trackCount', 0) == 0;
+      // trackCount/trackLimit/planTier are server-mirrored (Cloud Functions
+      // only) — trackLimit in particular gates the tracks/{trackId} create
+      // rule below, so a client must never be able to raise it. perks is
+      // artist-writable (free-text, not platform-enforced).
       allow update: if isSelf(artistId)
         && request.resource.data.artistId == resource.data.artistId
         && request.resource.data.slug == resource.data.slug
         && request.resource.data.followerCount == resource.data.followerCount
         && request.resource.data.supporterCount == resource.data.supporterCount
-        && request.resource.data.verified == resource.data.verified;
+        && request.resource.data.verified == resource.data.verified
+        && request.resource.data.get('trackCount', 0) == resource.data.get('trackCount', 0)
+        && request.resource.data.get('trackLimit', 0) == resource.data.get('trackLimit', 0)
+        && request.resource.data.get('planTier', 'free') == resource.data.get('planTier', 'free');
       allow delete: if false;
     }
 
@@ -81,9 +90,15 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isSelf(djId) && request.resource.data.djId == djId
         && request.resource.data.verificationStatus == 'unverified';
+      // requestsThisMonth/requestsMonthResetAt/planTier are server-mirrored
+      // (the monthly request counter is maintained inside submitLicenceRequest's
+      // transaction). bulkOutreachOptIn is DJ-writable — it's their own opt-in.
       allow update: if isSelf(djId)
         && request.resource.data.djId == resource.data.djId
-        && request.resource.data.verificationStatus == resource.data.verificationStatus;
+        && request.resource.data.verificationStatus == resource.data.verificationStatus
+        && request.resource.data.get('requestsThisMonth', 0) == resource.data.get('requestsThisMonth', 0)
+        && request.resource.data.get('requestsMonthResetAt', null) == resource.data.get('requestsMonthResetAt', null)
+        && request.resource.data.get('planTier', 'free') == resource.data.get('planTier', 'free');
       allow delete: if false;
     }
 
@@ -99,11 +114,19 @@ service cloud.firestore {
         || (isSignedIn() && resource.data.artistId == request.auth.uid)
         || isAdmin();
 
+      // Track-count limit: rules never resolve a plan — they only compare the
+      // two integers Cloud Functions already mirrored onto artistProfiles
+      // (trackLimit == -1 means unlimited).
       allow create: if isSignedIn()
         && request.resource.data.artistId == request.auth.uid
         && hasRole('artist')
         && request.resource.data.rightsConfirmed == true
-        && request.resource.data.playCount == 0;
+        && request.resource.data.playCount == 0
+        && (
+          get(/databases/$(database)/documents/artistProfiles/$(request.auth.uid)).data.trackLimit == -1
+          || get(/databases/$(database)/documents/artistProfiles/$(request.auth.uid)).data.trackCount
+             < get(/databases/$(database)/documents/artistProfiles/$(request.auth.uid)).data.trackLimit
+        );
 
       allow update: if isSignedIn()
         && resource.data.artistId == request.auth.uid
@@ -146,6 +169,15 @@ service cloud.firestore {
       allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
     }
 
+    // crates/{crateId} — DJ-only equivalent of playlists (saved/organized
+    // track lists for a set). Kept as a separate collection so fan playlist
+    // queries and DJ crate queries never conflate.
+    match /crates/{crateId} {
+      allow read: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid && hasRole('dj');
+      allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
     match /artistPosts/{postId} {
       allow read: if resource.data.visibility == 'everyone'
         || (isSignedIn() && resource.data.artistId == request.auth.uid)
@@ -171,8 +203,10 @@ service cloud.firestore {
     // ---------------------------------------------------------------------
     // Phase 2 — subscriptions, support allocation, revenue records.
     // ---------------------------------------------------------------------
-    match /subscriptions/{userId} {
-      allow read: if isSelf(userId) || isAdmin();
+    // Doc ID is `${userId}_${role}` — a user can hold up to 3 concurrent
+    // subscriptions, one per role, so ownership is a field check, not an ID check.
+    match /subscriptions/{subId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow write: if false; // Stripe webhook only
     }
 

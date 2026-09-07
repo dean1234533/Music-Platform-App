@@ -1,7 +1,10 @@
 import type { Timestamp } from 'firebase/firestore'
+import type { PlanRole } from './entitlements'
 
+/** Doc ID is `${userId}_${role}` — a user can hold up to 3 concurrent subscriptions, one per role. */
 export interface SubscriptionDoc {
   userId: string
+  role: PlanRole
   stripeCustomerId: string
   stripeSubscriptionId: string
   planId: string | null

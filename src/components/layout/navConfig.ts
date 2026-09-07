@@ -9,7 +9,9 @@ import {
   FileClock,
   Heart,
   Home,
+  Layers,
   Library,
+  LineChart,
   ListMusic,
   MessageSquare,
   Music4,
@@ -60,13 +62,17 @@ export const artistDashboardNavItems: NavItem[] = [
   { label: 'Community', to: '/dashboard/artist/community', icon: Users },
   { label: 'DJ Requests', to: '/dashboard/artist/dj-requests', icon: MessageSquare },
   { label: 'Revenue', to: '/dashboard/artist/revenue', icon: Wallet },
+  { label: 'Plan', to: '/dashboard/artist/plan', icon: CreditCard },
   { label: 'Settings', to: '/dashboard/artist/settings', icon: Settings },
 ]
 
 export const djNavItems: NavItem[] = [
   { label: 'Discover', to: '/dj/discover', icon: Radar, end: true },
   { label: 'Requests', to: '/dj/requests', icon: MessageSquare },
+  { label: 'Crates', to: '/dj/crates', icon: Layers },
+  { label: 'Analytics', to: '/dj/analytics', icon: LineChart },
   { label: 'Profile', to: '/dj/profile', icon: Music4 },
+  { label: 'Plan', to: '/dj/plan', icon: CreditCard },
 ]
 
 export const adminNavItems: NavItem[] = [

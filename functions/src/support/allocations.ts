@@ -23,7 +23,7 @@ export const updateSupportAllocations = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'allocations must be an array.')
   }
 
-  const subSnap = await db.collection('subscriptions').doc(uid).get()
+  const subSnap = await db.collection('subscriptions').doc(`${uid}_fan`).get()
   if (!subSnap.exists || subSnap.data()?.status !== 'active') {
     throw new HttpsError('failed-precondition', 'An active subscription is required to support artists.')
   }
@@ -32,7 +32,11 @@ export const updateSupportAllocations = onCall(async (request) => {
   let capMinor = Number.POSITIVE_INFINITY
   if (planId) {
     const planSnap = await db.collection('subscriptionPlans').doc(planId).get()
-    if (planSnap.exists) capMinor = planSnap.data()?.priceMinor as number
+    if (planSnap.exists) {
+      const plan = planSnap.data()!
+      const limitCap = plan.limits?.supportAllocationCapMinor as number | undefined
+      capMinor = typeof limitCap === 'number' ? limitCap : (plan.priceMinor as number)
+    }
   }
 
   const cleaned = allocations

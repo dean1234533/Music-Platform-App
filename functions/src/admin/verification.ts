@@ -2,6 +2,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
 import { requireAdmin, writeAuditLog } from './guard.js'
+import { hasFeature } from '../entitlements.js'
 
 type ProfileType = 'artist' | 'dj'
 
@@ -11,6 +12,11 @@ export const submitVerificationRequest = onCall(async (request) => {
   const profileType = request.data?.profileType as ProfileType | undefined
   if (profileType !== 'artist' && profileType !== 'dj') {
     throw new HttpsError('invalid-argument', 'profileType must be "artist" or "dj".')
+  }
+
+  // DJ verification eligibility is a DJ Pro feature; artist verification has no tier gate.
+  if (profileType === 'dj' && !(await hasFeature(uid, 'dj', 'verifiedDjEligible'))) {
+    throw new HttpsError('permission-denied', 'DJ verification requires DJ Pro or higher.')
   }
 
   const collection = profileType === 'artist' ? 'artistProfiles' : 'djProfiles'

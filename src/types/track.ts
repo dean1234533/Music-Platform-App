@@ -42,6 +42,14 @@ export interface TrackDoc {
   djPromotion: boolean
   djLicenceMode: LicenceMode
   djFixedPrice: number | null
+  /** Camelot notation (e.g. '8A'), for DJ Pro harmonic-mixing filters. */
+  key: string | null
+  /** Denormalized copy of the artist's ArtistProfile.location at upload time, so location filtering needs no join. */
+  location: string | null
+  /** Artist Pro+ "private promo pools" — restricts DJ-discovery visibility to DJ Pro+ only. */
+  djPromoTier: 'all' | 'pro_plus_only'
+  /** Artist Pro+ "release embargo dates" — hidden from DJ discovery/requests until this passes. */
+  embargoUntil: Timestamp | null
   playCount: number
   createdAt: Timestamp | null
   updatedAt: Timestamp | null

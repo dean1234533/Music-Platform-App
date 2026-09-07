@@ -4,6 +4,7 @@ import { callable } from '@/lib/callable'
 import type { UserProfile } from '@/types/user'
 import type { CopyrightClaimDoc, ReportDoc, VerificationRequestDoc } from '@/types/moderation'
 import type { SubscriptionPlan } from '@/types/platformSettings'
+import type { PlanFeatureKey, PlanLimitKey, PlanRole, PlanTier } from '@/types/entitlements'
 
 export async function listUsers(count = 50): Promise<UserProfile[]> {
   const snap = await getDocs(query(collection(db, 'users'), limit(count)))
@@ -53,14 +54,24 @@ export const adminUpsertSubscriptionPlan = callable<
   {
     planId: string
     name: string
+    role: PlanRole
+    tier: PlanTier
     priceMinor: number
     currency: string
     interval: 'month' | 'year'
-    stripePriceId: string
+    stripePriceId: string | null
     active: boolean
+    isDefaultFree: boolean
+    features: Partial<Record<PlanFeatureKey, boolean>>
+    limits: Partial<Record<PlanLimitKey, number>>
+    displayOrder: number
+    recommended: boolean
   },
   { ok: boolean }
 >('adminUpsertSubscriptionPlan')
 export const adminUpdatePlatformSettings = callable<Record<string, unknown>, { ok: boolean }>(
   'adminUpdatePlatformSettings',
+)
+export const adminSeedSubscriptionPlans = callable<void, { ok: boolean; seeded: string[]; skipped: string[] }>(
+  'adminSeedSubscriptionPlans',
 )

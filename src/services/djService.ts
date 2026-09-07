@@ -29,6 +29,10 @@ export async function createDJProfile(djId: string, input: CreateDJProfileInput)
     website: null,
     socialLinks: {},
     verificationStatus: 'unverified',
+    requestsThisMonth: 0,
+    requestsMonthResetAt: null,
+    planTier: 'free',
+    bulkOutreachOptIn: false,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { Megaphone, Plus } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeArtistTracks } from '@/services/artistService'
+import { useEntitlement } from '@/hooks/useEntitlements'
 import { Button } from '@/components/common/Button'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
+import { BulkDjOutreachModal } from '@/components/track/BulkDjOutreachModal'
 import type { TrackDoc } from '@/types/track'
 
 const VISIBILITY_LABEL: Record<TrackDoc['visibility'], string> = {
@@ -18,7 +20,9 @@ const VISIBILITY_LABEL: Record<TrackDoc['visibility'], string> = {
 
 export function MusicPage() {
   const { firebaseUser } = useAuth()
+  const { hasFeature } = useEntitlement('artist')
   const [tracks, setTracks] = useState<TrackDoc[] | null>(null)
+  const [outreachTrack, setOutreachTrack] = useState<TrackDoc | null>(null)
 
   useEffect(() => {
     if (!firebaseUser) return
@@ -58,10 +62,24 @@ export function MusicPage() {
               {track.djPromotion ? (
                 <span className="shrink-0 rounded-full bg-dj-500/15 px-2.5 py-1 text-xs text-dj-400">DJ promo</span>
               ) : null}
+              {track.djPromotion && hasFeature('bulkDjOutreach') ? (
+                <button
+                  type="button"
+                  onClick={() => setOutreachTrack(track)}
+                  className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-surface-3 hover:text-ink-0"
+                  title="Promote to opted-in DJs"
+                >
+                  <Megaphone className="h-4 w-4" />
+                </button>
+              ) : null}
             </div>
           ))}
         </div>
       )}
+
+      {outreachTrack ? (
+        <BulkDjOutreachModal trackId={outreachTrack.trackId} trackTitle={outreachTrack.title} onClose={() => setOutreachTrack(null)} />
+      ) : null}
     </div>
   )
 }

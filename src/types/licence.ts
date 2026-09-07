@@ -26,6 +26,8 @@ export interface LicenceRequestDoc {
   djId: string
   artistId: string
   trackId: string
+  /** Denormalized from the track at submission time, so DJ analytics can group by genre without N+1 reads. */
+  trackGenre: string
   intendedUse: IntendedUse
   territory: string | null
   expectedDate: string | null
@@ -36,6 +38,15 @@ export interface LicenceRequestDoc {
   currentAgreementId?: string
   createdAt: Timestamp | null
   updatedAt: Timestamp | null
+}
+
+export interface DownloadLogDoc {
+  djId: string
+  artistId: string
+  trackId: string
+  agreementId: string
+  fileVersion: number
+  timestamp: Timestamp | null
 }
 
 export type AgreementStatus = 'pending' | 'signed' | 'superseded'

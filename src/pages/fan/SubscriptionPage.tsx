@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { CreditCard } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { listActiveSubscriptionPlans } from '@/services/platformSettingsService'
+import { listActiveSubscriptionPlansForRole } from '@/services/platformSettingsService'
 import { openBillingPortal, subscribeToOwnSubscription, subscribeToPlan } from '@/services/subscriptionService'
 import { subscribeSupportAllocations, updateSupportAllocations } from '@/services/supportService'
 import { listFollowedArtistIds } from '@/services/followService'
@@ -22,12 +22,12 @@ export function SubscriptionPage() {
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
 
   useEffect(() => {
-    void listActiveSubscriptionPlans().then(setPlans)
+    void listActiveSubscriptionPlansForRole('fan').then(setPlans)
   }, [])
 
   useEffect(() => {
     if (!firebaseUser) return
-    return subscribeToOwnSubscription(firebaseUser.uid, setSubscription)
+    return subscribeToOwnSubscription(firebaseUser.uid, 'fan', setSubscription)
   }, [firebaseUser])
 
   const isActive = subscription?.status === 'active' || subscription?.status === 'trialing'
@@ -36,7 +36,7 @@ export function SubscriptionPage() {
   async function handleSubscribe(planId: string) {
     setCheckoutLoading(planId)
     try {
-      await subscribeToPlan(planId)
+      await subscribeToPlan(planId, 'fan')
     } finally {
       setCheckoutLoading(null)
     }
@@ -103,7 +103,13 @@ export function SubscriptionPage() {
         </>
       )}
 
-      {isActive && activePlan ? <AllocationEditor fanId={firebaseUser!.uid} planCapMinor={activePlan.priceMinor} currency={activePlan.currency} /> : null}
+      {isActive && activePlan ? (
+        <AllocationEditor
+          fanId={firebaseUser!.uid}
+          planCapMinor={activePlan.limits?.supportAllocationCapMinor ?? activePlan.priceMinor}
+          currency={activePlan.currency}
+        />
+      ) : null}
     </div>
   )
 }

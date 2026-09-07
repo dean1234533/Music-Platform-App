@@ -5,14 +5,17 @@ import { useAuth } from '@/contexts/AuthContext'
 import { subscribeDJProfile, updateDJProfile } from '@/services/djService'
 import { submitVerificationRequest } from '@/services/verificationService'
 import { signOut } from '@/services/authService'
+import { useEntitlement } from '@/hooks/useEntitlements'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
+import { UpgradePrompt } from '@/components/common/UpgradePrompt'
 import { LoadingState, EmptyState } from '@/components/common/StateViews'
 import type { DJProfile } from '@/types/dj'
 
 export function DJProfilePage() {
   const { firebaseUser } = useAuth()
   const navigate = useNavigate()
+  const { hasFeature } = useEntitlement('dj')
   const [profile, setProfile] = useState<DJProfile | null>(null)
   const [form, setForm] = useState({ name: '', bio: '', genres: '', country: '', city: '' })
   const [saving, setSaving] = useState(false)
@@ -71,9 +74,13 @@ export function DJProfilePage() {
         only appear once an admin approves your account.
       </p>
       {profile.verificationStatus === 'unverified' && !verificationRequested ? (
-        <Button size="sm" variant="secondary" className="w-fit" loading={requestingVerification} onClick={handleRequestVerification}>
-          Request verification
-        </Button>
+        hasFeature('verifiedDjEligible') ? (
+          <Button size="sm" variant="secondary" className="w-fit" loading={requestingVerification} onClick={handleRequestVerification}>
+            Request verification
+          </Button>
+        ) : (
+          <UpgradePrompt role="dj" reason="Verified DJ applications are a DJ Pro feature." cta="Upgrade to DJ Pro" />
+        )
       ) : null}
 
       <div>
@@ -98,6 +105,16 @@ export function DJProfilePage() {
           <Input value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />
         </div>
       </div>
+
+      <label className="flex items-center gap-2 text-sm text-ink-1">
+        <input
+          type="checkbox"
+          checked={profile.bulkOutreachOptIn}
+          onChange={(e) => updateDJProfile(profile.djId, { bulkOutreachOptIn: e.target.checked })}
+          className="h-4 w-4 accent-brand-500"
+        />
+        Receive promotional outreach from artists (Artist Pro+ bulk promos)
+      </label>
 
       {saved ? <p className="text-sm text-support-400">Saved.</p> : null}
       <Button onClick={handleSave} loading={saving} className="w-fit">

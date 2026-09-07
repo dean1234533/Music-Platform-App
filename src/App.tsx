@@ -5,6 +5,7 @@ import { ProtectedRoute, RequireOnboarding } from '@/components/auth/ProtectedRo
 import { RoleRoute } from '@/components/auth/RoleRoute'
 
 import { LandingPage } from '@/pages/marketing/LandingPage'
+import { PricingPage } from '@/pages/marketing/PricingPage'
 import { LegalPage } from '@/pages/marketing/LegalPage'
 import { SignInPage } from '@/pages/auth/SignInPage'
 import { SignUpPage } from '@/pages/auth/SignUpPage'
@@ -36,11 +37,15 @@ import { CommunityPage } from '@/pages/artist/dashboard/CommunityPage'
 import { DJRequestsPage as ArtistDJRequestsPage } from '@/pages/artist/dashboard/DJRequestsPage'
 import { RevenuePage } from '@/pages/artist/dashboard/RevenuePage'
 import { ArtistSettingsPage } from '@/pages/artist/dashboard/ArtistSettingsPage'
+import { ArtistPlanPage } from '@/pages/artist/dashboard/ArtistPlanPage'
 
 import { DJDashboardLayout } from '@/pages/dj/DJDashboardLayout'
 import { DJDiscoverPage } from '@/pages/dj/DJDiscoverPage'
 import { DJRequestsPage } from '@/pages/dj/DJRequestsPage'
 import { DJProfilePage } from '@/pages/dj/DJProfilePage'
+import { DJPlanPage } from '@/pages/dj/DJPlanPage'
+import { DJCratesPage } from '@/pages/dj/DJCratesPage'
+import { DJAnalyticsPage } from '@/pages/dj/DJAnalyticsPage'
 
 import { TrackPage } from '@/pages/track/TrackPage'
 import { RequestDetailPage } from '@/pages/requests/RequestDetailPage'
@@ -61,6 +66,7 @@ function App() {
         <PlayerProvider>
           <Routes>
             <Route path="/" element={<LandingPage />} />
+            <Route path="/pricing" element={<PricingPage />} />
             <Route path="/terms" element={<LegalPage type="terms" />} />
             <Route path="/privacy" element={<LegalPage type="privacy" />} />
             <Route path="/sign-in" element={<SignInPage />} />
@@ -144,6 +150,7 @@ function App() {
               <Route path="community" element={<CommunityPage />} />
               <Route path="dj-requests" element={<ArtistDJRequestsPage />} />
               <Route path="revenue" element={<RevenuePage />} />
+              <Route path="plan" element={<ArtistPlanPage />} />
               <Route path="settings" element={<ArtistSettingsPage />} />
             </Route>
 
@@ -161,7 +168,10 @@ function App() {
             >
               <Route path="discover" element={<DJDiscoverPage />} />
               <Route path="requests" element={<DJRequestsPage />} />
+              <Route path="crates" element={<DJCratesPage />} />
+              <Route path="analytics" element={<DJAnalyticsPage />} />
               <Route path="profile" element={<DJProfilePage />} />
+              <Route path="plan" element={<DJPlanPage />} />
             </Route>
 
             <Route

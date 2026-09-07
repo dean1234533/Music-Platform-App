@@ -21,32 +21,70 @@ Client can update `roles` (only to a subset of fan/artist/dj — never admin),
 only. `admin` is granted by hand in the Firestore console (see README) —
 there is intentionally no in-app path to it.
 
+**`subscriptionStatus` is fan-role-only.** Now that artists and DJs have
+their own independent paid tiers (see `subscriptions/{userId}_{role}`
+below), this field only ever reflects the *fan* subscription — it is not a
+general "does this user have any active paid plan" flag. Artist/DJ tier
+status lives in `artistProfiles.planTier`/`djProfiles.planTier` instead.
+
 ### `artistProfiles/{artistId}` (== owner's uid), public read
 `slug, name, nameLower, bio, genres[], location, socialLinks{}, photoURL,
 coverURL, verified, followerCount, supporterCount, djAllowRequests
-('anyone'|'verified_only'|'approved_only'|'disabled'), createdAt, updatedAt`
+('anyone'|'verified_only'|'approved_only'|'disabled'), trackCount, trackLimit,
+planTier('free'|'mid'|'top'), perks[], createdAt, updatedAt`
 
 `verified`/`followerCount`/`supporterCount` are frozen on client writes —
 maintained by `reviewVerificationRequest` and the follow/support triggers.
+`trackCount` is maintained by the `onTrackCreate`/`onTrackDelete` triggers.
+`trackLimit`/`planTier` are mirrored from the artist's resolved entitlement
+plan (see Entitlements section below) by `mirrorResolvedLimits`, called from
+both the `onArtistProfileCreate` trigger (initial free-tier value) and the
+Stripe subscription webhook (every upgrade/downgrade/cancellation).
+`trackLimit == -1` means unlimited; `tracks/{trackId}`'s create rule compares
+`trackCount < trackLimit` directly — rules never resolve a plan themselves.
+`perks` is artist-writable free text (Super Supporter perks) — not
+platform-enforced.
 
 ### `artistSlugs/{slug}` — `{ artistId }`, reserved transactionally with the profile create, immutable.
 
 ### `djProfiles/{djId}` (== owner's uid), public read
 `name, realName, photoURL, coverURL, bio, genres[], country, city, venues[],
 website, socialLinks{}, verificationStatus
-('unverified'|'pending'|'verified'|'rejected'), createdAt, updatedAt`
+('unverified'|'pending'|'verified'|'rejected'), requestsThisMonth,
+requestsMonthResetAt, planTier('free'|'mid'|'top'), bulkOutreachOptIn,
+createdAt, updatedAt`
+
+`requestsThisMonth`/`requestsMonthResetAt`/`planTier` are server-mirrored —
+the monthly counter is maintained transactionally inside
+`submitLicenceRequest` (lazy reset: if `requestsMonthResetAt` is in a prior
+calendar month, the effective count is treated as 0 before the limit check).
+`bulkOutreachOptIn` is DJ-writable — their own opt-in to receive Artist Pro+
+bulk promotional outreach (defaults `false`; `sendBulkDjOutreach` only ever
+targets DJs where this is `true`).
 
 ## Music
 
 ### `tracks/{trackId}`
-`artistId, title, titleLower, albumId, genre, subgenre, bpm, mood,
-releaseDate, description, explicit, credits{songwriters[],producers[],
+`artistId, title, titleLower, albumId, genre, subgenre, bpm, mood, key,
+location, releaseDate, description, explicit, credits{songwriters[],producers[],
 featuredArtists[]}, previewAudioPath, previewDurationSec, previewStartSec,
 originalAudioPath, artworkURL, visibility
 ('public'|'followers'|'supporters'|'early_access'|'dj_only'|'private'),
 djPromotion, djLicenceMode
 ('free'|'fixed_price'|'custom_price'|'negotiated'|'not_available'),
-djFixedPrice, playCount, rightsConfirmed, takenDown?, createdAt, updatedAt`
+djFixedPrice, djPromoTier('all'|'pro_plus_only'), embargoUntil, playCount,
+rightsConfirmed, takenDown?, createdAt, updatedAt`
+
+`genre`/`mood` are drawn from the fixed vocabulary in
+`src/constants/musicTaxonomy.ts` (not free text) so DJ Pro's discovery
+filters can rely on exact matches. `key` is Camelot notation. `location` is
+a denormalized copy of the artist's `ArtistProfile.location` at upload time
+(avoids a join for location filtering). `djPromoTier` (Artist Pro+ "private
+promo pools") and `embargoUntil` (Artist Pro+ "release embargoes") both
+gate DJ-discovery visibility and `submitLicenceRequest` eligibility — a
+`pro_plus_only` track is excluded from discovery unless the requesting DJ
+has the `privatePromoPools` feature, and an embargoed track is excluded
+until `embargoUntil` passes.
 
 Read: `visibility=='public'` (anyone), `visibility=='dj_only'` (any
 signed-in DJ), owner, or admin. **Any query over this collection must be
@@ -67,6 +105,13 @@ pattern (`where('visibility','in',['public','dj_only'])`, or a fixed
 
 ### `playlists/{playlistId}` — `ownerId, title, trackIds[], createdAt, updatedAt`. Owner-only.
 
+### `crates/{crateId}` — `ownerId, title, trackIds[], notes, tags[], createdAt, updatedAt`. Owner-only, `create` additionally requires the `dj` role.
+Structurally identical to `playlists` but kept as a separate collection so
+fan playlist and DJ crate queries never conflate. Basic crates (create/add/
+remove/view) are DJ Free; `notes`/`tags` are populated only when the DJ has
+the `advancedCrates` (Pro+) feature — enforced client-side in the crate
+editor UI, since the fields themselves are freeform and not security-sensitive.
+
 ### `artistPosts/{postId}` — `artistId, visibility('everyone'|'followers'|'supporters'), type, title, body, mediaURL, createdAt`.
 Same query-safety rule as tracks: a public viewer's read is split into one
 query per visibility tier they're entitled to (`subscribePublicArtistPosts`)
@@ -74,13 +119,43 @@ rather than one unconstrained query.
 
 ### `notifications/{notificationId}` — `userId, type, title, body, linkTo, read, createdAt`. Server-created only; client may only flip `read`.
 
-## Subscriptions & support (Phase 2)
+## Subscriptions & entitlements (Phase 2, extended for tiered Fan/Artist/DJ plans)
 
-### `subscriptionPlans/{planId}` — public read, admin-write-only (`adminUpsertSubscriptionPlan`). `planId, name, priceMinor, currency, interval, stripePriceId, active`.
+### `subscriptionPlans/{planId}` — public read, admin-write-only (`adminUpsertSubscriptionPlan`).
+`planId, name, role('fan'|'artist'|'dj'), tier('free'|'mid'|'top'),
+priceMinor, currency, interval, stripePriceId(null for the 3 free plans),
+active, isDefaultFree, features{PlanFeatureKey: boolean}, limits{PlanLimitKey:
+number}, displayOrder, recommended, updatedAt`.
+
+Exactly one plan per `role` must have `isDefaultFree: true` — the
+entitlement resolver's fallback when a user has no active subscription for
+that role. `limits` values use `-1` to mean unlimited. `features`/`limits`
+keys are the fixed vocabulary in `src/types/entitlements.ts` (client) /
+`functions/src/entitlements.ts` (server, duplicated deliberately — see
+comments in both files). The 9 spec'd plans (3 per role) are seeded via the
+admin-only `adminSeedSubscriptionPlans` callable, which skips (never
+overwrites) any plan doc that already exists, so it's safe to re-run.
 
 ### `platformSettings/default` — public read, admin-write-only (`adminUpdatePlatformSettings`). `platformFeePercent, artistAllocationPercent, djServiceFeePercent, minimumPayoutMinor, allowedPreviewDurationsSec[], maxUploadSizeMB, supportedAudioTypes[]`.
 
-### `subscriptions/{userId}` — Stripe webhook only. `userId, stripeCustomerId, stripeSubscriptionId, planId, stripePriceId, status, cancelAtPeriodEnd, currentPeriodEnd, updatedAt`.
+### `subscriptions/{userId}_{role}` — Stripe webhook only.
+`userId, role('fan'|'artist'|'dj'), stripeCustomerId, stripeSubscriptionId,
+planId, stripePriceId, status, cancelAtPeriodEnd, currentPeriodEnd,
+updatedAt`.
+
+Composite doc ID (was `subscriptions/{userId}`) — a user can hold up to 3
+concurrent subscriptions, one per role, since roles aren't mutually
+exclusive. **No doc exists for a user on a role's free/default tier** —
+entitlement resolution treats "no doc, or status not active/past_due" as
+"use that role's `isDefaultFree` plan." The Stripe subscription's
+`metadata.role` (set at Checkout-session creation) tells the webhook which
+role a given event belongs to. Every subscription lifecycle event
+(created/updated/deleted) also triggers `mirrorResolvedLimits`, which
+re-resolves the user's plan and writes the result onto `artistProfiles.
+trackLimit`/`.planTier` (role `artist`) or `djProfiles.planTier` (role
+`dj`) — see those sections above. `users/{uid}.subscriptionStatus` is only
+ever updated for `role=='fan'` (see the `users` section above) — it does
+not reflect artist/DJ tier status.
 
 ### `supportAllocations/{fanId}` — `updateSupportAllocations` callable only. `fanId, allocations{artistId: amountMinor}, totalMinor, updatedAt`. The callable re-validates the total against the fan's actual subscription price server-side — the client's numbers are a proposal, never trusted directly.
 
@@ -102,11 +177,18 @@ promotedAt (null until the clearing job promotes it)`
 ## DJ licensing (Phase 3/4)
 
 ### `licenceRequests/{requestId}` — server-written only (`submitLicenceRequest`/`respondToLicenceRequest`/`proposeAgreement`).
-`djId, artistId, trackId, intendedUse, territory, expectedDate, venue,
+`djId, artistId, trackId, trackGenre, intendedUse, territory, expectedDate, venue,
 message, status ('submitted'|'artist_review'|'negotiating'|
 'agreement_ready'|'awaiting_signatures'|'awaiting_payment'|'approved'|
 'rejected'|'expired'|'cancelled'), conversationId, currentAgreementId?,
 createdAt, updatedAt`
+
+`trackGenre` is denormalized from the track at submission time (DJ Pro+
+analytics groups requests by genre without an N+1 read per request).
+`submitLicenceRequest` also enforces the DJ's monthly request limit here —
+see `djProfiles.requestsThisMonth` above — and rejects requests against
+tracks that are embargoed (`tracks.embargoUntil` in the future) or in a
+private promo pool the requesting DJ can't see (`tracks.djPromoTier`).
 
 ### `licenceAgreements/{agreementId}` — server-written only (`proposeAgreement`/`signAgreement`/the licence-payment webhook handler).
 `licenceRequestId, artistId, djId, trackId, trackVersion, permittedUse,

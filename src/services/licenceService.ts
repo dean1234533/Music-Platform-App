@@ -1,7 +1,7 @@
-import { collection, doc, onSnapshot, orderBy, query, where } from 'firebase/firestore'
+import { collection, doc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { callable } from '@/lib/callable'
-import type { IntendedUse, LicenceAgreementDoc, LicenceRequestDoc } from '@/types/licence'
+import type { DownloadLogDoc, IntendedUse, LicenceAgreementDoc, LicenceRequestDoc } from '@/types/licence'
 
 export interface SubmitLicenceRequestInput {
   trackId: string
@@ -82,3 +82,17 @@ export const createLicencePaymentSession = callable<
 export const getSecureDownloadUrl = callable<{ agreementId: string }, { url: string; expiresInSeconds: number }>(
   'getSecureDownloadUrl',
 )
+
+/** DJ Pro — "download agreement receipts" / analytics. Previously write-only from getSecureDownloadUrl. */
+export async function listDjDownloadLogs(djId: string): Promise<DownloadLogDoc[]> {
+  const q = query(collection(db, 'downloadLogs'), where('djId', '==', djId), orderBy('timestamp', 'desc'))
+  const snap = await getDocs(q)
+  return snap.docs.map((d) => d.data() as DownloadLogDoc)
+}
+
+/** DJ Pro+ analytics / "advanced licence management" — one-off read, not a live subscription. */
+export async function listDjAgreements(djId: string): Promise<LicenceAgreementDoc[]> {
+  const q = query(collection(db, 'licenceAgreements'), where('djId', '==', djId), orderBy('createdAt', 'desc'))
+  const snap = await getDocs(q)
+  return snap.docs.map((d) => d.data() as LicenceAgreementDoc)
+}
