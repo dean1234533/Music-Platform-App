@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { clsx } from 'clsx'
-import { ArrowRight, Check, ChevronDown, Headphones, Mic2, Radio, Sparkles } from 'lucide-react'
+import { ArrowRight, Check, Headphones, Menu, Mic2, Radio, Sparkles, X } from 'lucide-react'
 import { BrandMark } from '@/components/common/BrandMark'
 
 const roles = [
@@ -26,18 +25,18 @@ export function LandingPage() {
         <nav className="flex items-center gap-1 sm:gap-3" aria-label="Primary navigation">
           <a href="#how-it-works" className="hidden rounded-full px-3 py-2.5 text-sm font-medium text-ink-2 transition hover:text-white md:block">How it works</a>
           <a href="#pricing" className="hidden rounded-full px-3 py-2.5 text-sm font-medium text-ink-2 transition hover:text-white md:block">Pricing</a>
+          <Link to="/sign-in" className="hidden rounded-full px-4 py-2.5 text-sm font-medium text-ink-1 transition hover:text-white md:block">Sign in</Link>
+          <Link to="/sign-up" className="rounded-full bg-brand-500 px-5 py-2.5 text-sm font-semibold text-[#090b06] transition hover:bg-brand-400">Join Wavelength</Link>
           <button
             type="button"
             onClick={() => setMenuOpen((open) => !open)}
             aria-expanded={menuOpen}
             aria-controls="mobile-nav-menu"
-            className="flex items-center gap-1 rounded-full px-3 py-2.5 text-sm font-medium text-ink-2 transition hover:text-white md:hidden"
+            aria-label="Toggle menu"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-ink-1 transition hover:text-white md:hidden"
           >
-            Menu
-            <ChevronDown className={clsx('h-4 w-4 transition-transform', menuOpen && 'rotate-180')} />
+            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
-          <Link to="/sign-in" className="rounded-full px-4 py-2.5 text-sm font-medium text-ink-1 transition hover:text-white">Sign in</Link>
-          <Link to="/sign-up" className="rounded-full bg-brand-500 px-5 py-2.5 text-sm font-semibold text-[#090b06] transition hover:bg-brand-400">Join Wavelength</Link>
         </nav>
       </header>
 
@@ -56,10 +55,17 @@ export function LandingPage() {
           <a
             href="#pricing"
             onClick={() => setMenuOpen(false)}
-            className="px-5 py-4 text-sm font-medium text-ink-1 transition hover:text-white"
+            className="border-b border-white/[0.06] px-5 py-4 text-sm font-medium text-ink-1 transition hover:text-white"
           >
             Pricing
           </a>
+          <Link
+            to="/sign-in"
+            onClick={() => setMenuOpen(false)}
+            className="px-5 py-4 text-sm font-medium text-ink-1 transition hover:text-white"
+          >
+            Sign in
+          </Link>
         </div>
       )}
 
