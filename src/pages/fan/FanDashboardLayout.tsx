@@ -1,10 +1,10 @@
 import { Outlet } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
-import { fanNavItems } from '@/components/layout/navConfig'
+import { fanMobileMoreExclude, fanNavItems } from '@/components/layout/navConfig'
 
 export function FanDashboardLayout() {
   return (
-    <AppShell sidebarItems={fanNavItems} mobileNavItems={fanNavItems}>
+    <AppShell sidebarItems={fanNavItems} mobileNavItems={fanNavItems} mobileMoreExclude={fanMobileMoreExclude}>
       <Outlet />
     </AppShell>
   )

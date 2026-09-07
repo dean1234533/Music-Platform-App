@@ -9,11 +9,13 @@ export function AppShell({
   children,
   sidebarItems,
   mobileNavItems,
+  mobileMoreExclude,
   sidebarTitle,
 }: {
   children: ReactNode
   sidebarItems: NavItem[]
   mobileNavItems: NavItem[]
+  mobileMoreExclude?: string[]
   sidebarTitle?: string
 }) {
   return (
@@ -28,7 +30,7 @@ export function AppShell({
         </div>
       </div>
       <PlayerBar />
-      <MobileNav items={mobileNavItems} />
+      <MobileNav items={mobileNavItems} moreExclude={mobileMoreExclude} />
     </div>
   )
 }
