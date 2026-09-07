@@ -1,6 +1,6 @@
 import { arrayRemove, arrayUnion, doc, updateDoc } from 'firebase/firestore'
 import { getToken, isSupported } from 'firebase/messaging'
-import { db, getMessagingInstance } from '@/lib/firebase'
+import { db, FIREBASE_VAPID_KEY, getMessagingInstance } from '@/lib/firebase'
 
 export type PushPermissionResult = 'granted' | 'denied' | 'unsupported'
 
@@ -22,7 +22,7 @@ export async function enablePushNotifications(uid: string): Promise<PushPermissi
 
   const registration = await navigator.serviceWorker.ready
   const token = await getToken(messaging, {
-    vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
+    vapidKey: FIREBASE_VAPID_KEY,
     serviceWorkerRegistration: registration,
   })
 
@@ -40,7 +40,7 @@ export async function disablePushNotifications(uid: string): Promise<void> {
 
   const registration = await navigator.serviceWorker.ready
   const token = await getToken(messaging, {
-    vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
+    vapidKey: FIREBASE_VAPID_KEY,
     serviceWorkerRegistration: registration,
   }).catch(() => null)
 
