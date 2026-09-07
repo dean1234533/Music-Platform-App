@@ -155,21 +155,27 @@ at hobby scale it should cost nothing in practice:
   that costs more than storage itself — predictable. See
   `src/utils/uploadLimits.ts` for the client-side mirror of that same limit.
 
-## Deploying the frontend to Cloudflare Pages
+## Deploying the frontend to Cloudflare
 
-1. Connect the repo in the Cloudflare dashboard, or deploy directly:
+Connecting this repo in the Cloudflare dashboard now defaults to the newer
+Workers-based static-asset deployment (`wrangler deploy`) rather than
+classic Pages — `wrangler.jsonc` at the project root is already configured
+for that (`assets.directory: "dist"`, `not_found_handling:
+"single-page-application"` for SPA routing on deep links like
+`/artist/some-artist`). There's deliberately no `public/_redirects` file —
+that's the old Pages-only mechanism, and shipping both causes Cloudflare to
+reject the deploy ("infinite loop detected" on the redirect rule).
+
+1. Connect the repo in the Cloudflare dashboard (build command `npm run
+   build`, output directory `dist`, Node version 20+), or deploy directly:
    ```
    npm run build
-   npx wrangler pages deploy dist --project-name=wavelength
+   npx wrangler deploy
    ```
-2. Build settings (if connecting via dashboard): build command `npm run
-   build`, output directory `dist`, Node version 20+.
-3. Add the same `VITE_FIREBASE_*` variables from `.env` as Pages environment
-   variables (Settings → Environment variables). These are public client
+2. Add the same `VITE_FIREBASE_*` variables from `.env` as environment
+   variables in the Cloudflare project settings. These are public client
    identifiers, safe to expose.
-4. `public/_redirects` (`/* /index.html 200`) is already in place for SPA
-   routing — deep links like `/artist/some-artist` resolve correctly.
-5. Custom domain + HTTPS are handled by Cloudflare Pages automatically.
+3. Custom domain + HTTPS are handled by Cloudflare automatically.
 
 ## Project structure
 
