@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Headphones, Menu, Mic2, Music2, Radio, X } from 'lucide-react'
+import { ArrowRight, Headphones, Menu, Mic2, Radio, X } from 'lucide-react'
 import { BrandMark } from '@/components/common/BrandMark'
 import { PriceCard } from '@/components/marketing/PriceCard'
+import { MusicGlyph } from '@/components/common/MusicGlyph'
 import { listActiveSubscriptionPlansForRole } from '@/services/platformSettingsService'
 import { formatCurrency } from '@/utils/format'
 import type { SubscriptionPlan } from '@/types/platformSettings'
@@ -86,7 +87,7 @@ export function LandingPage() {
         <main>
         <section className="hero-shell relative mx-auto grid min-h-[720px] max-w-[1440px] items-center gap-10 overflow-hidden px-5 pb-20 pt-14 sm:px-8 xl:grid-cols-[0.86fr_1.14fr] xl:overflow-visible xl:px-12 xl:py-20">
           <div className="hero-copy relative z-10 max-w-2xl">
-            <p className="eyebrow flex items-center gap-2"><Music2 className="h-3.5 w-3.5" /> Independent sounds. Direct support.</p>
+            <p className="eyebrow flex items-center gap-2"><MusicGlyph className="h-4 w-4" /> Independent sounds. Direct support.</p>
             <h1 className="mt-7 text-balance text-[clamp(3.6rem,8vw,7.6rem)] font-medium leading-[0.84] tracking-[-0.07em]">
               Music with<br /><span className="text-brand-400">a pulse.</span>
             </h1>

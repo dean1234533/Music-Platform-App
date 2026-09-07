@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, BadgeCheck, Disc3, MapPin, Music2, Radio } from 'lucide-react'
+import { ArrowLeft, BadgeCheck, Disc3, MapPin, Radio } from 'lucide-react'
 import { getArtistIdForSlug, subscribeArtistProfile, subscribePublicArtistTracks } from '@/services/artistService'
 import { subscribePublicArtistPosts } from '@/services/artistPostService'
 import { subscribeIsFollowing } from '@/services/followService'
@@ -11,6 +11,7 @@ import { SupportButton } from '@/components/music/SupportButton'
 import { TrackCard } from '@/components/music/TrackCard'
 import { ErrorState, LoadingState } from '@/components/common/StateViews'
 import { UpgradePrompt } from '@/components/common/UpgradePrompt'
+import { MusicGlyph } from '@/components/common/MusicGlyph'
 import { BrandMark } from '@/components/common/BrandMark'
 import { ShareButton } from '@/components/common/ShareButton'
 import { StoryViewer, type StoryGroup } from '@/components/stories/StoryViewer'
@@ -214,7 +215,7 @@ export function ArtistPublicProfilePage() {
                 <span className="flex h-12 w-12 items-center justify-center rounded-full border border-brand-400/20 bg-brand-400/[0.08] text-brand-400"><Disc3 className="h-5 w-5" /></span>
                 <h3 className="mt-7 text-2xl font-medium tracking-[-0.03em] text-ink-0">The first release is coming.</h3>
                 <p className="mt-3 max-w-md text-base leading-7 text-ink-2">Follow {artist.name} and their next public track will appear in your feed as soon as it lands.</p>
-                <div className="mt-7 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-brand-400"><Music2 className="h-3.5 w-3.5" /> Be here from the beginning</div>
+                <div className="mt-7 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-brand-400"><MusicGlyph className="h-4 w-4" /> Be here from the beginning</div>
               </div>
             ) : (
               <div className="flex flex-wrap gap-4">

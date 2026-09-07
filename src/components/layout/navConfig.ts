@@ -22,18 +22,19 @@ import {
   Settings,
   ShieldAlert,
   Sliders,
-  Music2,
   UploadCloud,
   User,
   Users,
   Wallet,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { MusicGlyph } from '@/components/common/MusicGlyph'
+import type { ComponentType, SVGProps } from 'react'
 
 export interface NavItem {
   label: string
   to: string
-  icon: LucideIcon
+  icon: LucideIcon | ComponentType<SVGProps<SVGSVGElement>>
   end?: boolean
 }
 
@@ -55,7 +56,7 @@ export const artistDashboardNavItems: NavItem[] = [
   { label: 'Overview', to: '/dashboard/artist', icon: BarChart3, end: true },
   { label: 'Music', to: '/dashboard/artist/music', icon: Disc3 },
   { label: 'Upload', to: '/dashboard/artist/upload', icon: UploadCloud },
-  { label: 'Stories', to: '/dashboard/artist/stories', icon: Music2 },
+  { label: 'Stories', to: '/dashboard/artist/stories', icon: MusicGlyph },
   { label: 'Community', to: '/dashboard/artist/community', icon: Users },
   { label: 'DJ Requests', to: '/dashboard/artist/dj-requests', icon: MessageSquare },
   { label: 'DJ Deals', to: '/dashboard/artist/deals', icon: Handshake },
