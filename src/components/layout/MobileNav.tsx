@@ -21,12 +21,15 @@ export function MobileNav({ items }: { items: NavItem[] }) {
     navigate('/')
   }
 
+  const itemClasses =
+    'relative flex w-16 shrink-0 flex-col items-center gap-1 py-2.5 text-xs font-medium transition-colors'
+
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 flex border-t border-white/[0.07] bg-surface-1/90 backdrop-blur-xl md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.07] bg-surface-1/90 backdrop-blur-xl md:hidden"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="flex flex-1 overflow-x-auto">
+      <div className="flex justify-around overflow-x-auto">
         {items.map((item) => (
           <NavLink
             key={item.to}
@@ -34,7 +37,7 @@ export function MobileNav({ items }: { items: NavItem[] }) {
             end={item.end}
             className={({ isActive }) =>
               clsx(
-                'relative flex min-w-[4.25rem] shrink-0 flex-1 flex-col items-center gap-1 py-2.5 text-xs font-medium transition-colors',
+                itemClasses,
                 isActive ? 'text-brand-400 after:absolute after:top-0 after:h-px after:w-6 after:bg-brand-500' : 'text-ink-3',
               )
             }
@@ -43,15 +46,11 @@ export function MobileNav({ items }: { items: NavItem[] }) {
             {item.label}
           </NavLink>
         ))}
+        <button onClick={handleSignOut} aria-label="Sign out" className={clsx(itemClasses, 'text-ink-3 hover:text-danger-500')}>
+          <LogOut className="h-5 w-5" />
+          Sign out
+        </button>
       </div>
-      <button
-        onClick={handleSignOut}
-        aria-label="Sign out"
-        className="flex min-w-[4.25rem] shrink-0 flex-col items-center gap-1 border-l border-white/[0.07] py-2.5 text-xs font-medium text-ink-3 transition-colors hover:text-danger-500"
-      >
-        <LogOut className="h-5 w-5" />
-        Sign out
-      </button>
     </nav>
   )
 }
