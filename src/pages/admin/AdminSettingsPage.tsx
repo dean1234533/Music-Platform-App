@@ -1,16 +1,30 @@
 import { useEffect, useState } from 'react'
 import {
+  adminEnableStrongPasswordPolicy,
   adminSeedSubscriptionPlans,
+  adminSetLegalHold,
+  adminUpdateDataRetentionSettings,
   adminUpdatePlatformSettings,
   adminUpsertSubscriptionPlan,
   listAllSubscriptionPlans,
 } from '@/services/adminService'
-import { getPlatformSettings } from '@/services/platformSettingsService'
+import { getDataRetentionSettings, getPlatformSettings } from '@/services/platformSettingsService'
 import { Button } from '@/components/common/Button'
 import { Input, Label } from '@/components/common/Input'
 import { formatCurrency } from '@/utils/format'
-import type { SubscriptionPlan } from '@/types/platformSettings'
+import { DEFAULT_DATA_RETENTION, type DataRetentionSettings, type SubscriptionPlan } from '@/types/platformSettings'
 import { PLAN_TIERS, type PlanFeatureKey, type PlanLimitKey, type PlanTier } from '@/types/entitlements'
+
+const RETENTION_FIELDS: { key: keyof DataRetentionSettings; label: string }[] = [
+  { key: 'notificationsDays', label: 'Notifications (days)' },
+  { key: 'storyRecoveryDays', label: 'Story recovery buffer (days)' },
+  { key: 'inactiveChatMonths', label: 'Inactive chats (months)' },
+  { key: 'abandonedRequestMonths', label: 'Abandoned DJ requests (months)' },
+  { key: 'draftOfferMonths', label: 'Unsigned draft offers (months)' },
+  { key: 'auditLogMonths', label: 'Audit logs (months)' },
+  { key: 'contractYears', label: 'Signed contracts (years)' },
+  { key: 'copyrightClaimYears', label: 'Copyright claims (years)' },
+]
 
 const FAN_FEATURE_KEYS: PlanFeatureKey[] = ['supporterContent', 'earlyAccess', 'polls', 'artistDefinedPerks']
 const FAN_LIMIT_KEYS: PlanLimitKey[] = ['supportAllocationCapMinor']
@@ -55,6 +69,22 @@ export function AdminSettingsPage() {
   const [feeForm, setFeeForm] = useState({ platformFeePercent: '', artistAllocationPercent: '', djServiceFeePercent: '', minimumPayoutMinor: '' })
   const [savingFees, setSavingFees] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)
+  const [retentionForm, setRetentionForm] = useState<Record<keyof DataRetentionSettings, string>>(
+    Object.fromEntries(Object.entries(DEFAULT_DATA_RETENTION).map(([k, v]) => [k, String(v)])) as Record<
+      keyof DataRetentionSettings,
+      string
+    >,
+  )
+  const [savingRetention, setSavingRetention] = useState(false)
+  const [legalHoldForm, setLegalHoldForm] = useState<{
+    collection: 'licenceRequests' | 'licenceAgreements' | 'tracks'
+    docId: string
+    legalHold: boolean
+    reason: string
+  }>({ collection: 'licenceAgreements', docId: '', legalHold: true, reason: '' })
+  const [savingLegalHold, setSavingLegalHold] = useState(false)
+  const [enablingPasswordPolicy, setEnablingPasswordPolicy] = useState(false)
+  const [passwordPolicyError, setPasswordPolicyError] = useState<string | null>(null)
 
   useEffect(() => {
     void listAllSubscriptionPlans().then((rows) => setPlans(rows.sort((a, b) => a.displayOrder - b.displayOrder)))
@@ -66,6 +96,12 @@ export function AdminSettingsPage() {
         djServiceFeePercent: String(settings.djServiceFeePercent),
         minimumPayoutMinor: String(settings.minimumPayoutMinor),
       })
+    })
+    void getDataRetentionSettings().then((settings) => {
+      setRetentionForm(Object.fromEntries(Object.entries(settings).map(([k, v]) => [k, String(v)])) as Record<
+        keyof DataRetentionSettings,
+        string
+      >)
     })
   }, [])
 
@@ -137,6 +173,46 @@ export function AdminSettingsPage() {
     }
   }
 
+  async function handleSaveRetention() {
+    setSavingRetention(true)
+    setSaved(null)
+    try {
+      const payload = Object.fromEntries(
+        Object.entries(retentionForm).map(([k, v]) => [k, Number(v)]),
+      ) as unknown as DataRetentionSettings
+      await adminUpdateDataRetentionSettings(payload)
+      setSaved('Data retention settings saved.')
+    } finally {
+      setSavingRetention(false)
+    }
+  }
+
+  async function handleEnablePasswordPolicy() {
+    setEnablingPasswordPolicy(true)
+    setPasswordPolicyError(null)
+    setSaved(null)
+    try {
+      await adminEnableStrongPasswordPolicy()
+      setSaved('Strong password policy enabled (12+ characters, enforced server-side by Identity Platform).')
+    } catch (err) {
+      setPasswordPolicyError(err instanceof Error ? err.message : 'Could not enable the password policy.')
+    } finally {
+      setEnablingPasswordPolicy(false)
+    }
+  }
+
+  async function handleSetLegalHold() {
+    setSavingLegalHold(true)
+    setSaved(null)
+    try {
+      await adminSetLegalHold(legalHoldForm)
+      setSaved(`Legal hold ${legalHoldForm.legalHold ? 'set' : 'cleared'} on ${legalHoldForm.collection}/${legalHoldForm.docId}.`)
+      setLegalHoldForm((f) => ({ ...f, docId: '', reason: '' }))
+    } finally {
+      setSavingLegalHold(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <h1 className="text-2xl font-semibold text-ink-0">Plans & fees</h1>
@@ -185,7 +261,7 @@ export function AdminSettingsPage() {
               <select
                 value={form.tier}
                 onChange={(e) => setForm((f) => ({ ...f, tier: e.target.value as PlanTier }))}
-                className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 outline-none focus:border-brand-500"
+                className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-base sm:text-sm text-ink-0 outline-none focus:border-brand-500"
               >
                 {PLAN_TIERS.map((t) => (
                   <option key={t} value={t}>{t}</option>
@@ -205,7 +281,7 @@ export function AdminSettingsPage() {
               <select
                 value={form.interval}
                 onChange={(e) => setForm((f) => ({ ...f, interval: e.target.value as 'month' | 'year' }))}
-                className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 outline-none focus:border-brand-500"
+                className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-base sm:text-sm text-ink-0 outline-none focus:border-brand-500"
               >
                 <option value="month">month</option>
                 <option value="year">year</option>
@@ -310,6 +386,90 @@ export function AdminSettingsPage() {
           <div className="col-span-2 sm:col-span-4">
             <Button size="sm" onClick={handleSaveFees} loading={savingFees}>
               Save platform settings
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-lg font-semibold text-ink-0">Data retention</h2>
+        <p className="mb-3 text-xs text-ink-3">
+          Configured periods that scheduled cleanup jobs use. Suggested defaults only — review with a solicitor/accountant before launch.
+        </p>
+        <div className="grid grid-cols-2 gap-3 rounded-xl border border-surface-border bg-surface-1 p-4 sm:grid-cols-4">
+          {RETENTION_FIELDS.map(({ key, label }) => (
+            <div key={key}>
+              <Label>{label}</Label>
+              <Input
+                type="number"
+                value={retentionForm[key]}
+                onChange={(e) => setRetentionForm((f) => ({ ...f, [key]: e.target.value }))}
+              />
+            </div>
+          ))}
+          <div className="col-span-2 sm:col-span-4">
+            <Button size="sm" onClick={handleSaveRetention} loading={savingRetention}>
+              Save retention settings
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-lg font-semibold text-ink-0">Password policy</h2>
+        <p className="mb-3 text-xs text-ink-3">
+          Client-side length/common-password checks are enforced in the browser only. This enables real server-side
+          enforcement (12+ characters) via Identity Platform — a one-time action. Requires this Firebase project to
+          be upgraded to Identity Platform first (Firebase Console → Authentication → Settings).
+        </p>
+        <div className="rounded-xl border border-surface-border bg-surface-1 p-4">
+          <Button size="sm" onClick={handleEnablePasswordPolicy} loading={enablingPasswordPolicy}>
+            Enable strong password policy
+          </Button>
+          {passwordPolicyError ? <p className="mt-2 text-xs text-danger-500">{passwordPolicyError}</p> : null}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-lg font-semibold text-ink-0">Legal hold</h2>
+        <p className="mb-3 text-xs text-ink-3">
+          Blocks automatic retention cleanup and revokes nothing on its own — use for an active dispute, investigation, or legal claim.
+        </p>
+        <div className="grid grid-cols-2 gap-3 rounded-xl border border-surface-border bg-surface-1 p-4 sm:grid-cols-4">
+          <div>
+            <Label>Collection</Label>
+            <select
+              value={legalHoldForm.collection}
+              onChange={(e) => setLegalHoldForm((f) => ({ ...f, collection: e.target.value as typeof f.collection }))}
+              className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-base sm:text-sm text-ink-0 outline-none focus:border-brand-500"
+            >
+              <option value="licenceAgreements">licenceAgreements</option>
+              <option value="licenceRequests">licenceRequests</option>
+              <option value="tracks">tracks</option>
+            </select>
+          </div>
+          <div>
+            <Label>Document ID</Label>
+            <Input value={legalHoldForm.docId} onChange={(e) => setLegalHoldForm((f) => ({ ...f, docId: e.target.value }))} />
+          </div>
+          <div>
+            <Label>Reason</Label>
+            <Input value={legalHoldForm.reason} onChange={(e) => setLegalHoldForm((f) => ({ ...f, reason: e.target.value }))} />
+          </div>
+          <div className="flex items-end gap-3">
+            <label className="flex items-center gap-2 text-sm text-ink-1">
+              <input
+                type="checkbox"
+                checked={legalHoldForm.legalHold}
+                onChange={(e) => setLegalHoldForm((f) => ({ ...f, legalHold: e.target.checked }))}
+                className="h-4 w-4 accent-brand-500"
+              />
+              Hold
+            </label>
+          </div>
+          <div className="col-span-2 sm:col-span-4">
+            <Button size="sm" onClick={handleSetLegalHold} loading={savingLegalHold} disabled={!legalHoldForm.docId}>
+              Apply legal hold
             </Button>
           </div>
         </div>

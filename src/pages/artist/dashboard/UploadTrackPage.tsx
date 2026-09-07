@@ -238,7 +238,7 @@ export function UploadTrackPage() {
               required
               value={genre}
               onChange={(e) => setGenre(e.target.value)}
-              className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 outline-none focus:border-brand-500"
+              className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-base sm:text-sm text-ink-0 outline-none focus:border-brand-500"
             >
               {GENRES.map((g) => (
                 <option key={g} value={g}>{g}</option>
@@ -258,7 +258,7 @@ export function UploadTrackPage() {
             <select
               value={trackKey}
               onChange={(e) => setTrackKey(e.target.value)}
-              className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 outline-none focus:border-brand-500"
+              className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-base sm:text-sm text-ink-0 outline-none focus:border-brand-500"
             >
               <option value="">Not set</option>
               {CAMELOT_KEYS.map((k) => (
@@ -270,7 +270,7 @@ export function UploadTrackPage() {
             <select
               value={mood}
               onChange={(e) => setMood(e.target.value)}
-              className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 outline-none focus:border-brand-500"
+              className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-base sm:text-sm text-ink-0 outline-none focus:border-brand-500"
             >
               <option value="">Not set</option>
               {MOODS.map((m) => (
@@ -369,7 +369,7 @@ export function UploadTrackPage() {
           <select
             value={visibility}
             onChange={(e) => setVisibility(e.target.value as TrackVisibility)}
-            className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 outline-none focus:border-brand-500"
+            className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-base sm:text-sm text-ink-0 outline-none focus:border-brand-500"
           >
             {VISIBILITY_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -395,7 +395,7 @@ export function UploadTrackPage() {
               <select
                 value={djLicenceMode}
                 onChange={(e) => setDjLicenceMode(e.target.value as LicenceMode)}
-                className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 outline-none focus:border-brand-500"
+                className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-base sm:text-sm text-ink-0 outline-none focus:border-brand-500"
               >
                 {LICENCE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -433,7 +433,7 @@ export function UploadTrackPage() {
               <select
                 value={ownsMaster}
                 onChange={(e) => setOwnsMaster(e.target.value as TrackRightsMetadata['ownsMasterRecording'])}
-                className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 outline-none focus:border-brand-500"
+                className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-base sm:text-sm text-ink-0 outline-none focus:border-brand-500"
               >
                 {OWNERSHIP_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -444,7 +444,7 @@ export function UploadTrackPage() {
               <select
                 value={ownsComposition}
                 onChange={(e) => setOwnsComposition(e.target.value as TrackRightsMetadata['ownsComposition'])}
-                className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 outline-none focus:border-brand-500"
+                className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-base sm:text-sm text-ink-0 outline-none focus:border-brand-500"
               >
                 {COMPOSITION_OWNERSHIP_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>

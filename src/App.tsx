@@ -3,6 +3,7 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { PlayerProvider } from '@/contexts/PlayerContext'
 import { ProtectedRoute, RequireOnboarding } from '@/components/auth/ProtectedRoute'
 import { RoleRoute } from '@/components/auth/RoleRoute'
+import { InstallBanner } from '@/components/pwa/InstallBanner'
 
 import { LandingPage } from '@/pages/marketing/LandingPage'
 import { PricingPage } from '@/pages/marketing/PricingPage'
@@ -61,6 +62,7 @@ import { AdminVerificationPage } from '@/pages/admin/AdminVerificationPage'
 import { AdminReportsPage } from '@/pages/admin/AdminReportsPage'
 import { AdminSettingsPage } from '@/pages/admin/AdminSettingsPage'
 import { AdminAuditLogPage } from '@/pages/admin/AdminAuditLogPage'
+import { AdminSecurityIncidentsPage } from '@/pages/admin/AdminSecurityIncidentsPage'
 
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
@@ -69,6 +71,7 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <PlayerProvider>
+          <InstallBanner />
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/pricing" element={<PricingPage />} />
@@ -223,6 +226,7 @@ function App() {
               <Route path="reports" element={<AdminReportsPage />} />
               <Route path="settings" element={<AdminSettingsPage />} />
               <Route path="audit-log" element={<AdminAuditLogPage />} />
+              <Route path="security-incidents" element={<AdminSecurityIncidentsPage />} />
             </Route>
 
             <Route path="*" element={<NotFoundPage />} />

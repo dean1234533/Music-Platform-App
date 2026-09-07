@@ -2,6 +2,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
 import { requireAdmin, writeAuditLog } from './guard.js'
+import { enforceRateLimit } from '../rateLimit.js'
 
 const CLAIM_STATUSES = [
   'under_review',
@@ -25,6 +26,7 @@ const RESTRICTABLE_CAPABILITIES = ['dj_licensing', 'discovery', 'streaming'] as 
  */
 export const submitCopyrightClaim = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await enforceRateLimit(`submitCopyrightClaim_${request.auth.uid}`, 5, 60 * 60)
   const {
     claimId,
     trackId,

@@ -3,6 +3,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
 import { userHasRole } from '../roles.js'
 import { writeSystemMessage } from '../messaging/messages.js'
+import { enforceRateLimit } from '../rateLimit.js'
 
 const INTENDED_USES = [
   'live_club_performance',
@@ -25,6 +26,7 @@ export const submitLicenceRequest = onCall(async (request) => {
   if (!(await userHasRole(djId, 'dj'))) {
     throw new HttpsError('permission-denied', 'A DJ profile is required to request tracks.')
   }
+  await enforceRateLimit(`submitLicenceRequest_${djId}`, 20, 60 * 60)
 
   const {
     trackId,

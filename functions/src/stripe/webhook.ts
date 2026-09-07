@@ -82,49 +82,54 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   if (entries.length === 0) return
 
   const settings = await getPlatformSettings()
-  const batch = db.batch()
 
+  // One transaction per artist entry: the read-check-write on txRef must be
+  // atomic against a concurrent duplicate delivery of the same invoice
+  // event, or two overlapping deliveries could both see "no existing tx" and
+  // double-credit the artist's balance. A plain batch (read outside, write
+  // inside) does not provide that guarantee — a transaction does, because
+  // Firestore serializes conflicting transactions on the same document.
   for (const [artistId, artistNetMinor] of entries) {
-    // Idempotency key: retried webhooks for the same invoice/artist must not double-pay.
     const txId = `${invoice.id}_${artistId}`
     const txRef = db.collection('transactions').doc(txId)
-    const existing = await txRef.get()
-    if (existing.exists) continue
 
-    const grossMinor = settings.artistAllocationPercent > 0
-      ? Math.round(artistNetMinor / (settings.artistAllocationPercent / 100))
-      : 0
-    const netMinor = artistNetMinor
-    const platformFeeMinor = Math.max(0, grossMinor - netMinor)
+    await db.runTransaction(async (tx) => {
+      const existing = await tx.get(txRef)
+      if (existing.exists) return
 
-    batch.set(txRef, {
-      transactionId: txId,
-      type: 'subscription_income',
-      artistId,
-      fanId: uid,
-      grossMinor,
-      platformFeeMinor,
-      netMinor,
-      currency: invoice.currency,
-      stripeInvoiceId: invoice.id,
-      promotedAt: null,
-      createdAt: FieldValue.serverTimestamp(),
-    })
+      const grossMinor = settings.artistAllocationPercent > 0
+        ? Math.round(artistNetMinor / (settings.artistAllocationPercent / 100))
+        : 0
+      const netMinor = artistNetMinor
+      const platformFeeMinor = Math.max(0, grossMinor - netMinor)
 
-    const balanceRef = db.collection('artistBalances').doc(artistId)
-    batch.set(
-      balanceRef,
-      {
+      tx.set(txRef, {
+        transactionId: txId,
+        type: 'subscription_income',
         artistId,
-        pendingMinor: FieldValue.increment(netMinor),
+        fanId: uid,
+        grossMinor,
+        platformFeeMinor,
+        netMinor,
         currency: invoice.currency,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    )
-  }
+        stripeInvoiceId: invoice.id,
+        promotedAt: null,
+        refundedAt: null,
+        createdAt: FieldValue.serverTimestamp(),
+      })
 
-  await batch.commit()
+      tx.set(
+        db.collection('artistBalances').doc(artistId),
+        {
+          artistId,
+          pendingMinor: FieldValue.increment(netMinor),
+          currency: invoice.currency,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      )
+    })
+  }
 }
 
 async function handleInvoiceFailed(invoice: Stripe.Invoice) {
@@ -155,78 +160,139 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   if (!agreementId) return
 
   const agreementRef = db.collection('licenceAgreements').doc(agreementId)
-  const snap = await agreementRef.get()
-  if (!snap.exists || snap.data()?.paidAt) return
-  const agreement = snap.data()!
 
-  const grossMinor = agreement.licenceFeeMinor as number
-  const platformFeeMinor = typeof agreement.platformFeeMinor === 'number'
-    ? agreement.platformFeeMinor
-    : Math.round(grossMinor * ((await getPlatformSettings()).djServiceFeePercent / 100))
-  const netMinor = typeof agreement.artistNetMinor === 'number' ? agreement.artistNetMinor : grossMinor - platformFeeMinor
-  const txId = `licence_${agreementId}`
+  // The whole read-check-write must be one Firestore transaction: two
+  // concurrent deliveries of the same event (Stripe explicitly documents
+  // "at least once" delivery, and retries can overlap) must not both read
+  // paidAt as null and both credit the artist's balance. A transaction
+  // serializes conflicting operations on agreementRef, so the second
+  // delivery's read happens only after the first's write commits.
+  const outcome = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(agreementRef)
+    if (!snap.exists || snap.data()?.paidAt) return null
+    const agreement = snap.data()!
 
-  const requestRef = db.collection('licenceRequests').doc(agreement.licenceRequestId)
-  const requestSnap = await requestRef.get()
-  const conversationRef = requestSnap.exists
-    ? db.collection('conversations').doc(requestSnap.data()!.conversationId as string)
-    : null
+    const requestRef = db.collection('licenceRequests').doc(agreement.licenceRequestId)
+    const requestSnap = await tx.get(requestRef)
+    const conversationRef = requestSnap.exists
+      ? db.collection('conversations').doc(requestSnap.data()!.conversationId as string)
+      : null
 
-  const batch = db.batch()
-  batch.update(agreementRef, { paidAt: FieldValue.serverTimestamp(), status: 'active' })
-  batch.update(requestRef, {
-    status: 'approved',
-    updatedAt: FieldValue.serverTimestamp(),
-  })
-  if (conversationRef) {
-    writeSystemMessage(batch, conversationRef, agreement.djId, 'payment_status', 'Payment completed — track access unlocked.', {
+    const grossMinor = agreement.licenceFeeMinor as number
+    const platformFeeMinor = typeof agreement.platformFeeMinor === 'number'
+      ? agreement.platformFeeMinor
+      : Math.round(grossMinor * ((await getPlatformSettings()).djServiceFeePercent / 100))
+    const netMinor = typeof agreement.artistNetMinor === 'number' ? agreement.artistNetMinor : grossMinor - platformFeeMinor
+    const txId = `licence_${agreementId}`
+    const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id ?? null
+
+    tx.update(agreementRef, { paidAt: FieldValue.serverTimestamp(), status: 'active' })
+    tx.update(requestRef, { status: 'approved', updatedAt: FieldValue.serverTimestamp() })
+    if (conversationRef) {
+      writeSystemMessage(tx, conversationRef, agreement.djId, 'payment_status', 'Payment completed — track access unlocked.', {
+        agreementId,
+      })
+    }
+    tx.set(db.collection('transactions').doc(txId), {
+      transactionId: txId,
+      type: 'dj_licence_income',
+      artistId: agreement.artistId,
+      djId: agreement.djId,
       agreementId,
+      grossMinor,
+      platformFeeMinor,
+      netMinor,
+      currency: agreement.currency,
+      stripeCheckoutSessionId: session.id,
+      stripePaymentIntentId: paymentIntentId,
+      promotedAt: null,
+      refundedAt: null,
+      createdAt: FieldValue.serverTimestamp(),
+    })
+    tx.set(
+      db.collection('artistBalances').doc(agreement.artistId),
+      {
+        artistId: agreement.artistId,
+        pendingMinor: FieldValue.increment(netMinor),
+        currency: agreement.currency,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    )
+    tx.set(db.collection('notifications').doc(), {
+      userId: agreement.djId,
+      type: 'download_unlocked',
+      title: 'Payment received — download unlocked',
+      body: 'Your licence payment was received. The full-quality track is now available.',
+      linkTo: '/dj/requests',
+      read: false,
+      createdAt: FieldValue.serverTimestamp(),
+    })
+    tx.set(db.collection('notifications').doc(), {
+      userId: agreement.artistId,
+      type: 'dj_licence_payment',
+      title: 'DJ licence paid',
+      body: 'A DJ completed payment for their licence.',
+      linkTo: '/dashboard/artist/revenue',
+      read: false,
+      createdAt: FieldValue.serverTimestamp(),
+    })
+    return { ok: true }
+  })
+
+  if (!outcome) {
+    logger.info('checkout.session.completed: agreement missing or already paid — no-op', { agreementId })
+  }
+}
+
+/**
+ * Reverses the artist-balance credit for a refunded charge. Matches by
+ * payment_intent — populated on DJ licence payment transactions (see
+ * handleCheckoutSessionCompleted). Subscription/support-allocation income
+ * has no payment_intent recorded on its transaction docs today, so a
+ * refunded subscription invoice is NOT automatically reversed by this
+ * handler — flagged as a known gap in SECURITY_AUDIT.md rather than
+ * silently assumed to be covered. Reverses from pendingMinor first, then
+ * availableMinor; if the funds have already been paid out (moved to
+ * paidMinor), automatic reversal would push a balance negative for money
+ * that already left the platform, so that case is flagged for manual admin
+ * reconciliation instead of silently mutating a paid-out balance.
+ */
+async function handleChargeRefunded(charge: Stripe.Charge) {
+  const matches = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>()
+  const paymentIntentId = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id
+  if (paymentIntentId) {
+    const snap = await db.collection('transactions').where('stripePaymentIntentId', '==', paymentIntentId).get()
+    for (const doc of snap.docs) matches.set(doc.id, doc)
+  }
+
+  for (const doc of matches.values()) {
+    const balanceRef = db.collection('artistBalances').doc(doc.data().artistId as string)
+    await db.runTransaction(async (tx) => {
+      const [txSnap, balanceSnap] = await Promise.all([tx.get(doc.ref), tx.get(balanceRef)])
+      const data = txSnap.data()
+      if (!data || data.refundedAt) return
+      const netMinor = data.netMinor as number
+      const balance = balanceSnap.data() ?? {}
+      const pending = (balance.pendingMinor as number) ?? 0
+      const available = (balance.availableMinor as number) ?? 0
+
+      tx.update(doc.ref, { refundedAt: FieldValue.serverTimestamp(), refundedMinor: charge.amount_refunded })
+
+      if (pending >= netMinor) {
+        tx.set(balanceRef, { pendingMinor: FieldValue.increment(-netMinor), updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+      } else if (available >= netMinor) {
+        tx.set(balanceRef, { availableMinor: FieldValue.increment(-netMinor), updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+      } else {
+        tx.set(db.collection('auditLogs').doc(), {
+          adminId: 'system',
+          action: 'refund_requires_manual_reconciliation',
+          details: { transactionId: doc.id, artistId: data.artistId, netMinor, reason: 'funds already promoted/paid out' },
+          createdAt: FieldValue.serverTimestamp(),
+        })
+      }
     })
   }
-  batch.set(db.collection('transactions').doc(txId), {
-    transactionId: txId,
-    type: 'dj_licence_income',
-    artistId: agreement.artistId,
-    djId: agreement.djId,
-    agreementId,
-    grossMinor,
-    platformFeeMinor,
-    netMinor,
-    currency: agreement.currency,
-    stripeCheckoutSessionId: session.id,
-    promotedAt: null,
-    createdAt: FieldValue.serverTimestamp(),
-  })
-  batch.set(
-    db.collection('artistBalances').doc(agreement.artistId),
-    {
-      artistId: agreement.artistId,
-      pendingMinor: FieldValue.increment(netMinor),
-      currency: agreement.currency,
-      updatedAt: FieldValue.serverTimestamp(),
-    },
-    { merge: true },
-  )
-  batch.set(db.collection('notifications').doc(), {
-    userId: agreement.djId,
-    type: 'download_unlocked',
-    title: 'Payment received — download unlocked',
-    body: 'Your licence payment was received. The full-quality track is now available.',
-    linkTo: '/dj/requests',
-    read: false,
-    createdAt: FieldValue.serverTimestamp(),
-  })
-  batch.set(db.collection('notifications').doc(), {
-    userId: agreement.artistId,
-    type: 'dj_licence_payment',
-    title: 'DJ licence paid',
-    body: 'A DJ completed payment for their licence.',
-    linkTo: '/dashboard/artist/revenue',
-    read: false,
-    createdAt: FieldValue.serverTimestamp(),
-  })
-
-  await batch.commit()
 }
 
 export const stripeWebhook = onRequest({ secrets: [stripeSecretKey, stripeWebhookSecret] }, async (req, res) => {
@@ -260,6 +326,9 @@ export const stripeWebhook = onRequest({ secrets: [stripeSecretKey, stripeWebhoo
         break
       case 'checkout.session.completed':
         await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session)
+        break
+      case 'charge.refunded':
+        await handleChargeRefunded(event.data.object as Stripe.Charge)
         break
       default:
         break

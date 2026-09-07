@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Wallet } from 'lucide-react'
+import { Download, Wallet } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeArtistBalance, subscribeArtistPayouts, subscribeArtistTransactions, requestPayout } from '@/services/revenueService'
 import { beginConnectOnboarding, openConnectDashboard, subscribeArtistPayoutAccount } from '@/services/connectService'
+import { listArtistDownloadLogs } from '@/services/licenceService'
 import { Button } from '@/components/common/Button'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import { formatCurrency } from '@/utils/format'
 import type { ArtistBalanceDoc, ArtistPayoutAccountDoc, PayoutDoc, TransactionDoc } from '@/types/finance'
+import type { DownloadLogDoc } from '@/types/licence'
 
 const TYPE_LABEL: Record<TransactionDoc['type'], string> = {
   subscription_income: 'Subscription income',
@@ -20,6 +22,7 @@ export function RevenuePage() {
   const [transactions, setTransactions] = useState<TransactionDoc[] | null>(null)
   const [payouts, setPayouts] = useState<PayoutDoc[]>([])
   const [payoutAccount, setPayoutAccount] = useState<ArtistPayoutAccountDoc | null>(null)
+  const [downloads, setDownloads] = useState<DownloadLogDoc[] | null>(null)
   const [connecting, setConnecting] = useState(false)
   const [payingOut, setPayingOut] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -30,6 +33,7 @@ export function RevenuePage() {
     const unsub2 = subscribeArtistTransactions(firebaseUser.uid, setTransactions)
     const unsub3 = subscribeArtistPayouts(firebaseUser.uid, setPayouts)
     const unsub4 = subscribeArtistPayoutAccount(firebaseUser.uid, setPayoutAccount)
+    void listArtistDownloadLogs(firebaseUser.uid).then(setDownloads)
     return () => {
       unsub1()
       unsub2()
@@ -129,6 +133,26 @@ export function RevenuePage() {
           </div>
         </section>
       ) : null}
+
+      <section>
+        <h2 className="mb-3 text-lg font-semibold text-ink-0">Download history</h2>
+        {downloads === null ? (
+          <LoadingState />
+        ) : downloads.length === 0 ? (
+          <EmptyState icon={<Download className="h-8 w-8 text-ink-3" />} title="No downloads yet" />
+        ) : (
+          <div className="flex flex-col divide-y divide-surface-border rounded-xl border border-surface-border">
+            {downloads.map((d, index) => (
+              <div key={`${d.agreementId}-${index}`} className="flex items-center justify-between px-4 py-3 text-sm">
+                <span className="text-ink-0">Track {d.trackId}</span>
+                <span className="text-ink-2">
+                  {d.timestamp ? d.timestamp.toDate().toLocaleDateString() : '—'} · v{d.fileVersion}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   )
 }

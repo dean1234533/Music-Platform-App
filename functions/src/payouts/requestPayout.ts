@@ -7,10 +7,10 @@ import { getStripe, stripeSecretKey } from '../stripe/client.js'
 export const requestPayout = onCall({ secrets: [stripeSecretKey] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   const artistId = request.auth.uid
+  const balanceRef = db.collection('artistBalances').doc(artistId)
 
-  const [accountSnap, balanceSnap, settings, holdSnap] = await Promise.all([
+  const [accountSnap, settings, holdSnap] = await Promise.all([
     db.collection('artistPayoutAccounts').doc(artistId).get(),
-    db.collection('artistBalances').doc(artistId).get(),
     getPlatformSettings(),
     db.collection('payoutHolds').doc(artistId).get(),
   ])
@@ -24,23 +24,55 @@ export const requestPayout = onCall({ secrets: [stripeSecretKey] }, async (reque
     throw new HttpsError('failed-precondition', 'Connect a verified payout account first.')
   }
 
-  const balance = balanceSnap.data()
-  const availableMinor = (balance?.availableMinor as number) ?? 0
-  if (availableMinor < settings.minimumPayoutMinor) {
-    throw new HttpsError(
-      'failed-precondition',
-      `Available balance must be at least ${(settings.minimumPayoutMinor / 100).toFixed(2)} to request a payout.`,
+  // Reserve the payout atomically before ever calling Stripe: a double-click
+  // (or two concurrent requests) must not both read the same availableMinor
+  // and both create a real transfer. The transaction below checks for an
+  // in-flight payout and decrements the balance in one atomic step, so a
+  // second concurrent call either sees payoutInFlight=true or an
+  // already-decremented balance and is rejected before Stripe is ever
+  // called. If the Stripe call itself then fails, the reservation is
+  // reverted below.
+  const reservation = await db.runTransaction(async (tx) => {
+    const balanceSnap = await tx.get(balanceRef)
+    const balance = balanceSnap.data() ?? {}
+    if (balance.payoutInFlight) {
+      throw new HttpsError('failed-precondition', 'A payout is already being processed.')
+    }
+    const availableMinor = (balance.availableMinor as number) ?? 0
+    if (availableMinor < settings.minimumPayoutMinor) {
+      throw new HttpsError(
+        'failed-precondition',
+        `Available balance must be at least ${(settings.minimumPayoutMinor / 100).toFixed(2)} to request a payout.`,
+      )
+    }
+    const currency = (balance.currency as string) ?? 'gbp'
+    tx.set(
+      balanceRef,
+      { availableMinor: FieldValue.increment(-availableMinor), payoutInFlight: true, updatedAt: FieldValue.serverTimestamp() },
+      { merge: true },
     )
-  }
-
-  const currency = (balance?.currency as string) ?? 'gbp'
-  const stripe = getStripe()
-  const transfer = await stripe.transfers.create({
-    amount: availableMinor,
-    currency,
-    destination: account.stripeAccountId,
-    metadata: { firebaseUid: artistId },
+    return { availableMinor, currency }
   })
+
+  const { availableMinor, currency } = reservation
+  const stripe = getStripe()
+
+  let transfer
+  try {
+    transfer = await stripe.transfers.create({
+      amount: availableMinor,
+      currency,
+      destination: account.stripeAccountId,
+      metadata: { firebaseUid: artistId },
+    })
+  } catch (err) {
+    // Stripe rejected the transfer — give the reserved amount back.
+    await balanceRef.set(
+      { availableMinor: FieldValue.increment(availableMinor), payoutInFlight: false, updatedAt: FieldValue.serverTimestamp() },
+      { merge: true },
+    )
+    throw err
+  }
 
   const payoutRef = db.collection('payouts').doc()
   const batch = db.batch()
@@ -54,12 +86,8 @@ export const requestPayout = onCall({ secrets: [stripeSecretKey] }, async (reque
     createdAt: FieldValue.serverTimestamp(),
   })
   batch.set(
-    db.collection('artistBalances').doc(artistId),
-    {
-      availableMinor: FieldValue.increment(-availableMinor),
-      paidMinor: FieldValue.increment(availableMinor),
-      updatedAt: FieldValue.serverTimestamp(),
-    },
+    balanceRef,
+    { paidMinor: FieldValue.increment(availableMinor), payoutInFlight: false, updatedAt: FieldValue.serverTimestamp() },
     { merge: true },
   )
   batch.set(db.collection('transactions').doc(`payout_${payoutRef.id}`), {

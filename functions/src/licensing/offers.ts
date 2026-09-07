@@ -45,6 +45,35 @@ async function loadNegotiableRequest(requestId: string, uid: string) {
   return { requestRef, licenceRequest, isArtist, isDj }
 }
 
+/**
+ * Enforces the per-track djDealSettings that were previously stored but
+ * never checked: a price floor (minimumPriceMinor) on any offer terms, and
+ * customApprovalRequired blocking the artist's opening offer until they've
+ * explicitly moved the request past 'submitted' via respondToLicenceRequest.
+ */
+async function enforceTrackDealSettings(
+  trackId: string,
+  priceMinor: number,
+  isOpeningOffer: boolean,
+  requestStatus: string,
+): Promise<void> {
+  const trackSnap = await db.collection('tracks').doc(trackId).get()
+  const dealSettings = trackSnap.data()?.djDealSettings as
+    | { minimumPriceMinor: number | null; customApprovalRequired: boolean }
+    | undefined
+  if (!dealSettings) return
+
+  if (isOpeningOffer && dealSettings.customApprovalRequired && requestStatus === 'submitted') {
+    throw new HttpsError(
+      'failed-precondition',
+      'This track requires you to explicitly approve the request before sending an offer.',
+    )
+  }
+  if (typeof dealSettings.minimumPriceMinor === 'number' && priceMinor < dealSettings.minimumPriceMinor) {
+    throw new HttpsError('invalid-argument', 'This offer is below the minimum price set for this track.')
+  }
+}
+
 /** Only the artist can open a negotiation with the first offer. */
 export const sendOffer = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
@@ -57,6 +86,7 @@ export const sendOffer = onCall(async (request) => {
   if (licenceRequest.currentOfferId) {
     throw new HttpsError('failed-precondition', 'An offer already exists on this request — use counterOffer instead.')
   }
+  await enforceTrackDealSettings(licenceRequest.trackId, terms.priceMinor, true, licenceRequest.status)
 
   const offerRef = db.collection('licenceOffers').doc()
   const conversationRef = db.collection('conversations').doc(licenceRequest.conversationId)
@@ -95,6 +125,7 @@ export const counterOffer = onCall(async (request) => {
   const previous = previousSnap.data()!
   if (previous.status !== 'pending') throw new HttpsError('failed-precondition', 'This offer is no longer pending.')
   if (previous.createdBy === uid) throw new HttpsError('failed-precondition', 'You cannot counter your own offer.')
+  await enforceTrackDealSettings(licenceRequest.trackId, terms.priceMinor, false, licenceRequest.status)
 
   const offerRef = db.collection('licenceOffers').doc()
   const conversationRef = db.collection('conversations').doc(licenceRequest.conversationId)

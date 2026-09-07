@@ -45,7 +45,7 @@ export function ReportTrackModal({ trackId, onClose }: { trackId: string; onClos
             <select
               value={reason}
               onChange={(e) => setReason(e.target.value as (typeof REASONS)[number])}
-              className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0"
+              className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-base sm:text-sm text-ink-0"
             >
               {REASONS.map((r) => (
                 <option key={r} value={r}>

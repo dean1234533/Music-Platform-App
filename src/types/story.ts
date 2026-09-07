@@ -27,6 +27,7 @@ export interface StoryDoc {
   mediaKind: StoryMediaKind
   storyCategory: StoryCategory
   mediaUrl: string | null
+  mediaStoragePath?: string | null
   caption: string
   visibility: StoryVisibility
   createdAt: Timestamp | null

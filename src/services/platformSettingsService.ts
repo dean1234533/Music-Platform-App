@@ -1,6 +1,6 @@
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import type { PlatformSettings, SubscriptionPlan } from '@/types/platformSettings'
+import { DEFAULT_DATA_RETENTION, type DataRetentionSettings, type PlatformSettings, type SubscriptionPlan } from '@/types/platformSettings'
 import type { PlanRole } from '@/types/entitlements'
 
 /**
@@ -16,4 +16,11 @@ export async function listActiveSubscriptionPlansForRole(role: PlanRole = 'fan')
 export async function getPlatformSettings(): Promise<PlatformSettings | null> {
   const snap = await getDoc(doc(db, 'platformSettings', 'default'))
   return snap.exists() ? (snap.data() as PlatformSettings) : null
+}
+
+/** Falls back to the documented suggested defaults until an admin configures real values. */
+export async function getDataRetentionSettings(): Promise<DataRetentionSettings> {
+  const snap = await getDoc(doc(db, 'platformSettings', 'dataRetention'))
+  if (!snap.exists()) return DEFAULT_DATA_RETENTION
+  return { ...DEFAULT_DATA_RETENTION, ...(snap.data() as Partial<DataRetentionSettings>) }
 }

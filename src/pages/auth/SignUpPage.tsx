@@ -1,23 +1,30 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AuthLayout } from './AuthLayout'
-import { Input, Label } from '@/components/common/Input'
+import { Input, Label, FieldError } from '@/components/common/Input'
 import { Button } from '@/components/common/Button'
+import { PasswordStrengthMeter } from '@/components/auth/PasswordStrengthMeter'
 import { signInWithGoogle, signUpWithEmail } from '@/services/authService'
 import { friendlyAuthError } from '@/utils/authErrors'
+import { checkPassword, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 
 export function SignUpPage() {
   const navigate = useNavigate()
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [passwordTouched, setPasswordTouched] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
 
+  const passwordCheck = checkPassword(password)
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setError(null)
+    setPasswordTouched(true)
+    if (!passwordCheck.valid) return
     setLoading(true)
     try {
       await signUpWithEmail(displayName, email, password)
@@ -54,16 +61,30 @@ export function SignUpPage() {
           <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
         </div>
         <div>
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">Create a secure password</Label>
           <Input
             id="password"
             type="password"
             required
-            minLength={6}
+            minLength={MIN_PASSWORD_LENGTH}
+            maxLength={MAX_PASSWORD_LENGTH}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            onBlur={() => setPasswordTouched(true)}
             autoComplete="new-password"
+            aria-describedby="password-requirements password-error"
           />
+          <p id="password-requirements" className="mt-1.5 text-xs text-ink-3">
+            At least {MIN_PASSWORD_LENGTH} characters. Avoid common passwords — passphrases are encouraged.
+          </p>
+          <PasswordStrengthMeter password={password} />
+          {passwordTouched && !passwordCheck.valid ? (
+            <div id="password-error">
+              {passwordCheck.reasons.map((reason) => (
+                <FieldError key={reason}>{reason}</FieldError>
+              ))}
+            </div>
+          ) : null}
         </div>
         {error ? <p className="text-sm text-danger-500">{error}</p> : null}
         <Button type="submit" loading={loading} className="w-full">

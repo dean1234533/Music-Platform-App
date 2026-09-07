@@ -31,3 +31,25 @@ export interface PlatformSettings {
   maxUploadSizeMB: number
   supportedAudioTypes: string[]
 }
+
+export interface DataRetentionSettings {
+  notificationsDays: number
+  storyRecoveryDays: number
+  inactiveChatMonths: number
+  abandonedRequestMonths: number
+  draftOfferMonths: number
+  auditLogMonths: number
+  contractYears: number
+  copyrightClaimYears: number
+}
+
+export const DEFAULT_DATA_RETENTION: DataRetentionSettings = {
+  notificationsDays: 90,
+  storyRecoveryDays: 7,
+  inactiveChatMonths: 24,
+  abandonedRequestMonths: 12,
+  draftOfferMonths: 12,
+  auditLogMonths: 24,
+  contractYears: 6,
+  copyrightClaimYears: 6,
+}

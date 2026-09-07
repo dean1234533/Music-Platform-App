@@ -32,7 +32,7 @@ export async function uploadStoryMedia(
   mediaKind: 'image' | 'video' | 'audio',
   file: File,
   onProgress?: (percent: number) => void,
-): Promise<string> {
+): Promise<{ url: string; path: string }> {
   let uploadFile = file
   if (mediaKind === 'image') {
     const { file: compressed } = await compressImage(file, 'story')
@@ -54,13 +54,15 @@ export async function uploadStoryMedia(
       () => resolve(),
     )
   })
-  return getDownloadURL(task.snapshot.ref)
+  const url = await getDownloadURL(task.snapshot.ref)
+  return { url, path }
 }
 
 export interface CreateStoryInput {
   mediaKind: StoryMediaKind
   storyCategory: StoryCategory
   mediaUrl?: string
+  mediaStoragePath?: string
   caption?: string
   visibility: StoryVisibility
   durationSec?: number

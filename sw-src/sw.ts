@@ -17,8 +17,17 @@ clientsClaim()
 // App-shell precaching, generated at build time by vite-plugin-pwa (injectManifest).
 precacheAndRoute(self.__WB_MANIFEST)
 
+// Same-origin only: matching by extension alone would also catch Firebase
+// Storage download URLs (a different origin) whose pathname happens to end
+// in .jpg/.png/etc — including access-controlled paths like copyright
+// evidence or licence-signature images. Caching those for up to 30 days
+// would keep serving them from this device after the underlying Storage
+// rule/token access is revoked, bypassing the entitlement check entirely.
+// Restricting to the app's own origin limits this cache to bundled/public
+// assets (icons, static artwork served through this origin), where that
+// risk doesn't apply.
 registerRoute(
-  ({ url }) => /\.(?:png|jpg|jpeg|svg|webp)$/.test(url.pathname),
+  ({ url }) => url.origin === self.location.origin && /\.(?:png|jpg|jpeg|webp)$/.test(url.pathname),
   new CacheFirst({
     cacheName: 'images',
     plugins: [new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 })],

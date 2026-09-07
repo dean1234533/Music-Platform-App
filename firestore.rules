@@ -267,9 +267,27 @@ service cloud.firestore {
       allow write: if false; // written only via adminUpsertSubscriptionPlan
     }
 
+    // platformSettings/default (fees) and platformSettings/dataRetention
+    // (retention periods) share this rule — both are public-read config,
+    // written only via adminUpdatePlatformSettings / adminUpdateDataRetentionSettings.
     match /platformSettings/{settingId} {
       allow read: if true;
-      allow write: if false; // written only via adminUpdatePlatformSettings
+      allow write: if false;
+    }
+
+    // accountDeletions/{uid} — deletion-status tracking written only by the
+    // deleteAccount callable. The owner can poll their own deletion's
+    // progress; nobody can forge or alter a status client-side.
+    match /accountDeletions/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow write: if false;
+    }
+
+    // rateLimits/{key} — Cloud-Function-only abuse-throttle counters
+    // (enforceRateLimit in functions/src/rateLimit.ts). Never client-readable
+    // or writable; the count itself isn't meaningful to expose.
+    match /rateLimits/{key} {
+      allow read, write: if false;
     }
 
     // ---------------------------------------------------------------------
@@ -393,6 +411,14 @@ service cloud.firestore {
       allow write: if false;
     }
     match /auditLogs/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // securityIncidents/{incidentId} — the breach register described in
+    // SECURITY_INCIDENT_RESPONSE.md. Admin-only, written exclusively via
+    // adminCreateSecurityIncident/adminUpdateSecurityIncident.
+    match /securityIncidents/{docId} {
       allow read: if isAdmin();
       allow write: if false;
     }

@@ -71,7 +71,7 @@ export function RequestDjAccessModal({
           <select
             value={intendedUse}
             onChange={(e) => setIntendedUse(e.target.value as IntendedUse)}
-            className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0"
+            className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-base sm:text-sm text-ink-0"
           >
             {USE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
