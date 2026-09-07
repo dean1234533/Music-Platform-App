@@ -24,6 +24,7 @@ import { DiscoverPage } from '@/pages/fan/DiscoverPage'
 import { SearchPage } from '@/pages/fan/SearchPage'
 import { FollowingPage } from '@/pages/fan/FollowingPage'
 import { SupportedPage } from '@/pages/fan/SupportedPage'
+import { FanOffersPage as ListenerOffersPage } from '@/pages/fan/FanOffersPage'
 import { LibraryPage } from '@/pages/fan/LibraryPage'
 import { PlaylistsPage } from '@/pages/fan/PlaylistsPage'
 import { PlaylistDetailPage } from '@/pages/fan/PlaylistDetailPage'
@@ -41,6 +42,7 @@ import { StoriesPage } from '@/pages/artist/dashboard/StoriesPage'
 import { DjDealsPage } from '@/pages/artist/dashboard/DjDealsPage'
 import { StoryAnalyticsPage } from '@/pages/artist/dashboard/StoryAnalyticsPage'
 import { CommunityPage } from '@/pages/artist/dashboard/CommunityPage'
+import { FanOffersPage as ArtistFanOffersPage } from '@/pages/artist/dashboard/FanOffersPage'
 import { DJRequestsPage as ArtistDJRequestsPage } from '@/pages/artist/dashboard/DJRequestsPage'
 import { RevenuePage } from '@/pages/artist/dashboard/RevenuePage'
 import { ArtistSettingsPage } from '@/pages/artist/dashboard/ArtistSettingsPage'
@@ -159,6 +161,7 @@ function App() {
               <Route path="search" element={<SearchPage />} />
               <Route path="following" element={<FollowingPage />} />
               <Route path="supported" element={<SupportedPage />} />
+              <Route path="offers" element={<ListenerOffersPage />} />
               <Route path="library" element={<LibraryPage />} />
               <Route path="playlists" element={<PlaylistsPage />} />
               <Route path="playlists/:playlistId" element={<PlaylistDetailPage />} />
@@ -186,6 +189,7 @@ function App() {
               <Route path="stories" element={<StoriesPage />} />
               <Route path="stories/analytics" element={<StoryAnalyticsPage />} />
               <Route path="community" element={<CommunityPage />} />
+              <Route path="offers" element={<ArtistFanOffersPage />} />
               <Route path="dj-requests" element={<ArtistDJRequestsPage />} />
               <Route path="deals" element={<DjDealsPage />} />
               <Route path="revenue" element={<RevenuePage />} />

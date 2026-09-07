@@ -190,6 +190,44 @@ service cloud.firestore {
       allow update, delete: if isSignedIn() && resource.data.artistId == request.auth.uid;
     }
 
+    // Artist-created benefits for listeners. Audience access mirrors posts;
+    // redemption details are part of the offer and therefore protected by
+    // the same visibility check.
+    match /fanOffers/{offerId} {
+      allow read: if resource.data.audience == 'everyone'
+        || (isSignedIn() && resource.data.artistId == request.auth.uid)
+        || (resource.data.audience == 'followers' && isSignedIn() &&
+            exists(/databases/$(database)/documents/follows/$(request.auth.uid + '_' + resource.data.artistId)))
+        || (resource.data.audience == 'supporters' && isSignedIn() &&
+            exists(/databases/$(database)/documents/supportRelationships/$(request.auth.uid + '_' + resource.data.artistId)));
+      allow create: if isSignedIn()
+        && hasRole('artist')
+        && request.resource.data.artistId == request.auth.uid
+        && request.resource.data.offerId == offerId;
+      allow update: if false;
+      allow delete: if isSignedIn() && resource.data.artistId == request.auth.uid;
+    }
+
+    match /fanOfferClaims/{claimId} {
+      allow read: if isSignedIn()
+        && (resource == null || resource.data.fanId == request.auth.uid || resource.data.artistId == request.auth.uid);
+      allow create: if isSignedIn()
+        && request.resource.data.fanId == request.auth.uid
+        && request.resource.data.claimId == claimId
+        && claimId == request.auth.uid + '_' + request.resource.data.offerId
+        && exists(/databases/$(database)/documents/fanOffers/$(request.resource.data.offerId))
+        && request.resource.data.artistId == get(/databases/$(database)/documents/fanOffers/$(request.resource.data.offerId)).data.artistId
+        && (
+          get(/databases/$(database)/documents/fanOffers/$(request.resource.data.offerId)).data.audience == 'everyone'
+          || (get(/databases/$(database)/documents/fanOffers/$(request.resource.data.offerId)).data.audience == 'followers'
+              && exists(/databases/$(database)/documents/follows/$(request.auth.uid + '_' + request.resource.data.artistId)))
+          || (get(/databases/$(database)/documents/fanOffers/$(request.resource.data.offerId)).data.audience == 'supporters'
+              && exists(/databases/$(database)/documents/supportRelationships/$(request.auth.uid + '_' + request.resource.data.artistId)))
+        );
+      allow update: if false;
+      allow delete: if isSignedIn() && resource.data.fanId == request.auth.uid;
+    }
+
     // ---------------------------------------------------------------------
     // stories/{storyId} — ephemeral artist updates, tiered visibility same
     // shape as artistPosts plus a 4th 'dj' tier gated by the artist's own

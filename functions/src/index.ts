@@ -2,6 +2,7 @@ export { onUserCreate } from './users.js'
 export { onFollowCreate, onFollowDelete } from './follows.js'
 export { recordPreviewPlay } from './tracks.js'
 export { onNotificationCreatePush } from './notifications/pushTrigger.js'
+export { onFanOfferCreate, onFanOfferDelete } from './fanOffers.js'
 
 // Phase 2 — platform subscriptions, fan support allocation, revenue.
 export { createCheckoutSession } from './stripe/checkout.js'

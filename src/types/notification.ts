@@ -9,6 +9,7 @@ export type NotificationType =
   | 'event'
   | 'new_follower'
   | 'new_supporter'
+  | 'fan_offer'
   | 'dj_request'
   | 'dj_message'
   | 'agreement_signed'

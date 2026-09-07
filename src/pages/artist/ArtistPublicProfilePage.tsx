@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, BadgeCheck, Disc3, MapPin, Radio } from 'lucide-react'
 import { getArtistIdForSlug, subscribeArtistProfile, subscribePublicArtistTracks } from '@/services/artistService'
 import { subscribePublicArtistPosts } from '@/services/artistPostService'
@@ -22,10 +22,16 @@ import type { ArtistProfile, ArtistPost } from '@/types/artist'
 import type { TrackDoc } from '@/types/track'
 import type { StoryDoc, StoryVisibility } from '@/types/story'
 import { clsx } from 'clsx'
+import { FanOfferCard } from '@/components/music/FanOfferCard'
+import { claimFanOffer, removeFanOfferClaim, subscribeOwnFanOfferClaims, subscribeVisibleFanOffers } from '@/services/fanOfferService'
+import { useToast } from '@/contexts/ToastContext'
+import type { FanOfferClaimDoc, FanOfferDoc } from '@/types/fanOffer'
 
 export function ArtistPublicProfilePage() {
   const { slug } = useParams<{ slug: string }>()
+  const navigate = useNavigate()
   const { firebaseUser, hasRole } = useAuth()
+  const { notify } = useToast()
   const [artistId, setArtistId] = useState<string | null | undefined>(undefined)
   const [artist, setArtist] = useState<ArtistProfile | null>(null)
   const [tracks, setTracks] = useState<TrackDoc[]>([])
@@ -35,6 +41,9 @@ export function ArtistPublicProfilePage() {
   const [activeStoriesByTier, setActiveStoriesByTier] = useState<Record<string, StoryDoc[]>>({})
   const [highlights, setHighlights] = useState<StoryDoc[]>([])
   const [viewerGroup, setViewerGroup] = useState<StoryGroup | null>(null)
+  const [fanOffers, setFanOffers] = useState<FanOfferDoc[]>([])
+  const [offerClaims, setOfferClaims] = useState<FanOfferClaimDoc[]>([])
+  const [pendingOfferId, setPendingOfferId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!slug) return
@@ -71,6 +80,19 @@ export function ArtistPublicProfilePage() {
     return subscribePublicArtistPosts(artistId, { isFollowing, isSupporting }, setPosts)
   }, [artistId, isFollowing, isSupporting])
 
+  useEffect(() => {
+    if (!artistId) return
+    return subscribeVisibleFanOffers(artistId, { isFollowing, isSupporting }, setFanOffers)
+  }, [artistId, isFollowing, isSupporting])
+
+  useEffect(() => {
+    if (!firebaseUser) {
+      setOfferClaims([])
+      return
+    }
+    return subscribeOwnFanOfferClaims(firebaseUser.uid, setOfferClaims)
+  }, [firebaseUser])
+
   const qualifyingTiers = useMemo((): StoryVisibility[] => {
     const tiers: StoryVisibility[] = ['public']
     if (isFollowing) tiers.push('followers')
@@ -102,6 +124,29 @@ export function ArtistPublicProfilePage() {
   const activeStories = Object.values(activeStoriesByTier)
     .flat()
     .sort((a, b) => (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0))
+  const claimedOfferIds = new Set(offerClaims.map((claim) => claim.offerId))
+
+  async function toggleOfferClaim(offer: FanOfferDoc) {
+    if (!firebaseUser) {
+      notify('Sign in to claim artist offers.', 'info')
+      navigate('/sign-in')
+      return
+    }
+    setPendingOfferId(offer.offerId)
+    try {
+      if (claimedOfferIds.has(offer.offerId)) {
+        await removeFanOfferClaim(firebaseUser.uid, offer.offerId)
+        notify(`Removed your claim for “${offer.title}”.`, 'info')
+      } else {
+        await claimFanOffer(firebaseUser.uid, offer)
+        notify(`Claimed “${offer.title}”. Redemption details are now unlocked.`)
+      }
+    } catch {
+      notify('Could not update this offer. Please try again.', 'error')
+    } finally {
+      setPendingOfferId(null)
+    }
+  }
 
   return (
     <div className="min-h-svh overflow-hidden bg-surface-0 pb-24 text-ink-0">
@@ -237,6 +282,26 @@ export function ArtistPublicProfilePage() {
             </div>
           </aside>
         </div>
+
+        {fanOffers.length > 0 ? (
+          <section className="mt-10">
+            <div className="mb-4 border-b border-white/[0.08] pb-4">
+              <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-brand-400">For the community</p>
+              <h2 className="mt-1 text-2xl font-medium tracking-[-0.03em] text-ink-0">Offers from {artist.name}</h2>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {fanOffers.map((offer) => (
+                <FanOfferCard
+                  key={offer.offerId}
+                  offer={offer}
+                  claimed={claimedOfferIds.has(offer.offerId)}
+                  pending={pendingOfferId === offer.offerId}
+                  onClaim={() => void toggleOfferClaim(offer)}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {posts.length > 0 ? (
           <div className="mt-10">
