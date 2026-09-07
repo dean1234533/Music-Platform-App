@@ -189,6 +189,61 @@ service cloud.firestore {
       allow update, delete: if isSignedIn() && resource.data.artistId == request.auth.uid;
     }
 
+    // ---------------------------------------------------------------------
+    // stories/{storyId} — ephemeral artist updates, tiered visibility same
+    // shape as artistPosts plus a 4th 'dj' tier gated by the artist's own
+    // storiesDjEnabled opt-in (independent of djAllowRequests). Written only
+    // via createStory/toggleStoryHighlight/adminDeleteStory (Admin SDK) so
+    // CTA targets can be server-validated against real tracks — the one
+    // client-writable exception is ctaClickCount, a low-stakes counter.
+    // ---------------------------------------------------------------------
+    match /stories/{storyId} {
+      allow read: if resource.data.visibility == 'public'
+        || (isSignedIn() && resource.data.artistId == request.auth.uid)
+        || (resource.data.visibility == 'followers' && isSignedIn() &&
+            exists(/databases/$(database)/documents/follows/$(request.auth.uid + '_' + resource.data.artistId)))
+        || (resource.data.visibility == 'supporters' && isSignedIn() &&
+            exists(/databases/$(database)/documents/supportRelationships/$(request.auth.uid + '_' + resource.data.artistId)))
+        || (resource.data.visibility == 'dj' && hasRole('dj') &&
+            get(/databases/$(database)/documents/artistProfiles/$(resource.data.artistId)).data.get('storiesDjEnabled', false) == true)
+        || isAdmin();
+      allow create: if false;
+      allow delete: if isSignedIn() && resource.data.artistId == request.auth.uid;
+      allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ctaClickCount'])
+        && request.resource.data.ctaClickCount == resource.data.ctaClickCount + 1;
+    }
+
+    // storyViews/{storyId_userId} — dedup doc per viewer; direct client write
+    // + Firestore trigger aggregates uniqueViewerCount onto the story, same
+    // pattern as follows/followerCount. Never deletable (a "seen" state
+    // sticks) or updatable.
+    match /storyViews/{viewId} {
+      allow read: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid
+        && viewId == request.resource.data.storyId + '_' + request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // storyReactions/{storyId_userId} — one reaction per viewer, deletable
+    // (un-react), aggregated onto reactionCount by trigger.
+    match /storyReactions/{reactionId} {
+      allow read: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid
+        && reactionId == request.resource.data.storyId + '_' + request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow update: if false;
+    }
+
+    // storyPollVotes/{storyId_userId} — one vote per viewer, permanent,
+    // aggregated onto pollVoteCounts by trigger.
+    match /storyPollVotes/{voteId} {
+      allow read: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid
+        && voteId == request.resource.data.storyId + '_' + request.auth.uid;
+      allow update, delete: if false;
+    }
+
     // subscriptionPlans/{planId} — admin-configured pricing, public read only.
     match /subscriptionPlans/{planId} {
       allow read: if true;

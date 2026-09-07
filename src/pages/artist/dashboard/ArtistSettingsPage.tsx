@@ -30,6 +30,7 @@ export function ArtistSettingsPage() {
     website: '',
   })
   const [djAllowRequests, setDjAllowRequests] = useState<DJRequestPolicy>('verified_only')
+  const [storiesDjEnabled, setStoriesDjEnabled] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [verificationRequested, setVerificationRequested] = useState(false)
@@ -51,6 +52,7 @@ export function ArtistSettingsPage() {
           website: profile.socialLinks.website ?? '',
         })
         setDjAllowRequests(profile.djAllowRequests)
+        setStoriesDjEnabled(profile.storiesDjEnabled)
       }
     })
   }, [firebaseUser])
@@ -133,6 +135,7 @@ export function ArtistSettingsPage() {
         location: form.location,
         socialLinks: nextSocialLinks,
         djAllowRequests,
+        storiesDjEnabled,
       })
       setSaved(true)
     } finally {
@@ -200,6 +203,23 @@ export function ArtistSettingsPage() {
             </option>
           ))}
         </select>
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Stories</h2>
+        <label className="flex items-center gap-2.5 text-sm text-ink-1">
+          <input
+            type="checkbox"
+            checked={storiesDjEnabled}
+            onChange={(e) => setStoriesDjEnabled(e.target.checked)}
+            className="h-4 w-4"
+          />
+          Show my DJ-tier Stories to DJs
+        </label>
+        <p className="mt-1.5 text-xs text-ink-3">
+          Independent of DJ requests above — this only controls whether Stories you mark "DJs only" are visible to
+          DJs.
+        </p>
       </section>
 
       {saved ? <p className="text-sm text-support-400">Saved.</p> : null}

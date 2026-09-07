@@ -88,6 +88,7 @@ export async function createArtistProfile(
       djAllowRequests: 'verified_only',
       trackCount: 0,
       perks: [],
+      storiesDjEnabled: false,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     })

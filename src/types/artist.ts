@@ -32,6 +32,8 @@ export interface ArtistProfile {
   trackCount: number
   /** Free-text benefits the artist offers paying supporters. */
   perks: string[]
+  /** Independent of djAllowRequests — whether this artist's DJ-tier Stories are visible to DJs at all. */
+  storiesDjEnabled: boolean
   createdAt: Timestamp | null
   updatedAt: Timestamp | null
 }

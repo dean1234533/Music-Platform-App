@@ -1,10 +1,15 @@
-import { doc, onSnapshot } from 'firebase/firestore'
+import { collection, doc, getDocs, onSnapshot, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { callable } from '@/lib/callable'
 import type { SupportAllocationDoc } from '@/types/subscription'
 
 export function subscribeIsSupporting(fanId: string, artistId: string, onChange: (supporting: boolean) => void) {
   return onSnapshot(doc(db, 'supportRelationships', `${fanId}_${artistId}`), (snap) => onChange(snap.exists()))
+}
+
+export async function listSupportedArtistIds(fanId: string): Promise<string[]> {
+  const snap = await getDocs(query(collection(db, 'supportRelationships'), where('fanId', '==', fanId)))
+  return snap.docs.map((d) => (d.data() as { artistId: string }).artistId)
 }
 
 interface AllocationInput {

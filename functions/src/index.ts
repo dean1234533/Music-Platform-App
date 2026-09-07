@@ -26,7 +26,7 @@ export { requestPayout } from './payouts/requestPayout.js'
 export { promotePendingBalances } from './payouts/promoteBalances.js'
 export { submitVerificationRequest, reviewVerificationRequest } from './admin/verification.js'
 export { submitCopyrightClaim, reviewCopyrightClaim, submitArtistResponse, submitCounterNotice } from './admin/copyright.js'
-export { adminSetUserSuspension, adminSetTrackTakedown } from './admin/moderation.js'
+export { adminSetUserSuspension, adminSetTrackTakedown, adminDeleteStory } from './admin/moderation.js'
 export { blockSuspendedSignIn } from './admin/enforceSuspension.js'
 export { submitReport, adminResolveReport } from './admin/reports.js'
 export { adminUpsertSubscriptionPlan, adminUpdatePlatformSettings } from './admin/settings.js'
@@ -39,3 +39,7 @@ export { sendBulkDjOutreach } from './messaging/bulkOutreach.js'
 // Media compression, sharing, and copyright protection.
 export { recordRightsDeclaration, recordLegalAcceptance } from './legal/acceptances.js'
 export { onOriginalUploaded } from './tracks/onOriginalUploaded.js'
+
+// Artist Stories.
+export { createStory, toggleStoryHighlight } from './stories/stories.js'
+export { onStoryViewCreate, onStoryReactionCreate, onStoryReactionDelete, onStoryPollVoteCreate } from './stories/triggers.js'

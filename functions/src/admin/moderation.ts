@@ -34,3 +34,16 @@ export const adminSetTrackTakedown = onCall(async (request) => {
   await writeAuditLog(adminId, 'set_track_takedown', { trackId, takenDown })
   return { ok: true }
 })
+
+export const adminDeleteStory = onCall(async (request) => {
+  const adminId = await requireAdmin(request)
+  const { storyId } = request.data ?? {}
+  if (!storyId || typeof storyId !== 'string') {
+    throw new HttpsError('invalid-argument', 'storyId is required.')
+  }
+
+  await db.collection('stories').doc(storyId).delete()
+
+  await writeAuditLog(adminId, 'delete_story', { storyId })
+  return { ok: true }
+})

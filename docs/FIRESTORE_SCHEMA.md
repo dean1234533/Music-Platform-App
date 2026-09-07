@@ -47,6 +47,13 @@ DJs can submit unlimited requests, use filters/crates/analytics, and apply for v
 
 Copyright evidence files upload to Storage under `copyrightEvidence/{claimId}/{fileName}`, readable only by the claim's own reporter or an admin.
 
+## Artist Stories
+
+- `stories/{storyId}` is an ephemeral (24h default, up to 7 days) artist update — `mediaKind` (`image`/`video`/`audio`/`text`/`poll`), `storyCategory` (a descriptive label), `visibility` (`public`/`followers`/`supporters`/`dj`), a restricted `ctaType`/`ctaTargetId` pair (never an arbitrary URL — `'track'` CTAs are checked server-side against a real track the artist owns), and denormalised counters (`uniqueViewerCount`, `reactionCount`, `ctaClickCount`, `pollVoteCounts`). Written only via the `createStory`/`toggleStoryHighlight` callables (or deleted directly by the owning artist); the one client-writable field is `ctaClickCount`, and rules enforce it can only ever increment by exactly 1.
+- `storyViews/{storyId_userId}`, `storyReactions/{storyId_userId}`, `storyPollVotes/{storyId_userId}` are per-viewer dedup docs, direct client writes (like `follows`), aggregated onto the story's counters by a Firestore trigger.
+- The `dj` visibility tier additionally requires the viewer to hold the `dj` role AND the artist's own `artistProfiles.storiesDjEnabled` opt-in — independent of `djAllowRequests`, which only governs licensing requests. Story media lives under `artists/{artistId}/stories/{public,followers,supporters,dj}/{fileName}` — the tier is encoded directly in the Storage path, so (unlike track streaming) no Firestore visibility lookup is needed for the public/followers/supporters tiers.
+- Marking a Story `isHighlight` keeps it queryable past its `expiresAt` for the profile's Highlights row (public-tier highlights only, in this pass); it does not extend the "active" rail, which always filters on `expiresAt`.
+
 ## Platform configuration
 
 `platformSettings/default` is public-readable and admin-write-only. Payment processing requires `platformFeePercent`, `artistAllocationPercent`, `djServiceFeePercent`, and `minimumPayoutMinor`. Platform and artist percentages must total 100. Revenue code does not fall back to hard-coded percentages.

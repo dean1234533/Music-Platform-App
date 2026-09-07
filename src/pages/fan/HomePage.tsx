@@ -1,28 +1,69 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { listFollowedArtistIds } from '@/services/followService'
+import { listSupportedArtistIds } from '@/services/supportService'
 import { listNewReleaseTracks } from '@/services/discoveryService'
+import { subscribeActiveStoriesForArtists, subscribeMyViewedStoryIds } from '@/services/storyService'
 import { TrackCard } from '@/components/music/TrackCard'
+import { StoryRail } from '@/components/stories/StoryRail'
+import { StoryViewer, type StoryGroup } from '@/components/stories/StoryViewer'
 import { LoadingState, EmptyState } from '@/components/common/StateViews'
 import type { TrackDoc } from '@/types/track'
+import type { StoryDoc } from '@/types/story'
+
+function useStoryRail(artistIds: string[], tiers: ('public' | 'followers' | 'supporters')[]) {
+  const [byTier, setByTier] = useState<Record<string, StoryDoc[]>>({})
+  useEffect(() => {
+    const unsubs = tiers.map((tier) =>
+      subscribeActiveStoriesForArtists(artistIds, tier, (stories) =>
+        setByTier((prev) => ({ ...prev, [tier]: stories })),
+      ),
+    )
+    return () => unsubs.forEach((u) => u())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [artistIds.join(','), tiers.join(',')])
+
+  const byArtist = useMemo(() => {
+    const map = new Map<string, StoryDoc[]>()
+    for (const stories of Object.values(byTier)) {
+      for (const s of stories) {
+        map.set(s.artistId, [...(map.get(s.artistId) ?? []), s])
+      }
+    }
+    // Preserve the caller's artist ordering (e.g. most-recently-followed first).
+    const ordered = new Map<string, StoryDoc[]>()
+    for (const id of artistIds) {
+      if (map.has(id)) ordered.set(id, map.get(id)!)
+    }
+    return ordered
+  }, [byTier, artistIds])
+
+  return byArtist
+}
 
 export function HomePage() {
   const { firebaseUser, profile } = useAuth()
   const [followedIds, setFollowedIds] = useState<string[]>([])
+  const [supportedIds, setSupportedIds] = useState<string[]>([])
   const [newReleases, setNewReleases] = useState<TrackDoc[]>([])
   const [loading, setLoading] = useState(true)
+  const [viewedStoryIds, setViewedStoryIds] = useState<Set<string>>(new Set())
+  const [viewerGroups, setViewerGroups] = useState<StoryGroup[] | null>(null)
+  const [viewerInitialArtistId, setViewerInitialArtistId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
     async function load() {
       setLoading(true)
-      const [ids, releases] = await Promise.all([
+      const [followed, supported, releases] = await Promise.all([
         firebaseUser ? listFollowedArtistIds(firebaseUser.uid) : Promise.resolve([]),
+        firebaseUser ? listSupportedArtistIds(firebaseUser.uid) : Promise.resolve([]),
         listNewReleaseTracks(24),
       ])
       if (cancelled) return
-      setFollowedIds(ids)
+      setFollowedIds(followed)
+      setSupportedIds(supported)
       setNewReleases(releases)
       setLoading(false)
     }
@@ -31,6 +72,20 @@ export function HomePage() {
       cancelled = true
     }
   }, [firebaseUser])
+
+  useEffect(() => {
+    if (!firebaseUser) return
+    return subscribeMyViewedStoryIds(firebaseUser.uid, setViewedStoryIds)
+  }, [firebaseUser])
+
+  const followedStoriesByArtist = useStoryRail(followedIds, ['public', 'followers'])
+  const supportedStoriesByArtist = useStoryRail(supportedIds, ['public', 'supporters'])
+
+  function openRail(byArtist: Map<string, StoryDoc[]>, artistId: string) {
+    const groups: StoryGroup[] = Array.from(byArtist.entries()).map(([id, stories]) => ({ artistId: id, stories }))
+    setViewerGroups(groups)
+    setViewerInitialArtistId(artistId)
+  }
 
   if (loading) return <LoadingState label="Loading your feed…" />
 
@@ -44,6 +99,32 @@ export function HomePage() {
         <h1 className="mt-3 text-4xl font-medium tracking-[-0.045em] text-ink-0 sm:text-5xl">{firstName ? `Good to have you back, ${firstName}.` : 'Good to have you back.'}</h1>
         <p className="mt-3 text-base text-ink-2">Fresh releases and familiar voices, selected around you.</p>
       </div>
+
+      {followedStoriesByArtist.size > 0 ? (
+        <div>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Stories from artists you follow</h2>
+          <StoryRail
+            groups={Array.from(followedStoriesByArtist.entries()).map(([artistId, stories]) => ({
+              artistId,
+              hasUnseen: stories.some((s) => !viewedStoryIds.has(s.storyId)),
+            }))}
+            onOpen={(artistId) => openRail(followedStoriesByArtist, artistId)}
+          />
+        </div>
+      ) : null}
+
+      {supportedStoriesByArtist.size > 0 ? (
+        <div>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Stories from artists you support</h2>
+          <StoryRail
+            groups={Array.from(supportedStoriesByArtist.entries()).map(([artistId, stories]) => ({
+              artistId,
+              hasUnseen: stories.some((s) => !viewedStoryIds.has(s.storyId)),
+            }))}
+            onOpen={(artistId) => openRail(supportedStoriesByArtist, artistId)}
+          />
+        </div>
+      ) : null}
 
       {fromFollowed.length > 0 ? (
         <Section title="New from artists you follow" tracks={fromFollowed} />
@@ -60,6 +141,15 @@ export function HomePage() {
       ) : null}
 
       <Section title="New releases" tracks={newReleases} />
+
+      {viewerGroups && viewerInitialArtistId ? (
+        <StoryViewer
+          groups={viewerGroups}
+          initialArtistId={viewerInitialArtistId}
+          viewerUserId={firebaseUser?.uid ?? null}
+          onClose={() => setViewerGroups(null)}
+        />
+      ) : null}
     </div>
   )
 }

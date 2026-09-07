@@ -35,6 +35,8 @@ import { ArtistDashboardLayout } from '@/pages/artist/dashboard/ArtistDashboardL
 import { OverviewPage } from '@/pages/artist/dashboard/OverviewPage'
 import { MusicPage } from '@/pages/artist/dashboard/MusicPage'
 import { UploadTrackPage } from '@/pages/artist/dashboard/UploadTrackPage'
+import { StoriesPage } from '@/pages/artist/dashboard/StoriesPage'
+import { StoryAnalyticsPage } from '@/pages/artist/dashboard/StoryAnalyticsPage'
 import { CommunityPage } from '@/pages/artist/dashboard/CommunityPage'
 import { DJRequestsPage as ArtistDJRequestsPage } from '@/pages/artist/dashboard/DJRequestsPage'
 import { RevenuePage } from '@/pages/artist/dashboard/RevenuePage'
@@ -157,6 +159,8 @@ function App() {
               <Route index element={<OverviewPage />} />
               <Route path="music" element={<MusicPage />} />
               <Route path="upload" element={<UploadTrackPage />} />
+              <Route path="stories" element={<StoriesPage />} />
+              <Route path="stories/analytics" element={<StoryAnalyticsPage />} />
               <Route path="community" element={<CommunityPage />} />
               <Route path="dj-requests" element={<ArtistDJRequestsPage />} />
               <Route path="revenue" element={<RevenuePage />} />

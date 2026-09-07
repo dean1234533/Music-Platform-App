@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, BadgeCheck, Disc3, MapPin, Radio, Sparkles } from 'lucide-react'
 import { getArtistIdForSlug, subscribeArtistProfile, subscribePublicArtistTracks } from '@/services/artistService'
@@ -13,20 +13,27 @@ import { ErrorState, LoadingState } from '@/components/common/StateViews'
 import { UpgradePrompt } from '@/components/common/UpgradePrompt'
 import { BrandMark } from '@/components/common/BrandMark'
 import { ShareButton } from '@/components/common/ShareButton'
+import { StoryViewer, type StoryGroup } from '@/components/stories/StoryViewer'
+import { subscribeActiveStoriesForArtist, subscribeArtistPublicHighlights } from '@/services/storyService'
 import { formatCount } from '@/utils/format'
 import { artistShareUrl } from '@/utils/shareLinks'
 import type { ArtistProfile, ArtistPost } from '@/types/artist'
 import type { TrackDoc } from '@/types/track'
+import type { StoryDoc, StoryVisibility } from '@/types/story'
+import { clsx } from 'clsx'
 
 export function ArtistPublicProfilePage() {
   const { slug } = useParams<{ slug: string }>()
-  const { firebaseUser } = useAuth()
+  const { firebaseUser, hasRole } = useAuth()
   const [artistId, setArtistId] = useState<string | null | undefined>(undefined)
   const [artist, setArtist] = useState<ArtistProfile | null>(null)
   const [tracks, setTracks] = useState<TrackDoc[]>([])
   const [posts, setPosts] = useState<ArtistPost[]>([])
   const [isFollowing, setIsFollowing] = useState(false)
   const [isSupporting, setIsSupporting] = useState(false)
+  const [activeStoriesByTier, setActiveStoriesByTier] = useState<Record<string, StoryDoc[]>>({})
+  const [highlights, setHighlights] = useState<StoryDoc[]>([])
+  const [viewerGroup, setViewerGroup] = useState<StoryGroup | null>(null)
 
   useEffect(() => {
     if (!slug) return
@@ -63,11 +70,37 @@ export function ArtistPublicProfilePage() {
     return subscribePublicArtistPosts(artistId, { isFollowing, isSupporting }, setPosts)
   }, [artistId, isFollowing, isSupporting])
 
+  const qualifyingTiers = useMemo((): StoryVisibility[] => {
+    const tiers: StoryVisibility[] = ['public']
+    if (isFollowing) tiers.push('followers')
+    if (isSupporting) tiers.push('supporters')
+    if (hasRole('dj') && artist?.storiesDjEnabled) tiers.push('dj')
+    return tiers
+  }, [isFollowing, isSupporting, hasRole, artist?.storiesDjEnabled])
+
+  useEffect(() => {
+    if (!artistId) return
+    const unsubs = qualifyingTiers.map((tier) =>
+      subscribeActiveStoriesForArtist(artistId, tier, (stories) =>
+        setActiveStoriesByTier((prev) => ({ ...prev, [tier]: stories })),
+      ),
+    )
+    return () => unsubs.forEach((u) => u())
+  }, [artistId, qualifyingTiers])
+
+  useEffect(() => {
+    if (!artistId) return
+    return subscribeArtistPublicHighlights(artistId, setHighlights)
+  }, [artistId])
+
   if (artistId === undefined) return <LoadingState label="Loading artist…" />
   if (artistId === null) return <ErrorState title="Artist not found" description="This artist URL doesn't exist." />
   if (!artist) return <LoadingState label="Loading artist…" />
 
   const publicTracks = tracks
+  const activeStories = Object.values(activeStoriesByTier)
+    .flat()
+    .sort((a, b) => (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0))
 
   return (
     <div className="min-h-svh overflow-hidden bg-surface-0 pb-24 text-ink-0">
@@ -94,7 +127,14 @@ export function ArtistPublicProfilePage() {
       <main className="relative z-10 mx-auto -mt-20 max-w-6xl px-5 sm:-mt-24 sm:px-8 lg:px-10">
         <section className="premium-panel rounded-[2rem] p-5 sm:p-7 lg:p-9">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-end">
-          <div className="h-28 w-28 shrink-0 overflow-hidden rounded-[1.6rem] border border-white/15 bg-surface-3 shadow-[0_24px_70px_rgba(0,0,0,.45)] sm:h-36 sm:w-36">
+          <button
+            type="button"
+            onClick={() => activeStories.length > 0 && setViewerGroup({ artistId: artist.artistId, stories: activeStories })}
+            className={clsx(
+              'h-28 w-28 shrink-0 overflow-hidden rounded-[1.6rem] border shadow-[0_24px_70px_rgba(0,0,0,.45)] sm:h-36 sm:w-36',
+              activeStories.length > 0 ? 'border-brand-400 border-2 cursor-pointer' : 'border-white/15 bg-surface-3',
+            )}
+          >
             {artist.photoURL ? (
               <img src={artist.photoURL} alt="" className="h-full w-full object-cover" />
             ) : (
@@ -102,7 +142,7 @@ export function ArtistPublicProfilePage() {
                 {artist.name.charAt(0).toUpperCase()}
               </div>
             )}
-          </div>
+          </button>
           <div className="min-w-0 flex-1">
             <p className="mb-2 flex items-center gap-2 text-[0.7rem] font-bold uppercase tracking-[0.18em] text-brand-400"><Radio className="h-3.5 w-3.5" /> Independent artist</p>
             <div className="flex items-center gap-2.5">
@@ -140,6 +180,27 @@ export function ArtistPublicProfilePage() {
           </div>
           </div>
         </section>
+
+        {highlights.length > 0 ? (
+          <div className="scrollbar-none mt-6 flex gap-4 overflow-x-auto pb-1">
+            {highlights.map((h) => (
+              <button
+                key={h.storyId}
+                onClick={() => setViewerGroup({ artistId: artist.artistId, stories: [h] })}
+                className="flex w-16 shrink-0 flex-col items-center gap-1.5"
+              >
+                <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-white/15 bg-surface-2">
+                  {h.mediaUrl && h.mediaKind === 'image' ? (
+                    <img src={h.mediaUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-xs text-ink-2">✦</div>
+                  )}
+                </div>
+                <span className="w-full truncate text-center text-xs text-ink-2">{h.highlightGroup || h.storyCategory}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1.6fr)_minmax(17rem,.7fr)]">
           <div>
@@ -204,6 +265,15 @@ export function ArtistPublicProfilePage() {
           />
         ) : null}
       </main>
+
+      {viewerGroup ? (
+        <StoryViewer
+          groups={[viewerGroup]}
+          initialArtistId={viewerGroup.artistId}
+          viewerUserId={firebaseUser?.uid ?? null}
+          onClose={() => setViewerGroup(null)}
+        />
+      ) : null}
     </div>
   )
 }

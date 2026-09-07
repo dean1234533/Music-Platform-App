@@ -111,6 +111,37 @@ service firebase.storage {
       allow write: if isOwner(artistId) && underAudioUploadLimit() && isCompressedAudio();
     }
 
+    function isStoryMedia() {
+      return isImage() || isVideo() || isCompressedAudio();
+    }
+
+    // Story tier is baked directly into the path (unlike tracks, which need
+    // a Firestore visibility lookup) — no cross-service read needed for the
+    // public/followers/supporters tiers, keeping this far simpler than the
+    // streaming/previews checks above.
+    match /artists/{artistId}/stories/public/{fileName} {
+      allow read: if true;
+      allow write: if isOwner(artistId) && underVideoUploadLimit() && isStoryMedia();
+    }
+    match /artists/{artistId}/stories/followers/{fileName} {
+      allow read: if isOwner(artistId)
+        || (isSignedIn() && firestore.exists(/databases/(default)/documents/follows/$(request.auth.uid + '_' + artistId)));
+      allow write: if isOwner(artistId) && underVideoUploadLimit() && isStoryMedia();
+    }
+    match /artists/{artistId}/stories/supporters/{fileName} {
+      allow read: if isOwner(artistId)
+        || (isSignedIn() && firestore.exists(/databases/(default)/documents/supportRelationships/$(request.auth.uid + '_' + artistId)));
+      allow write: if isOwner(artistId) && underVideoUploadLimit() && isStoryMedia();
+    }
+    // dj/ additionally requires the artist's own storiesDjEnabled opt-in —
+    // confirm this in an emulator test, it's the newest cross-service check.
+    match /artists/{artistId}/stories/dj/{fileName} {
+      allow read: if isOwner(artistId)
+        || (isSignedIn() && 'dj' in firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.roles
+            && firestore.get(/databases/(default)/documents/artistProfiles/$(artistId)).data.get('storiesDjEnabled', false) == true);
+      allow write: if isOwner(artistId) && underVideoUploadLimit() && isStoryMedia();
+    }
+
     // User avatar / profile image uploads.
     match /users/{userId}/profile/{fileName} {
       allow read: if true;
