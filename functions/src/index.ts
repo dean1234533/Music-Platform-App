@@ -35,4 +35,5 @@ export { adminUpsertSubscriptionPlan, adminUpdatePlatformSettings } from './admi
 export { onTrackCreate, onTrackDelete } from './tracks/triggers.js'
 export { onArtistProfileCreate, onDjProfileCreate } from './profiles/triggers.js'
 export { adminSeedSubscriptionPlans } from './admin/seedPlans.js'
+export { adminBackfillEntitlements } from './admin/backfillEntitlements.js'
 export { sendBulkDjOutreach } from './messaging/bulkOutreach.js'

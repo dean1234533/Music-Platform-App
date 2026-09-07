@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  adminBackfillEntitlements,
   adminSeedSubscriptionPlans,
   adminUpdatePlatformSettings,
   adminUpsertSubscriptionPlan,
@@ -81,6 +82,7 @@ export function AdminSettingsPage() {
   const [form, setForm] = useState<PlanFormState>(EMPTY_FORM)
   const [savingPlan, setSavingPlan] = useState(false)
   const [seeding, setSeeding] = useState(false)
+  const [backfilling, setBackfilling] = useState(false)
   const [feeForm, setFeeForm] = useState({ platformFeePercent: '15', artistAllocationPercent: '85', djServiceFeePercent: '10', minimumPayoutMinor: '2000' })
   const [savingFees, setSavingFees] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)
@@ -141,6 +143,20 @@ export function AdminSettingsPage() {
     }
   }
 
+  async function handleBackfill() {
+    setBackfilling(true)
+    setSaved(null)
+    try {
+      const result = await adminBackfillEntitlements()
+      setSaved(
+        `Re-synced ${result.artistsUpdated} artist(s) and ${result.djsUpdated} DJ(s)` +
+          (result.errors.length ? ` — ${result.errors.length} error(s), first: ${result.errors[0]}` : '.'),
+      )
+    } finally {
+      setBackfilling(false)
+    }
+  }
+
   async function handleSaveFees() {
     setSavingFees(true)
     setSaved(null)
@@ -165,10 +181,20 @@ export function AdminSettingsPage() {
       <section>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-ink-0">Subscription plans</h2>
-          <Button size="sm" variant="secondary" onClick={handleSeed} loading={seeding}>
-            Seed default 9 plans
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" onClick={handleSeed} loading={seeding}>
+              Seed default 9 plans
+            </Button>
+            <Button size="sm" variant="secondary" onClick={handleBackfill} loading={backfilling}>
+              Re-sync existing artist/DJ limits
+            </Button>
+          </div>
         </div>
+        <p className="mb-3 text-xs text-ink-3">
+          Run "Seed" first if plans don't exist yet, then "Re-sync" to fix any artist/DJ profile
+          created before entitlements were added (their track/request limits won't update on their
+          own — new profiles do this automatically).
+        </p>
 
         {PLAN_ROLES.map((role) => (
           <div key={role} className="mb-4">

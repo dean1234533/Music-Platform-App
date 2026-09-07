@@ -75,3 +75,7 @@ export const adminUpdatePlatformSettings = callable<Record<string, unknown>, { o
 export const adminSeedSubscriptionPlans = callable<void, { ok: boolean; seeded: string[]; skipped: string[] }>(
   'adminSeedSubscriptionPlans',
 )
+export const adminBackfillEntitlements = callable<
+  void,
+  { ok: boolean; artistsUpdated: number; djsUpdated: number; errors: string[] }
+>('adminBackfillEntitlements')
