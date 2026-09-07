@@ -122,7 +122,13 @@ service cloud.firestore {
         && resource.data.artistId == request.auth.uid
         && request.resource.data.artistId == resource.data.artistId
         && request.resource.data.playCount == resource.data.playCount
-        && request.resource.data.get('takenDown', false) == resource.data.get('takenDown', false);
+        && request.resource.data.get('takenDown', false) == resource.data.get('takenDown', false)
+        && request.resource.data.get('fileHash', null) == resource.data.get('fileHash', null)
+        && request.resource.data.get('fileSize', null) == resource.data.get('fileSize', null)
+        && request.resource.data.get('mimeType', null) == resource.data.get('mimeType', null)
+        && request.resource.data.get('hashCheckedAt', null) == resource.data.get('hashCheckedAt', null)
+        && request.resource.data.get('possibleDuplicateOfTrackId', null) == resource.data.get('possibleDuplicateOfTrackId', null)
+        && request.resource.data.get('restrictedCapabilities', []) == resource.data.get('restrictedCapabilities', []);
 
       allow delete: if isSignedIn() && resource.data.artistId == request.auth.uid;
     }
@@ -300,6 +306,16 @@ service cloud.firestore {
     match /auditLogs/{docId} {
       allow read: if isAdmin();
       allow write: if false;
+    }
+
+    // legalAcceptances/{userId}_{docType}_{version} — append-only. The
+    // rights-declaration variant is written by recordRightsDeclaration (a
+    // callable, so it can idempotency-guard); ToS/privacy acceptance has no
+    // cross-doc validation to enforce, so a direct client write is fine.
+    match /legalAcceptances/{docId} {
+      allow read: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
     }
   }
 }

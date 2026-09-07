@@ -33,15 +33,58 @@ service firebase.storage {
       return request.resource.contentType.matches('image/.*');
     }
 
+    function isVideo() {
+      return request.resource.contentType.matches('video/.*');
+    }
+
+    function underVideoUploadLimit() {
+      return request.resource.size < 100 * 1024 * 1024;
+    }
+
+    // Files are named {trackId}.{ext} — strip the extension to look the
+    // track doc up in Firestore for a visibility-aware read check. Mirrors
+    // the same existence-check pattern already proven by supporter-content
+    // below, extended to the track's full visibility tier set.
+    function trackIdFromFileName(fileName) {
+      return fileName.split('.')[0];
+    }
+
+    function canReadTrackAsset(artistId, fileName) {
+      let trackId = trackIdFromFileName(fileName);
+      let track = firestore.get(/databases/(default)/documents/tracks/$(trackId)).data;
+      let visibilityAllows = track.visibility == 'public'
+        || (track.visibility == 'followers' && isSignedIn() &&
+            firestore.exists(/databases/(default)/documents/follows/$(request.auth.uid + '_' + artistId)))
+        || (track.visibility == 'supporters' && isSignedIn() &&
+            firestore.exists(/databases/(default)/documents/supportRelationships/$(request.auth.uid + '_' + artistId)));
+      return visibilityAllows
+        && track.get('takenDown', false) == false
+        && !('streaming' in track.get('restrictedCapabilities', []));
+    }
+
     // Public artwork — anyone can view, only the owning artist can upload.
     match /artists/{artistId}/artwork/{fileName} {
       allow read: if true;
       allow write: if isOwner(artistId) && underImageUploadLimit() && isImage();
     }
 
-    // Public preview clips — anyone can stream, only the owning artist can upload.
+    // Preview clips — publicly readable in the normal case, but a taken-down
+    // or streaming-restricted track's preview must stop being fetchable too,
+    // not just hidden in the UI (previously this was `allow read: if true`
+    // unconditionally, so a removed track's preview stayed reachable by
+    // anyone with the URL).
     match /artists/{artistId}/previews/{fileName} {
-      allow read: if true;
+      allow read: if !firestore.exists(/databases/(default)/documents/tracks/$(trackIdFromFileName(fileName)))
+        || (firestore.get(/databases/(default)/documents/tracks/$(trackIdFromFileName(fileName))).data.get('takenDown', false) == false
+            && !('streaming' in firestore.get(/databases/(default)/documents/tracks/$(trackIdFromFileName(fileName))).data.get('restrictedCapabilities', [])));
+      allow write: if isOwner(artistId) && underAudioUploadLimit() && isCompressedAudio();
+    }
+
+    // Full-length optimised streaming version — visibility-gated exactly
+    // like the track doc itself (public/followers/supporters), not just
+    // publicly readable like previews.
+    match /artists/{artistId}/streaming/{fileName} {
+      allow read: if isOwner(artistId) || canReadTrackAsset(artistId, fileName);
       allow write: if isOwner(artistId) && underAudioUploadLimit() && isCompressedAudio();
     }
 
@@ -65,7 +108,7 @@ service firebase.storage {
       allow read: if isOwner(artistId)
         || (isSignedIn() &&
             firestore.exists(/databases/(default)/documents/supportRelationships/$(request.auth.uid + '_' + artistId)));
-      allow write: if isOwner(artistId) && underAudioUploadLimit();
+      allow write: if isOwner(artistId) && underAudioUploadLimit() && isCompressedAudio();
     }
 
     // User avatar / profile image uploads.

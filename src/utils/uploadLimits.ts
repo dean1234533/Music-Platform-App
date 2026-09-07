@@ -1,21 +1,10 @@
 // Mirrors the enforcement in storage.rules — kept here too so artists get an
 // instant, friendly error instead of wasting upload bandwidth on a file
-// Storage will reject anyway.
+// Storage will reject anyway. Constants live in constants/mediaConfig.ts.
 
-export const MAX_AUDIO_MB = 40
-export const MAX_IMAGE_MB = 8
+import { ALLOWED_AUDIO_TYPES, MAX_AUDIO_MB, MAX_IMAGE_MB, REJECTED_AUDIO_HINTS } from '@/constants/mediaConfig'
 
-export const ALLOWED_AUDIO_TYPES = [
-  'audio/mpeg', // .mp3
-  'audio/mp4', // .m4a (some browsers report this)
-  'audio/aac',
-  'audio/x-m4a',
-  'audio/ogg',
-  'audio/opus',
-  'audio/webm',
-]
-
-const REJECTED_AUDIO_HINTS = ['wav', 'x-wav', 'wave', 'flac', 'aiff', 'x-aiff']
+export { MAX_AUDIO_MB, MAX_IMAGE_MB, ALLOWED_AUDIO_TYPES }
 
 export function validateAudioFile(file: File): string | null {
   const sizeMB = file.size / (1024 * 1024)

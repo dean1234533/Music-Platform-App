@@ -37,6 +37,8 @@ export interface TrackDoc {
   previewStartSec: number
   /** Storage path under /artists/{artistId}/originals/ — never exposed publicly */
   originalAudioPath: string
+  /** Storage path under /artists/{artistId}/streaming/ — full-length optimised derivative, visibility-gated like the track itself. */
+  streamAudioPath: string
   artworkURL: string | null
   visibility: TrackVisibility
   djPromotion: boolean
@@ -55,6 +57,39 @@ export interface TrackDoc {
   updatedAt: Timestamp | null
   rightsConfirmed: boolean
   takenDown?: boolean
+  /** SHA-256 of the original master, computed server-side by a Storage trigger. Not proof of ownership — duplicate-detection only. */
+  fileHash?: string | null
+  fileSize?: number | null
+  mimeType?: string | null
+  hashCheckedAt?: Timestamp | null
+  /** Flagged (never auto-actioned) when another artist's track shares this file's hash. */
+  possibleDuplicateOfTrackId?: string | null
+  /** Free-text ownership/rights context an artist provides — evidence, not proof. */
+  rightsMetadata?: TrackRightsMetadata
+  /** Capabilities temporarily withheld by an admin during a copyright review — never all-or-nothing like takenDown. */
+  restrictedCapabilities?: RestrictedCapability[]
+}
+
+export type RestrictedCapability = 'dj_licensing' | 'discovery' | 'streaming'
+
+export interface TrackRightsMetadata {
+  ownsMasterRecording: 'yes' | 'no' | 'shared' | 'licensed'
+  ownsComposition: 'yes' | 'no' | 'shared' | 'licensed' | 'not_sure'
+  containsSamples: boolean
+  hasFeaturedArtists: boolean
+  hasProducers: boolean
+  hasSongwriters: boolean
+  isCoverOrInterpolation: boolean
+  hasLabelInvolvement: boolean
+  hasPublisherInvolvement: boolean
+  hasOtherRightsHolders: boolean
+  masterOwner: string | null
+  publisher: string | null
+  label: string | null
+  pro: string | null
+  isrc: string | null
+  iswc: string | null
+  copyrightNotice: string | null
 }
 
 export interface AlbumDoc {

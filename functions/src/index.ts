@@ -35,3 +35,7 @@ export { adminUpsertSubscriptionPlan, adminUpdatePlatformSettings } from './admi
 export { onTrackCreate, onTrackDelete } from './tracks/triggers.js'
 export { adminSeedSubscriptionPlans } from './admin/seedPlans.js'
 export { sendBulkDjOutreach } from './messaging/bulkOutreach.js'
+
+// Media compression, sharing, and copyright protection.
+export { recordRightsDeclaration, recordLegalAcceptance } from './legal/acceptances.js'
+export { onOriginalUploaded } from './tracks/onOriginalUploaded.js'

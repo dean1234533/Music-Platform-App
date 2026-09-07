@@ -13,6 +13,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
+    "browser-image-compression": "^2.0.2",
     "clsx": "^2.1.1",
     "firebase": "^12.18.0",
     "lucide-react": "^1.41.0",

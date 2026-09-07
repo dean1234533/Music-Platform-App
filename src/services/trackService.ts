@@ -12,7 +12,7 @@ import {
   setDoc,
   where,
 } from 'firebase/firestore'
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
+import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions, storage } from '@/lib/firebase'
 import type { LicenceMode, TrackCredits, TrackDoc, TrackVisibility } from '@/types/track'
@@ -27,34 +27,64 @@ export function newTrackId(): string {
 
 export interface UploadedTrackAssets {
   previewAudioPath: string
+  streamAudioPath: string
   originalAudioPath: string
   artworkURL: string | null
 }
 
 /**
- * Uploads the three track assets to their dedicated, access-controlled
- * Storage prefixes. Originals live under /originals/ which Storage rules
- * keep private to the owning artist — never read back a public URL for it.
+ * Uploads the master + its derived streaming/preview audio (already trimmed
+ * and compressed client-side by audioProcessing.ts before this is called)
+ * plus optional artwork, to their dedicated access-controlled Storage
+ * prefixes. Originals live under /originals/ which Storage rules keep
+ * private to the owning artist — never read back a public URL for it.
+ * Reports aggregate byte progress across all uploads via onProgress.
  */
 export async function uploadTrackAssets(
   artistId: string,
   trackId: string,
-  files: { preview: File; original: File; artwork: File | null },
+  files: { master: File; streaming: File; preview: File; artwork: File | null },
+  onProgress?: (percent: number) => void,
 ): Promise<UploadedTrackAssets> {
+  const originalPath = `artists/${artistId}/originals/${trackId}.${extOf(files.master)}`
+  const streamingPath = `artists/${artistId}/streaming/${trackId}.${extOf(files.streaming)}`
   const previewPath = `artists/${artistId}/previews/${trackId}.${extOf(files.preview)}`
-  const originalPath = `artists/${artistId}/originals/${trackId}.${extOf(files.original)}`
 
-  await uploadBytes(ref(storage, previewPath), files.preview)
-  await uploadBytes(ref(storage, originalPath), files.original)
+  const uploads: { task: ReturnType<typeof uploadBytesResumable>; total: number }[] = [
+    { task: uploadBytesResumable(ref(storage, originalPath), files.master), total: files.master.size },
+    { task: uploadBytesResumable(ref(storage, streamingPath), files.streaming), total: files.streaming.size },
+    { task: uploadBytesResumable(ref(storage, previewPath), files.preview), total: files.preview.size },
+  ]
+  const totalBytes = uploads.reduce((sum, u) => sum + u.total, 0)
+  const transferred = new Array(uploads.length).fill(0)
+
+  await Promise.all(
+    uploads.map(
+      ({ task }, index) =>
+        new Promise<void>((resolve, reject) => {
+          task.on(
+            'state_changed',
+            (snapshot) => {
+              transferred[index] = snapshot.bytesTransferred
+              if (onProgress && totalBytes > 0) {
+                onProgress(Math.round((transferred.reduce((a, b) => a + b, 0) / totalBytes) * 100))
+              }
+            },
+            reject,
+            () => resolve(),
+          )
+        }),
+    ),
+  )
 
   let artworkURL: string | null = null
   if (files.artwork) {
     const artworkPath = `artists/${artistId}/artwork/${trackId}.${extOf(files.artwork)}`
-    const artworkSnap = await uploadBytes(ref(storage, artworkPath), files.artwork)
+    const artworkSnap = await uploadBytesResumable(ref(storage, artworkPath), files.artwork)
     artworkURL = await getDownloadURL(artworkSnap.ref)
   }
 
-  return { previewAudioPath: previewPath, originalAudioPath: originalPath, artworkURL }
+  return { previewAudioPath: previewPath, streamAudioPath: streamingPath, originalAudioPath: originalPath, artworkURL }
 }
 
 function extOf(file: File): string {
@@ -85,6 +115,7 @@ export interface CreateTrackInput {
   djPromoTier: 'all' | 'pro_plus_only'
   /** Optional release embargo. */
   embargoUntil: Date | null
+  rightsMetadata: TrackDoc['rightsMetadata']
 }
 
 export async function createTrack(
@@ -117,6 +148,7 @@ export async function createTrack(
     previewDurationSec: input.previewDurationSec,
     previewStartSec: input.previewStartSec,
     originalAudioPath: assets.originalAudioPath,
+    streamAudioPath: assets.streamAudioPath,
     artworkURL: assets.artworkURL,
     visibility: input.visibility,
     djPromotion: input.djPromotion,
@@ -128,6 +160,7 @@ export async function createTrack(
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     rightsConfirmed: true,
+    rightsMetadata: input.rightsMetadata,
   }
   await setDoc(trackRef(trackId), track)
 }
@@ -145,6 +178,11 @@ export function subscribeTrack(trackId: string, onChange: (track: TrackDoc | nul
 
 export async function getPreviewPlaybackURL(track: TrackDoc): Promise<string> {
   return getDownloadURL(ref(storage, track.previewAudioPath))
+}
+
+/** Full-length optimised playback for entitled listeners — visibility-gated the same as the track itself. */
+export async function getStreamPlaybackURL(track: TrackDoc): Promise<string> {
+  return getDownloadURL(ref(storage, track.streamAudioPath))
 }
 
 export async function listNewReleases(count = 20): Promise<TrackDoc[]> {
