@@ -19,57 +19,60 @@ export function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false)
 
   return (
-    <div className="min-h-svh overflow-hidden bg-surface-0 text-ink-0">
-      <header className="relative z-20 mx-auto flex max-w-[1440px] items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
-        <BrandMark />
-        <nav className="flex items-center gap-1 sm:gap-3" aria-label="Primary navigation">
-          <a href="#how-it-works" className="hidden rounded-full px-3 py-2.5 text-sm font-medium text-ink-2 transition hover:text-white md:block">How it works</a>
-          <a href="#pricing" className="hidden rounded-full px-3 py-2.5 text-sm font-medium text-ink-2 transition hover:text-white md:block">Pricing</a>
-          <Link to="/sign-in" className="hidden rounded-full px-4 py-2.5 text-sm font-medium text-ink-1 transition hover:text-white md:block">Sign in</Link>
-          <Link to="/sign-up" className="rounded-full bg-brand-500 px-5 py-2.5 text-sm font-semibold text-[#090b06] transition hover:bg-brand-400">Join Wavelength</Link>
-          <button
-            type="button"
-            onClick={() => setMenuOpen((open) => !open)}
-            aria-expanded={menuOpen}
-            aria-controls="mobile-nav-menu"
-            aria-label="Toggle menu"
-            className="flex h-10 w-10 items-center justify-center rounded-full text-ink-1 transition hover:text-white md:hidden"
+    <>
+      <header className="sticky top-0 z-20 border-b border-white/[0.07] bg-surface-0/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1440px] items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
+          <BrandMark />
+          <nav className="flex items-center gap-1 sm:gap-3" aria-label="Primary navigation">
+            <a href="#how-it-works" className="hidden rounded-full px-3 py-2.5 text-sm font-medium text-ink-2 transition hover:text-white md:block">How it works</a>
+            <a href="#pricing" className="hidden rounded-full px-3 py-2.5 text-sm font-medium text-ink-2 transition hover:text-white md:block">Pricing</a>
+            <Link to="/sign-in" className="hidden rounded-full px-4 py-2.5 text-sm font-medium text-ink-1 transition hover:text-white md:block">Sign in</Link>
+            <Link to="/sign-up" className="rounded-full bg-brand-500 px-5 py-2.5 text-sm font-semibold text-[#090b06] transition hover:bg-brand-400">Join Wavelength</Link>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-expanded={menuOpen}
+              aria-controls="mobile-nav-menu"
+              aria-label="Toggle menu"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-ink-1 transition hover:text-white md:hidden"
+            >
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </nav>
+        </div>
+
+        {menuOpen && (
+          <div
+            id="mobile-nav-menu"
+            className="absolute inset-x-0 top-full mx-5 mt-2 flex flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-surface-1/95 backdrop-blur-xl sm:mx-8 md:hidden"
           >
-            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
-        </nav>
+            <a
+              href="#how-it-works"
+              onClick={() => setMenuOpen(false)}
+              className="border-b border-white/[0.06] px-5 py-4 text-sm font-medium text-ink-1 transition hover:text-white"
+            >
+              How it works
+            </a>
+            <a
+              href="#pricing"
+              onClick={() => setMenuOpen(false)}
+              className="border-b border-white/[0.06] px-5 py-4 text-sm font-medium text-ink-1 transition hover:text-white"
+            >
+              Pricing
+            </a>
+            <Link
+              to="/sign-in"
+              onClick={() => setMenuOpen(false)}
+              className="px-5 py-4 text-sm font-medium text-ink-1 transition hover:text-white"
+            >
+              Sign in
+            </Link>
+          </div>
+        )}
       </header>
 
-      {menuOpen && (
-        <div
-          id="mobile-nav-menu"
-          className="relative z-20 mx-5 -mt-2 mb-2 flex flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-surface-1/95 backdrop-blur-xl sm:mx-8 md:hidden"
-        >
-          <a
-            href="#how-it-works"
-            onClick={() => setMenuOpen(false)}
-            className="border-b border-white/[0.06] px-5 py-4 text-sm font-medium text-ink-1 transition hover:text-white"
-          >
-            How it works
-          </a>
-          <a
-            href="#pricing"
-            onClick={() => setMenuOpen(false)}
-            className="border-b border-white/[0.06] px-5 py-4 text-sm font-medium text-ink-1 transition hover:text-white"
-          >
-            Pricing
-          </a>
-          <Link
-            to="/sign-in"
-            onClick={() => setMenuOpen(false)}
-            className="px-5 py-4 text-sm font-medium text-ink-1 transition hover:text-white"
-          >
-            Sign in
-          </Link>
-        </div>
-      )}
-
-      <main>
+      <div className="min-h-svh overflow-hidden bg-surface-0 text-ink-0">
+        <main>
         <section className="hero-shell relative mx-auto grid min-h-[720px] max-w-[1440px] items-center gap-10 overflow-hidden px-5 pb-20 pt-14 sm:px-8 xl:grid-cols-[0.86fr_1.14fr] xl:overflow-visible xl:px-12 xl:py-20">
           <div className="hero-copy relative z-10 max-w-2xl">
             <p className="eyebrow flex items-center gap-2"><Sparkles className="h-3.5 w-3.5" /> Independent sounds. Direct support.</p>
@@ -169,7 +172,8 @@ export function LandingPage() {
         </div>
         <div className="mx-auto flex max-w-[1440px] flex-col gap-2 border-t border-white/[0.07] px-5 py-6 text-xs text-ink-3 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-12"><p>© {new Date().getFullYear()} Wavelength.</p><p>Independent by design.</p></div>
       </footer>
-    </div>
+      </div>
+    </>
   )
 }
 
