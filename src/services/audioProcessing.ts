@@ -108,7 +108,11 @@ export async function deriveAudioAssets(
       preview: { file: previewFile, sizeBytes: previewFile.size },
       degraded: false,
     }
-  } catch {
+  } catch (err) {
+    // Swallowing this entirely made a real bug (a blocked CSP fetch, say)
+    // indistinguishable from an actual low-memory device — surface it so
+    // it's diagnosable from the console instead of just "degraded: true".
+    console.warn('Client-side audio compression failed, uploading the original file instead:', err)
     return degradedFallback(master)
   }
 }
