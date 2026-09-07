@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { precacheAndRoute } from 'workbox-precaching'
 import { registerRoute } from 'workbox-routing'
-import { CacheFirst } from 'workbox-strategies'
+import { CacheFirst, NetworkFirst } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 import { clientsClaim } from 'workbox-core'
 import { initializeApp } from 'firebase/app'
@@ -13,6 +13,20 @@ declare const self: ServiceWorkerGlobalScope
 // tab is fully closed, so users keep getting the stale cached app shell.
 self.skipWaiting()
 clientsClaim()
+
+// Navigation requests (the document itself) go network-first, registered
+// ahead of precacheAndRoute so it wins the route match. Precaching the
+// document is otherwise a trap: the cached Response carries whatever HTTP
+// headers (CSP, etc.) were live at the moment it was captured, and nothing
+// about a headers-only deploy (e.g. editing public/_headers) changes any
+// precached asset's content hash — so the service worker never has a
+// reason to reinstall and refetch, and a stale document (with stale
+// headers) can keep being served indefinitely. Falls back to the cache
+// only when actually offline.
+registerRoute(
+  ({ request }) => request.mode === 'navigate',
+  new NetworkFirst({ cacheName: 'pages' }),
+)
 
 // App-shell precaching, generated at build time by vite-plugin-pwa (injectManifest).
 precacheAndRoute(self.__WB_MANIFEST)
