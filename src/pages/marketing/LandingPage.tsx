@@ -16,28 +16,6 @@ const steps = [
 ]
 
 export function LandingPage() {
-  const pricingRef = useRef<HTMLDivElement>(null)
-  const [pricingVisible, setPricingVisible] = useState(false)
-
-  useEffect(() => {
-    const element = pricingRef.current
-    if (!element || !('IntersectionObserver' in window)) {
-      setPricingVisible(true)
-      return
-    }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setPricingVisible(true)
-          observer.disconnect()
-        }
-      },
-      { threshold: 0.18 },
-    )
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [])
-
   return (
     <div className="min-h-svh overflow-hidden bg-surface-0 text-ink-0">
       <header className="relative z-20 mx-auto flex max-w-[1440px] items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
@@ -124,10 +102,10 @@ export function LandingPage() {
             <h2 className="mt-4 text-4xl font-medium tracking-[-0.045em] sm:text-5xl">Join free. Support when it matters.</h2>
             <p className="mx-auto mt-5 max-w-xl text-base leading-7 text-ink-2">Explore the platform without a membership. Subscribe when you’re ready to direct meaningful monthly support to artists.</p>
           </div>
-          <div ref={pricingRef} className={`price-grid mx-auto mt-12 grid max-w-5xl gap-3 md:grid-cols-3 ${pricingVisible ? 'is-visible' : ''}`}>
-            <PriceCard title="Listener" price="Free" description="Discover, follow, save, and build playlists." features={['Full discovery catalogue', 'Personal library and playlists', 'Follow independent artists']} cta="Create free account" to="/sign-up?role=fan" />
-            <PriceCard featured title="Supporter" price="£10" suffix="/month" description="Turn listening into direct artist support." features={['Everything in Listener', 'Allocate support each month', 'Access supporter-only posts']} cta="Become a supporter" to="/sign-up?role=fan" />
-            <PriceCard title="Artist & DJ" price="Free" description="Publish, connect, and agree opportunities directly." features={['Artist profiles and releases', 'DJ discovery and requests', 'Documented licensing flow']} cta="Join the platform" to="/sign-up" />
+          <div className="price-grid mx-auto mt-12 grid max-w-5xl gap-3 md:grid-cols-3">
+            <PriceCard index={0} title="Listener" price="Free" description="Discover, follow, save, and build playlists." features={['Full discovery catalogue', 'Personal library and playlists', 'Follow independent artists']} cta="Create free account" to="/sign-up?role=fan" />
+            <PriceCard index={1} featured title="Supporter" price="£10" suffix="/month" description="Turn listening into direct artist support." features={['Everything in Listener', 'Allocate support each month', 'Access supporter-only posts']} cta="Become a supporter" to="/sign-up?role=fan" />
+            <PriceCard index={2} title="Artist & DJ" price="Free" description="Publish, connect, and agree opportunities directly." features={['Artist profiles and releases', 'DJ discovery and requests', 'Documented licensing flow']} cta="Join the platform" to="/sign-up" />
           </div>
           <p className="mx-auto mt-6 max-w-2xl text-center text-xs leading-5 text-ink-3">Licensing fees are agreed directly between artists and DJs. Applicable platform fees are shown before payment or payout.</p>
         </section>
@@ -152,9 +130,31 @@ export function LandingPage() {
   )
 }
 
-function PriceCard({ title, price, suffix, description, features, cta, to, featured = false }: { title: string; price: string; suffix?: string; description: string; features: string[]; cta: string; to: string; featured?: boolean }) {
+function PriceCard({ index, title, price, suffix, description, features, cta, to, featured = false }: { index: number; title: string; price: string; suffix?: string; description: string; features: string[]; cta: string; to: string; featured?: boolean }) {
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    const element = cardRef.current
+    if (!element || !('IntersectionObserver' in window)) {
+      setVisible(true)
+      return
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.28 },
+    )
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
   return (
-    <div className={`relative flex min-h-[28rem] flex-col rounded-[1.5rem] p-7 ${featured ? 'bg-brand-500 text-surface-0 shadow-[0_30px_90px_rgba(200,243,63,.12)]' : 'premium-panel'}`}>
+    <div ref={cardRef} className={`price-card-reveal price-card-delay-${index} ${visible ? 'is-visible' : ''} relative flex min-h-[28rem] flex-col rounded-[1.5rem] p-7 ${featured ? 'bg-brand-500 text-surface-0 shadow-[0_30px_90px_rgba(200,243,63,.12)]' : 'premium-panel'}`}>
       {featured ? <span className="absolute right-5 top-5 rounded-full bg-black/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em]">Most meaningful</span> : null}
       <p className={`text-xs font-bold uppercase tracking-[0.16em] ${featured ? 'text-surface-0/60' : 'text-ink-3'}`}>{title}</p>
       <p className="mt-6 text-5xl font-medium tracking-[-0.055em]">{price}<span className={`ml-1 text-sm font-medium tracking-normal ${featured ? 'text-surface-0/60' : 'text-ink-2'}`}>{suffix}</span></p>
