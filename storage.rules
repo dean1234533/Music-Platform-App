@@ -116,5 +116,18 @@ service firebase.storage {
       allow read: if true;
       allow write: if isSignedIn() && request.auth.uid == userId && underImageUploadLimit() && isImage();
     }
+
+    // Copyright claim evidence — claim filing is intentionally open to
+    // anyone (per submitCopyrightClaim), so the claimId is generated
+    // client-side and evidence uploaded here before the claim doc itself is
+    // written; only the claimant (once the claim exists) or an admin can
+    // read it back. Images or PDFs, same size ceiling as images.
+    match /copyrightEvidence/{claimId}/{fileName} {
+      allow read: if isSignedIn() &&
+        (firestore.get(/databases/(default)/documents/copyrightClaims/$(claimId)).data.reporterId == request.auth.uid
+          || ('admin' in firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.roles));
+      allow write: if isSignedIn() && underImageUploadLimit() &&
+        (isImage() || request.resource.contentType == 'application/pdf');
+    }
   }
 }

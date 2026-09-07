@@ -294,14 +294,24 @@ service cloud.firestore {
       allow write: if false;
     }
     match /reports/{docId} {
+      // Written only via the submitReport/adminResolveReport callables
+      // (Admin SDK, bypasses these rules) — client writes are never valid.
       allow read: if isAdmin();
-      allow create: if isSignedIn();
-      allow update, delete: if false;
+      allow write: if false;
     }
     match /copyrightClaims/{docId} {
+      // Written only via submitCopyrightClaim/reviewCopyrightClaim/
+      // submitArtistResponse/submitCounterNotice (Admin SDK). A client
+      // `create` here would bypass the callable's declaration/claimant
+      // validation and let anyone forge a claim's status or artistId.
       allow read: if isSignedIn() && (resource.data.reporterId == request.auth.uid || resource.data.artistId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn();
-      allow update, delete: if false;
+      allow write: if false;
+    }
+    // payoutHolds/{artistId} — admin/system only. An active hold blocks
+    // requestPayout; artists can see their own hold status but never set it.
+    match /payoutHolds/{artistId} {
+      allow read: if isSelf(artistId) || isAdmin();
+      allow write: if false;
     }
     match /auditLogs/{docId} {
       allow read: if isAdmin();

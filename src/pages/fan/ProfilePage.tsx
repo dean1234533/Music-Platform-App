@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, type ChangeEvent } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { updateBasicProfile } from '@/services/userService'
+import { uploadUserAvatar } from '@/services/profileMediaService'
+import { validateImageFile } from '@/utils/uploadLimits'
 import { Button } from '@/components/common/Button'
 import { Input, Label } from '@/components/common/Input'
 
@@ -11,6 +13,8 @@ export function ProfilePage() {
   const [displayName, setDisplayName] = useState(profile?.displayName ?? '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
 
   async function handleSave() {
     if (!firebaseUser) return
@@ -21,6 +25,26 @@ export function ProfilePage() {
       setSaved(true)
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleAvatarChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !firebaseUser) return
+    const validationError = validateImageFile(file)
+    if (validationError) {
+      setAvatarError(validationError)
+      return
+    }
+    setAvatarError(null)
+    setUploadingAvatar(true)
+    try {
+      const photoURL = await uploadUserAvatar(firebaseUser.uid, file)
+      await updateBasicProfile(firebaseUser.uid, { photoURL })
+    } catch (err) {
+      setAvatarError(err instanceof Error ? err.message : 'Could not upload photo.')
+    } finally {
+      setUploadingAvatar(false)
     }
   }
 
@@ -45,6 +69,11 @@ export function ProfilePage() {
               </span>
             ))}
           </div>
+          <label className="mt-2 inline-block cursor-pointer rounded-full border border-surface-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-ink-1 hover:bg-surface-3">
+            {uploadingAvatar ? 'Uploading…' : 'Change photo'}
+            <input type="file" accept="image/*" className="hidden" disabled={uploadingAvatar} onChange={handleAvatarChange} />
+          </label>
+          {avatarError ? <p className="mt-1 text-xs text-danger-500">{avatarError}</p> : null}
         </div>
       </div>
 

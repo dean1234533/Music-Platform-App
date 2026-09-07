@@ -8,11 +8,16 @@ export const requestPayout = onCall({ secrets: [stripeSecretKey] }, async (reque
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   const artistId = request.auth.uid
 
-  const [accountSnap, balanceSnap, settings] = await Promise.all([
+  const [accountSnap, balanceSnap, settings, holdSnap] = await Promise.all([
     db.collection('artistPayoutAccounts').doc(artistId).get(),
     db.collection('artistBalances').doc(artistId).get(),
     getPlatformSettings(),
+    db.collection('payoutHolds').doc(artistId).get(),
   ])
+
+  if (holdSnap.exists && holdSnap.data()?.active) {
+    throw new HttpsError('failed-precondition', 'Payouts are on hold pending a copyright review.')
+  }
 
   const account = accountSnap.data()
   if (!account?.stripeAccountId || !account.payoutsEnabled) {

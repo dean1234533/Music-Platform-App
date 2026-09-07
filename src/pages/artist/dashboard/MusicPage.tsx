@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Megaphone, Plus } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeArtistTracks } from '@/services/artistService'
+import { subscribeArtistCopyrightClaims } from '@/services/moderationService'
 import { Button } from '@/components/common/Button'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import { BulkDjOutreachModal } from '@/components/track/BulkDjOutreachModal'
+import { CopyrightClaimBanner } from '@/components/track/CopyrightClaimBanner'
 import type { TrackDoc } from '@/types/track'
+import { OPEN_CLAIM_STATUSES, type CopyrightClaimDoc } from '@/types/moderation'
 
 const VISIBILITY_LABEL: Record<TrackDoc['visibility'], string> = {
   public: 'Public',
@@ -20,12 +23,28 @@ const VISIBILITY_LABEL: Record<TrackDoc['visibility'], string> = {
 export function MusicPage() {
   const { firebaseUser } = useAuth()
   const [tracks, setTracks] = useState<TrackDoc[] | null>(null)
+  const [claims, setClaims] = useState<CopyrightClaimDoc[]>([])
   const [outreachTrack, setOutreachTrack] = useState<TrackDoc | null>(null)
 
   useEffect(() => {
     if (!firebaseUser) return
     return subscribeArtistTracks(firebaseUser.uid, setTracks)
   }, [firebaseUser])
+
+  useEffect(() => {
+    if (!firebaseUser) return
+    return subscribeArtistCopyrightClaims(firebaseUser.uid, setClaims)
+  }, [firebaseUser])
+
+  // Latest open claim per track — claims are already ordered newest-first.
+  const openClaimByTrackId = useMemo(() => {
+    const map = new Map<string, CopyrightClaimDoc>()
+    for (const claim of claims) {
+      if (!OPEN_CLAIM_STATUSES.includes(claim.status)) continue
+      if (!map.has(claim.trackId)) map.set(claim.trackId, claim)
+    }
+    return map
+  }, [claims])
 
   return (
     <div className="flex flex-col gap-6">
@@ -38,6 +57,18 @@ export function MusicPage() {
           </Button>
         </Link>
       </div>
+
+      {openClaimByTrackId.size > 0 ? (
+        <div className="flex flex-col gap-3">
+          {Array.from(openClaimByTrackId.entries()).map(([trackId, claim]) => (
+            <CopyrightClaimBanner
+              key={claim.claimId}
+              claim={claim}
+              trackTitle={tracks?.find((t) => t.trackId === trackId)?.title ?? 'this track'}
+            />
+          ))}
+        </div>
+      ) : null}
 
       {tracks === null ? (
         <LoadingState />

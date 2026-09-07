@@ -1,6 +1,12 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Check } from 'lucide-react'
 import { BrandMark } from '@/components/common/BrandMark'
+import { Button } from '@/components/common/Button'
+import { useAuth } from '@/contexts/AuthContext'
+import { hasAcceptedLegal, recordLegalAcceptance } from '@/services/legalService'
+
+const DOC_VERSION = '2026-09-07'
 
 const terms = [
   ['Using Wavelength', 'You must provide accurate account information, keep your sign-in details secure, and use the platform lawfully. You are responsible for activity carried out through your account.'],
@@ -27,6 +33,30 @@ const privacy = [
 export function LegalPage({ type }: { type: 'terms' | 'privacy' }) {
   const isTerms = type === 'terms'
   const sections = isTerms ? terms : privacy
+  const docType = isTerms ? 'terms' : 'privacy'
+  const { firebaseUser } = useAuth()
+  const [accepted, setAccepted] = useState(false)
+  const [accepting, setAccepting] = useState(false)
+
+  useEffect(() => {
+    if (!firebaseUser) {
+      setAccepted(false)
+      return
+    }
+    hasAcceptedLegal(firebaseUser.uid, docType, DOC_VERSION).then(setAccepted)
+  }, [firebaseUser, docType])
+
+  async function handleAccept() {
+    if (!firebaseUser) return
+    setAccepting(true)
+    try {
+      await recordLegalAcceptance(docType, DOC_VERSION, firebaseUser.uid)
+      setAccepted(true)
+    } finally {
+      setAccepting(false)
+    }
+  }
+
   return (
     <div className="min-h-svh bg-surface-0 text-ink-0">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-6 sm:px-8"><Link to="/"><BrandMark /></Link><Link to="/" className="flex items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0"><ArrowLeft className="h-4 w-4" /> Back home</Link></header>
@@ -34,6 +64,21 @@ export function LegalPage({ type }: { type: 'terms' | 'privacy' }) {
         <p className="eyebrow">Legal</p>
         <h1 className="mt-4 text-5xl font-medium tracking-[-0.055em] sm:text-7xl">{isTerms ? 'Terms & conditions' : 'Privacy policy'}</h1>
         <p className="mt-6 text-sm text-ink-3">Last updated 7 September 2026</p>
+        {firebaseUser ? (
+          accepted ? (
+            <p className="mt-6 flex items-center gap-2 text-sm text-support-400">
+              <Check className="h-4 w-4" /> You've accepted this version.
+            </p>
+          ) : (
+            <Button size="sm" className="mt-6" onClick={handleAccept} loading={accepting}>
+              I agree to these {isTerms ? 'terms' : 'this policy'}
+            </Button>
+          )
+        ) : (
+          <p className="mt-6 text-sm text-ink-3">
+            <Link to="/sign-in" className="text-brand-400 hover:underline">Sign in</Link> to record your acceptance.
+          </p>
+        )}
         <div className="mt-16 divide-y divide-white/[0.08] border-y border-white/[0.08]">
           {sections.map(([title, copy], index) => <section key={title} className="grid gap-4 py-8 sm:grid-cols-[3rem_1fr_2fr]"><span className="text-xs text-brand-400">{String(index + 1).padStart(2, '0')}</span><h2 className="text-lg font-medium">{title}</h2><p className="text-base leading-7 text-ink-2">{copy}</p></section>)}
         </div>

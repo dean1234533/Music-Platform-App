@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeArtistProfile, updateArtistProfile } from '@/services/artistService'
 import { subscribeOwnVerificationRequests, submitVerificationRequest } from '@/services/verificationService'
+import { uploadArtistCover, uploadArtistPhoto } from '@/services/profileMediaService'
 import { signOut } from '@/services/authService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
 import { LoadingState, EmptyState } from '@/components/common/StateViews'
+import { validateImageFile } from '@/utils/uploadLimits'
 import type { ArtistProfile, DJRequestPolicy } from '@/types/artist'
 
 const DJ_POLICY_OPTIONS: { value: DJRequestPolicy; label: string }[] = [
@@ -32,6 +34,9 @@ export function ArtistSettingsPage() {
   const [saved, setSaved] = useState(false)
   const [verificationRequested, setVerificationRequested] = useState(false)
   const [requestingVerification, setRequestingVerification] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [uploadingCover, setUploadingCover] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!firebaseUser) return
@@ -64,6 +69,46 @@ export function ArtistSettingsPage() {
       setVerificationRequested(true)
     } finally {
       setRequestingVerification(false)
+    }
+  }
+
+  async function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !firebaseUser) return
+    const validationError = validateImageFile(file)
+    if (validationError) {
+      setPhotoError(validationError)
+      return
+    }
+    setPhotoError(null)
+    setUploadingPhoto(true)
+    try {
+      const photoURL = await uploadArtistPhoto(firebaseUser.uid, file)
+      await updateArtistProfile(firebaseUser.uid, { photoURL })
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : 'Could not upload photo.')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
+  async function handleCoverChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !firebaseUser) return
+    const validationError = validateImageFile(file)
+    if (validationError) {
+      setPhotoError(validationError)
+      return
+    }
+    setPhotoError(null)
+    setUploadingCover(true)
+    try {
+      const coverURL = await uploadArtistCover(firebaseUser.uid, file)
+      await updateArtistProfile(firebaseUser.uid, { coverURL })
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : 'Could not upload cover.')
+    } finally {
+      setUploadingCover(false)
     }
   }
 
@@ -100,6 +145,25 @@ export function ArtistSettingsPage() {
       <h1 className="text-2xl font-semibold text-ink-0">Artist settings</h1>
 
       <section className="flex flex-col gap-4">
+        <div className="flex items-center gap-5">
+          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-surface-2">
+            {artist.photoURL ? <img src={artist.photoURL} alt="" className="h-full w-full object-cover" /> : null}
+          </div>
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              <label className="cursor-pointer rounded-full border border-surface-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-ink-1 hover:bg-surface-3">
+                {uploadingPhoto ? 'Uploading…' : 'Change photo'}
+                <input type="file" accept="image/*" className="hidden" disabled={uploadingPhoto} onChange={handlePhotoChange} />
+              </label>
+              <label className="cursor-pointer rounded-full border border-surface-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-ink-1 hover:bg-surface-3">
+                {uploadingCover ? 'Uploading…' : 'Change cover'}
+                <input type="file" accept="image/*" className="hidden" disabled={uploadingCover} onChange={handleCoverChange} />
+              </label>
+            </div>
+            <p className="text-xs text-ink-3">Resized and compressed automatically.</p>
+            {photoError ? <p className="text-xs text-danger-500">{photoError}</p> : null}
+          </div>
+        </div>
         <div>
           <Label>Artist name</Label>
           <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />

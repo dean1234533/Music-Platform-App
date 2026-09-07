@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Modal } from '@/components/common/Modal'
 import { Button } from '@/components/common/Button'
 import { Label, TextArea } from '@/components/common/Input'
-import { submitCopyrightClaim, submitReport } from '@/services/moderationService'
+import { submitReport } from '@/services/moderationService'
 
-const REASONS = ['Copyright infringement', 'Not the actual rights holder', 'Inappropriate content', 'Spam', 'Other'] as const
+const REASONS = ['Not the actual rights holder', 'Inappropriate content', 'Spam', 'Other'] as const
 
 export function ReportTrackModal({ trackId, onClose }: { trackId: string; onClose: () => void }) {
   const [reason, setReason] = useState<(typeof REASONS)[number]>(REASONS[0])
@@ -17,11 +18,7 @@ export function ReportTrackModal({ trackId, onClose }: { trackId: string; onClos
     setSubmitting(true)
     setError(null)
     try {
-      if (reason === 'Copyright infringement') {
-        await submitCopyrightClaim({ trackId, reason, description })
-      } else {
-        await submitReport({ targetType: 'track', targetId: trackId, reason, description })
-      }
+      await submitReport({ targetType: 'track', targetId: trackId, reason, description })
       setDone(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not submit your report.')
@@ -36,6 +33,13 @@ export function ReportTrackModal({ trackId, onClose }: { trackId: string; onClos
         <p className="text-sm text-support-400">Thanks — an admin will review this.</p>
       ) : (
         <div className="flex flex-col gap-4">
+          <p className="text-xs text-ink-3">
+            Reporting a copyright issue?{' '}
+            <Link to={`/copyright/report?trackId=${trackId}`} onClick={onClose} className="text-brand-400 hover:underline">
+              Use the dedicated copyright claim form
+            </Link>{' '}
+            instead — it needs different information than a general report.
+          </p>
           <div>
             <Label>Reason</Label>
             <select

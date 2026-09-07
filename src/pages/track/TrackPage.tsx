@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Play, Pause, Radio, Flag } from 'lucide-react'
+import { Play, Pause, Radio, Flag, Scale } from 'lucide-react'
 import { subscribeTrack } from '@/services/trackService'
 import { usePlayer } from '@/contexts/PlayerContext'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
@@ -97,6 +97,13 @@ export function TrackPage() {
                 Report
               </button>
             ) : null}
+            <Link
+              to={`/copyright/report?trackId=${track.trackId}`}
+              className="flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium text-ink-3 hover:bg-surface-2 hover:text-ink-1"
+            >
+              <Scale className="h-3.5 w-3.5" />
+              Report copyright issue
+            </Link>
           </div>
         </div>
       </div>

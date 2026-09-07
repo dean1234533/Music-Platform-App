@@ -187,6 +187,11 @@ export function RequestDetailPage() {
             <Field label="Commercial use" value={agreement.commercialUse ? 'Yes' : 'No'} />
           </dl>
           {agreement.additionalTerms ? <p className="mt-3 text-xs text-ink-2">{agreement.additionalTerms}</p> : null}
+          <p className="mt-3 text-xs leading-5 text-ink-3">
+            Access to this file does not transfer copyright ownership. This licence only grants the specific
+            permitted uses set out above, for the stated territory and duration — the artist remains the owner of
+            the underlying recording and composition.
+          </p>
 
           {agreement.licenceFeeMinor > 0 && platformFeeMinor !== undefined && artistNetMinor !== undefined ? (
             <div className="mt-4 rounded-xl border border-white/10 bg-surface-2 p-4 text-sm">

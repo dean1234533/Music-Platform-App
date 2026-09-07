@@ -2,7 +2,8 @@ import { collection, getDocs, limit, orderBy, query, where } from 'firebase/fire
 import { db } from '@/lib/firebase'
 import { callable } from '@/lib/callable'
 import type { UserProfile } from '@/types/user'
-import type { CopyrightClaimDoc, ReportDoc, VerificationRequestDoc } from '@/types/moderation'
+import { OPEN_CLAIM_STATUSES, type CopyrightClaimDoc, type ReportDoc, type VerificationRequestDoc } from '@/types/moderation'
+import type { RestrictedCapability } from '@/types/track'
 import type { SubscriptionPlan } from '@/types/platformSettings'
 import type { PlanFeatureKey, PlanLimitKey, PlanTier } from '@/types/entitlements'
 
@@ -24,7 +25,7 @@ export async function listOpenReports(): Promise<ReportDoc[]> {
 }
 
 export async function listCopyrightClaims(): Promise<CopyrightClaimDoc[]> {
-  const q = query(collection(db, 'copyrightClaims'), where('status', '==', 'submitted'), orderBy('createdAt', 'desc'))
+  const q = query(collection(db, 'copyrightClaims'), where('status', 'in', OPEN_CLAIM_STATUSES), orderBy('createdAt', 'desc'))
   const snap = await getDocs(q)
   return snap.docs.map((d) => d.data() as CopyrightClaimDoc)
 }
@@ -44,7 +45,7 @@ export const reviewVerificationRequest = callable<{ verificationRequestId: strin
   'reviewVerificationRequest',
 )
 export const reviewCopyrightClaim = callable<
-  { claimId: string; status: string; adminNote?: string },
+  { claimId: string; status: string; adminNote?: string; restrictedCapabilities?: RestrictedCapability[] },
   { ok: boolean }
 >('reviewCopyrightClaim')
 export const adminResolveReport = callable<{ reportId: string; status: 'resolved' | 'dismissed' }, { ok: boolean }>(

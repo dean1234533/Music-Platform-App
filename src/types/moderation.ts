@@ -1,6 +1,30 @@
 import type { Timestamp } from 'firebase/firestore'
+import type { RestrictedCapability } from './track'
 
-export type CopyrightClaimStatus = 'submitted' | 'under_review' | 'action_required' | 'removed' | 'restored' | 'rejected'
+export type CopyrightClaimStatus =
+  | 'submitted'
+  | 'under_review'
+  | 'information_required'
+  | 'artist_notified'
+  | 'temporarily_restricted'
+  | 'removed'
+  | 'rejected'
+  | 'resolved'
+  | 'restored'
+  | 'appealed'
+  | 'counter_noticed'
+
+/** Statuses that still need admin/artist attention — excludes the closed-out terminal ones (rejected, resolved, restored). */
+export const OPEN_CLAIM_STATUSES: CopyrightClaimStatus[] = [
+  'submitted',
+  'under_review',
+  'information_required',
+  'artist_notified',
+  'temporarily_restricted',
+  'removed',
+  'appealed',
+  'counter_noticed',
+]
 
 export interface CopyrightClaimDoc {
   claimId: string
@@ -13,12 +37,29 @@ export interface CopyrightClaimDoc {
   adminNote?: string | null
   createdAt: Timestamp | null
   reviewedAt?: Timestamp | null
+  reviewedBy?: string | null
+  // Claimant identity — collected separately from the authenticated
+  // reporterId since the claimant may be filing on behalf of someone else.
+  claimantName?: string | null
+  claimantEmail?: string | null
+  claimantCompany?: string | null
+  claimantIsOwnerOrRep?: boolean
+  claimedRights?: string | null
+  supportingLinks?: string[]
+  evidenceUrls?: string[]
+  declarationSignature?: string | null
+  declaredAt?: Timestamp | null
+  restrictedCapabilities?: RestrictedCapability[]
+  artistResponse?: string | null
+  artistRespondedAt?: Timestamp | null
+  counterNoticeText?: string | null
+  counterNoticeSubmittedAt?: Timestamp | null
 }
 
 export interface ReportDoc {
   reportId: string
   reporterId: string
-  targetType: 'track' | 'artist' | 'dj' | 'user' | 'message' | 'post'
+  targetType: 'track' | 'artist' | 'dj' | 'user' | 'message' | 'post' | 'story'
   targetId: string
   reason: string
   description: string

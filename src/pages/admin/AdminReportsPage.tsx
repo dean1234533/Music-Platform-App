@@ -1,18 +1,49 @@
 import { useEffect, useState } from 'react'
 import { adminResolveReport, listCopyrightClaims, listOpenReports, reviewCopyrightClaim } from '@/services/adminService'
 import { Button } from '@/components/common/Button'
+import { TextArea } from '@/components/common/Input'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
-import type { CopyrightClaimDoc, ReportDoc } from '@/types/moderation'
+import type { CopyrightClaimDoc, CopyrightClaimStatus, ReportDoc } from '@/types/moderation'
+import type { RestrictedCapability } from '@/types/track'
+
+const RESTRICTABLE_CAPABILITIES: RestrictedCapability[] = ['dj_licensing', 'discovery', 'streaming']
+const CAPABILITY_LABEL: Record<RestrictedCapability, string> = {
+  dj_licensing: 'DJ licensing',
+  discovery: 'Discovery placement',
+  streaming: 'Full-length streaming',
+}
+
+interface ClaimDraft {
+  adminNote: string
+  restrictedCapabilities: RestrictedCapability[]
+}
 
 export function AdminReportsPage() {
   const [reports, setReports] = useState<ReportDoc[] | null>(null)
   const [claims, setClaims] = useState<CopyrightClaimDoc[] | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [drafts, setDrafts] = useState<Record<string, ClaimDraft>>({})
 
   useEffect(() => {
     void listOpenReports().then(setReports)
     void listCopyrightClaims().then(setClaims)
   }, [])
+
+  function draftFor(claimId: string): ClaimDraft {
+    return drafts[claimId] ?? { adminNote: '', restrictedCapabilities: [] }
+  }
+
+  function updateDraft(claimId: string, patch: Partial<ClaimDraft>) {
+    setDrafts((prev) => ({ ...prev, [claimId]: { ...draftFor(claimId), ...patch } }))
+  }
+
+  function toggleCapability(claimId: string, capability: RestrictedCapability) {
+    const draft = draftFor(claimId)
+    const next = draft.restrictedCapabilities.includes(capability)
+      ? draft.restrictedCapabilities.filter((c) => c !== capability)
+      : [...draft.restrictedCapabilities, capability]
+    updateDraft(claimId, { restrictedCapabilities: next })
+  }
 
   async function resolveReport(id: string, status: 'resolved' | 'dismissed') {
     setBusyId(id)
@@ -24,11 +55,17 @@ export function AdminReportsPage() {
     }
   }
 
-  async function resolveClaim(id: string, status: 'removed' | 'rejected') {
-    setBusyId(id)
+  async function applyClaimStatus(claim: CopyrightClaimDoc, status: CopyrightClaimStatus) {
+    setBusyId(claim.claimId)
     try {
-      await reviewCopyrightClaim({ claimId: id, status })
-      setClaims((prev) => prev?.filter((c) => c.claimId !== id) ?? null)
+      const draft = draftFor(claim.claimId)
+      await reviewCopyrightClaim({
+        claimId: claim.claimId,
+        status,
+        adminNote: draft.adminNote || undefined,
+        restrictedCapabilities: status === 'temporarily_restricted' ? draft.restrictedCapabilities : undefined,
+      })
+      setClaims((prev) => prev?.map((c) => (c.claimId === claim.claimId ? { ...c, status, adminNote: draft.adminNote || c.adminNote } : c)) ?? null)
     } finally {
       setBusyId(null)
     }
@@ -45,23 +82,104 @@ export function AdminReportsPage() {
         ) : claims.length === 0 ? (
           <EmptyState title="No open copyright claims" />
         ) : (
-          <div className="flex flex-col divide-y divide-surface-border rounded-xl border border-surface-border">
-            {claims.map((claim) => (
-              <div key={claim.claimId} className="flex items-center justify-between gap-3 px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-ink-0">{claim.reason}</p>
-                  <p className="text-xs text-ink-2">{claim.description}</p>
+          <div className="flex flex-col gap-4">
+            {claims.map((claim) => {
+              const draft = draftFor(claim.claimId)
+              const busy = busyId === claim.claimId
+              return (
+                <div key={claim.claimId} className="flex flex-col gap-3 rounded-xl border border-surface-border p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-ink-0">{claim.reason}</p>
+                      <p className="text-xs text-ink-2">{claim.description}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-surface-3 px-2.5 py-1 text-xs text-ink-1">{claim.status}</span>
+                  </div>
+
+                  <div className="grid gap-1 text-xs text-ink-2 sm:grid-cols-2">
+                    <p>Claimant: {claim.claimantName} ({claim.claimantEmail})</p>
+                    {claim.claimantCompany ? <p>Company: {claim.claimantCompany}</p> : null}
+                    {claim.claimedRights ? <p>Claimed rights: {claim.claimedRights}</p> : null}
+                    <p>Track: {claim.trackId}</p>
+                    <p>Artist: {claim.artistId}</p>
+                  </div>
+
+                  {claim.supportingLinks && claim.supportingLinks.length > 0 ? (
+                    <div className="text-xs text-ink-2">
+                      Supporting links:{' '}
+                      {claim.supportingLinks.map((link) => (
+                        <a key={link} href={link} target="_blank" rel="noreferrer" className="mr-2 text-brand-400 hover:underline">
+                          {link}
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {claim.evidenceUrls && claim.evidenceUrls.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {claim.evidenceUrls.map((url) => (
+                        <a key={url} href={url} target="_blank" rel="noreferrer" className="rounded-lg border border-surface-border px-2.5 py-1.5 text-xs text-brand-400 hover:underline">
+                          View evidence
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {claim.artistResponse ? (
+                    <p className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-1">Artist response: {claim.artistResponse}</p>
+                  ) : null}
+                  {claim.counterNoticeText ? (
+                    <p className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-1">Counter-notice: {claim.counterNoticeText}</p>
+                  ) : null}
+
+                  <div>
+                    <TextArea
+                      rows={2}
+                      value={draft.adminNote}
+                      onChange={(e) => updateDraft(claim.claimId, { adminNote: e.target.value })}
+                      placeholder="Admin note (visible to the artist)"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-3 text-xs text-ink-2">
+                    {RESTRICTABLE_CAPABILITIES.map((capability) => (
+                      <label key={capability} className="flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          checked={draft.restrictedCapabilities.includes(capability)}
+                          onChange={() => toggleCapability(claim.claimId, capability)}
+                        />
+                        {CAPABILITY_LABEL[capability]}
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="secondary" loading={busy} onClick={() => applyClaimStatus(claim, 'under_review')}>
+                      Mark under review
+                    </Button>
+                    <Button size="sm" variant="secondary" loading={busy} onClick={() => applyClaimStatus(claim, 'information_required')}>
+                      Request more info
+                    </Button>
+                    <Button size="sm" variant="secondary" loading={busy} onClick={() => applyClaimStatus(claim, 'temporarily_restricted')}>
+                      Restrict selected
+                    </Button>
+                    <Button size="sm" variant="danger" loading={busy} onClick={() => applyClaimStatus(claim, 'removed')}>
+                      Remove track
+                    </Button>
+                    <Button size="sm" variant="secondary" loading={busy} onClick={() => applyClaimStatus(claim, 'restored')}>
+                      Restore
+                    </Button>
+                    <Button size="sm" variant="secondary" loading={busy} onClick={() => applyClaimStatus(claim, 'rejected')}>
+                      Reject claim
+                    </Button>
+                    <Button size="sm" variant="secondary" loading={busy} onClick={() => applyClaimStatus(claim, 'resolved')}>
+                      Mark resolved
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="danger" loading={busyId === claim.claimId} onClick={() => resolveClaim(claim.claimId, 'removed')}>
-                    Remove track
-                  </Button>
-                  <Button size="sm" variant="secondary" loading={busyId === claim.claimId} onClick={() => resolveClaim(claim.claimId, 'rejected')}>
-                    Reject claim
-                  </Button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </section>
