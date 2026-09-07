@@ -146,7 +146,9 @@ service cloud.firestore {
     // follows/{fanId_artistId} — only the fan can read/write their own follow.
     // followerCount on artistProfiles is updated server-side by a trigger.
     match /follows/{followId} {
-      allow read: if isSignedIn() && resource.data.fanId == request.auth.uid;
+      // resource == null short-circuits for the common "not following" case
+      // — subscribeIsFollowing reads a doc that usually doesn't exist.
+      allow read: if isSignedIn() && (resource == null || resource.data.fanId == request.auth.uid);
       allow create: if isSignedIn()
         && request.resource.data.fanId == request.auth.uid
         && followId == request.resource.data.fanId + '_' + request.resource.data.artistId;
@@ -155,7 +157,9 @@ service cloud.firestore {
     }
 
     match /trackLikes/{likeId} {
-      allow read: if isSignedIn() && resource.data.fanId == request.auth.uid;
+      // resource == null short-circuits for the common "not liked" case —
+      // subscribeIsLiked reads a doc that usually doesn't exist.
+      allow read: if isSignedIn() && (resource == null || resource.data.fanId == request.auth.uid);
       allow create: if isSignedIn()
         && request.resource.data.fanId == request.auth.uid
         && likeId == request.resource.data.fanId + '_' + request.resource.data.trackId;
@@ -164,7 +168,7 @@ service cloud.firestore {
     }
 
     match /playlists/{playlistId} {
-      allow read: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow read: if isSignedIn() && (resource == null || resource.data.ownerId == request.auth.uid);
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
       allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
     }
@@ -221,8 +225,10 @@ service cloud.firestore {
     }
 
     match /supportRelationships/{relationshipId} {
+      // resource == null short-circuits for the common "not supporting" case
+      // — subscribeIsSupporting reads a doc that usually doesn't exist.
       allow read: if isSignedIn() &&
-        (resource.data.fanId == request.auth.uid || resource.data.artistId == request.auth.uid);
+        (resource == null || resource.data.fanId == request.auth.uid || resource.data.artistId == request.auth.uid);
       allow write: if false; // updateSupportAllocations callable only
     }
 
