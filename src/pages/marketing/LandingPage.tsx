@@ -61,15 +61,6 @@ export function LandingPage() {
           </div>
         </section>
 
-        <figure className="px-5 pb-16 sm:hidden">
-          <div className="relative aspect-[16/9] overflow-hidden rounded-[1.5rem] border border-white/[0.08] bg-surface-1 shadow-[0_22px_64px_rgba(0,0,0,.28)]">
-            <img src="/wavelength-mobile-editorial.jpg" alt="A translucent blue record being placed onto a turntable" loading="lazy" className="h-full w-full object-cover" />
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-5 pb-4 pt-14">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-400">Closer to the music</p>
-            </div>
-          </div>
-        </figure>
-
         <section className="mx-auto max-w-[1440px] px-5 pb-24 sm:px-8 lg:px-12 lg:pb-32">
           <div className="mb-9 flex flex-col justify-between gap-4 border-t border-white/10 pt-8 sm:flex-row sm:items-end">
             <div><p className="eyebrow">One ecosystem</p><h2 className="mt-3 text-3xl font-medium tracking-[-0.04em] sm:text-4xl">Built around the people who move music.</h2></div>
