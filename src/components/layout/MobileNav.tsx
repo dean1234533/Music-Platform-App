@@ -12,10 +12,10 @@ import type { NavItem } from './navConfig'
 export function MobileNav({ items }: { items: NavItem[] }) {
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 flex border-t border-white/[0.07] bg-surface-1/90 backdrop-blur-xl md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.07] bg-surface-1/95 shadow-[0_-14px_40px_rgba(0,0,0,.3)] backdrop-blur-xl md:hidden"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="flex flex-1 overflow-x-auto">
+      <div className="flex snap-x snap-mandatory gap-1 overflow-x-auto px-2 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((item) => (
           <NavLink
             key={item.to}
@@ -23,13 +23,13 @@ export function MobileNav({ items }: { items: NavItem[] }) {
             end={item.end}
             className={({ isActive }) =>
               clsx(
-                'relative flex min-w-[4.25rem] shrink-0 flex-1 flex-col items-center gap-1 py-2.5 text-xs font-medium transition-colors',
-                isActive ? 'text-brand-400 after:absolute after:top-0 after:h-px after:w-6 after:bg-brand-500' : 'text-ink-3',
+                'relative flex w-20 min-w-20 snap-start flex-none flex-col items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[0.6875rem] font-semibold leading-none transition-colors',
+                isActive ? 'bg-brand-400/[0.09] text-brand-400' : 'text-ink-3 active:bg-white/[0.05]',
               )
             }
           >
-            <item.icon className="h-5 w-5" />
-            {item.label}
+            <item.icon className="h-[1.15rem] w-[1.15rem] shrink-0" />
+            <span className="whitespace-nowrap">{item.label}</span>
           </NavLink>
         ))}
       </div>
