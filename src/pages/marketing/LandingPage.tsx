@@ -61,10 +61,10 @@ export function LandingPage() {
           </div>
         </section>
 
-        <figure className="px-5 pb-20 sm:hidden">
-          <div className="relative aspect-[4/5] overflow-hidden rounded-[1.5rem] border border-white/[0.08] bg-surface-1 shadow-[0_28px_80px_rgba(0,0,0,.32)]">
+        <figure className="px-5 pb-16 sm:hidden">
+          <div className="relative aspect-[16/9] overflow-hidden rounded-[1.5rem] border border-white/[0.08] bg-surface-1 shadow-[0_22px_64px_rgba(0,0,0,.28)]">
             <img src="/wavelength-mobile-editorial.jpg" alt="A translucent blue record being placed onto a turntable" loading="lazy" className="h-full w-full object-cover" />
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-6 pb-6 pt-20">
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-5 pb-4 pt-14">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-400">Closer to the music</p>
             </div>
           </div>
@@ -121,8 +121,8 @@ export function LandingPage() {
 
         <section className="px-5 pb-24 sm:px-8 lg:px-12 lg:pb-32">
           <div className="premium-panel relative mx-auto flex min-h-[22rem] max-w-[1344px] flex-col items-start justify-end gap-8 overflow-hidden rounded-[2rem] px-7 py-10 sm:min-h-[25rem] sm:px-10 lg:flex-row lg:items-end lg:justify-between lg:px-14 lg:py-14">
-            <img src="/wavelength-cta-venue.jpg" alt="An intimate independent music venue before doors open" loading="lazy" className="absolute inset-0 h-full w-full object-cover object-[64%_center]" />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/65 to-black/20" />
+            <img src="/wavelength-cta-instruments.jpg" alt="A cobalt guitar, microphone, amplifier and drum kit ready on stage" loading="lazy" className="absolute inset-0 h-full w-full object-cover object-center" />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/20 to-transparent" />
             <div className="relative z-10"><p className="eyebrow">Your music, better connected</p><h2 className="mt-3 text-3xl font-medium tracking-[-0.04em] text-white sm:text-4xl">Ready to tune in?</h2></div>
             <Link to="/sign-up" className="group relative z-10 inline-flex items-center gap-3 rounded-full bg-brand-500 px-6 py-3.5 text-sm font-semibold text-surface-0 transition hover:bg-brand-400">Join Wavelength <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" /></Link>
           </div>
