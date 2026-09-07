@@ -1,0 +1,77 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(artistId) {
+      return isSignedIn() && request.auth.uid == artistId;
+    }
+
+    // 40MB is a generous ceiling for a compressed track (a 320kbps MP3 at
+    // 40MB runs ~17 minutes) while keeping storage/egress costs predictable
+    // on a free-tier-conscious setup. Raw WAV/FLAC uploads are rejected
+    // outright below rather than accepted and left to bloat storage.
+    function underAudioUploadLimit() {
+      return request.resource.size < 40 * 1024 * 1024;
+    }
+
+    function isCompressedAudio() {
+      return request.resource.contentType in [
+        'audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/x-m4a', 'audio/ogg', 'audio/opus', 'audio/webm'
+      ];
+    }
+
+    function underImageUploadLimit() {
+      return request.resource.size < 8 * 1024 * 1024;
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    // Public artwork — anyone can view, only the owning artist can upload.
+    match /artists/{artistId}/artwork/{fileName} {
+      allow read: if true;
+      allow write: if isOwner(artistId) && underImageUploadLimit() && isImage();
+    }
+
+    // Public preview clips — anyone can stream, only the owning artist can upload.
+    match /artists/{artistId}/previews/{fileName} {
+      allow read: if true;
+      allow write: if isOwner(artistId) && underAudioUploadLimit() && isCompressedAudio();
+    }
+
+    // Full-quality originals — NEVER publicly readable. Only the owning
+    // artist can read/write directly; DJ downloads are served exclusively
+    // through a Cloud Function issuing short-lived signed URLs (Phase 4),
+    // never through a client-readable Storage rule. Still must be a
+    // compressed format — WAV/FLAC uploads are rejected here too, since
+    // "original" means the master the artist licenses, not an unlimited
+    // raw-file dumping ground.
+    match /artists/{artistId}/originals/{fileName} {
+      allow read: if isOwner(artistId);
+      allow write: if isOwner(artistId) && underAudioUploadLimit() && isCompressedAudio();
+    }
+
+    // Supporter-only content — owner can always read/write; a supporter's
+    // read access is enforced once Phase 2 support entitlements exist in
+    // Firestore (checked here via a cross-service firestore.get on the
+    // supportRelationships collection).
+    match /artists/{artistId}/supporter-content/{fileName} {
+      allow read: if isOwner(artistId)
+        || (isSignedIn() &&
+            firestore.exists(/databases/(default)/documents/supportRelationships/$(request.auth.uid + '_' + artistId)));
+      allow write: if isOwner(artistId) && underAudioUploadLimit();
+    }
+
+    // User avatar / profile image uploads.
+    match /users/{userId}/profile/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() && request.auth.uid == userId && underImageUploadLimit() && isImage();
+    }
+  }
+}

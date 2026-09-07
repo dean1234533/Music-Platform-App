@@ -1,0 +1,270 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function existingUserRoles() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles;
+    }
+
+    function hasRole(role) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        role in existingUserRoles();
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    // ---------------------------------------------------------------------
+    // users/{userId} — private account document. Owner can read/update it,
+    // but can never touch roles beyond fan/artist/dj, never grant themselves
+    // admin, and never write subscriptionStatus, stripeCustomerId, or
+    // suspended (all Cloud-Function/Admin-SDK only). Admins can read any
+    // user for the admin dashboard, but writes to other accounts still only
+    // happen through callables (adminSetUserSuspension etc.), never a raw
+    // client write, so every admin action produces an audit log entry.
+    // ---------------------------------------------------------------------
+    match /users/{userId} {
+      allow read: if isSelf(userId) || isAdmin();
+
+      allow create: if isSelf(userId)
+        && request.resource.data.uid == userId
+        && request.resource.data.roles.size() == 0
+        && request.resource.data.onboardingComplete == false
+        && request.resource.data.subscriptionStatus == 'none';
+
+      allow update: if isSelf(userId)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.subscriptionStatus == resource.data.subscriptionStatus
+        && request.resource.data.get('stripeCustomerId', null) == resource.data.get('stripeCustomerId', null)
+        && request.resource.data.get('suspended', false) == resource.data.get('suspended', false)
+        && request.resource.data.roles.hasOnly(['fan', 'artist', 'dj']);
+
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // artistProfiles/{artistId} — public read. Only the owning artist can
+    // write, and only to their own document (artistId == uid). verified/
+    // followerCount/supporterCount are frozen — Cloud Functions only.
+    // ---------------------------------------------------------------------
+    match /artistProfiles/{artistId} {
+      allow read: if true;
+      allow create: if isSelf(artistId) && request.resource.data.artistId == artistId;
+      allow update: if isSelf(artistId)
+        && request.resource.data.artistId == resource.data.artistId
+        && request.resource.data.slug == resource.data.slug
+        && request.resource.data.followerCount == resource.data.followerCount
+        && request.resource.data.supporterCount == resource.data.supporterCount
+        && request.resource.data.verified == resource.data.verified;
+      allow delete: if false;
+    }
+
+    // artistSlugs/{slug} — reservation records; immutable once created.
+    match /artistSlugs/{slug} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.artistId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /djProfiles/{djId} {
+      allow read: if true;
+      allow create: if isSelf(djId) && request.resource.data.djId == djId
+        && request.resource.data.verificationStatus == 'unverified';
+      allow update: if isSelf(djId)
+        && request.resource.data.djId == resource.data.djId
+        && request.resource.data.verificationStatus == resource.data.verificationStatus;
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // tracks/{trackId} — visibility-gated read, owner-only write. Supporter/
+    // follower-gated visibility is enforced client-side for now (Storage
+    // rules are the real gate on the audio file itself); playCount and
+    // takenDown are frozen from client writes.
+    // ---------------------------------------------------------------------
+    match /tracks/{trackId} {
+      allow read: if resource.data.visibility == 'public'
+        || (resource.data.visibility == 'dj_only' && hasRole('dj'))
+        || (isSignedIn() && resource.data.artistId == request.auth.uid)
+        || isAdmin();
+
+      allow create: if isSignedIn()
+        && request.resource.data.artistId == request.auth.uid
+        && hasRole('artist')
+        && request.resource.data.rightsConfirmed == true
+        && request.resource.data.playCount == 0;
+
+      allow update: if isSignedIn()
+        && resource.data.artistId == request.auth.uid
+        && request.resource.data.artistId == resource.data.artistId
+        && request.resource.data.playCount == resource.data.playCount
+        && request.resource.data.get('takenDown', false) == resource.data.get('takenDown', false);
+
+      allow delete: if isSignedIn() && resource.data.artistId == request.auth.uid;
+    }
+
+    match /albums/{albumId} {
+      allow read: if true;
+      allow create, update: if isSignedIn() && request.resource.data.artistId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.artistId == request.auth.uid;
+    }
+
+    // follows/{fanId_artistId} — only the fan can read/write their own follow.
+    // followerCount on artistProfiles is updated server-side by a trigger.
+    match /follows/{followId} {
+      allow read: if isSignedIn() && resource.data.fanId == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.fanId == request.auth.uid
+        && followId == request.resource.data.fanId + '_' + request.resource.data.artistId;
+      allow delete: if isSignedIn() && resource.data.fanId == request.auth.uid;
+      allow update: if false;
+    }
+
+    match /trackLikes/{likeId} {
+      allow read: if isSignedIn() && resource.data.fanId == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.fanId == request.auth.uid
+        && likeId == request.resource.data.fanId + '_' + request.resource.data.trackId;
+      allow delete: if isSignedIn() && resource.data.fanId == request.auth.uid;
+      allow update: if false;
+    }
+
+    match /playlists/{playlistId} {
+      allow read: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /artistPosts/{postId} {
+      allow read: if resource.data.visibility == 'everyone'
+        || (isSignedIn() && resource.data.artistId == request.auth.uid)
+        || (resource.data.visibility == 'followers' && isSignedIn() &&
+            exists(/databases/$(database)/documents/follows/$(request.auth.uid + '_' + resource.data.artistId)))
+        || (resource.data.visibility == 'supporters' && isSignedIn() &&
+            exists(/databases/$(database)/documents/supportRelationships/$(request.auth.uid + '_' + resource.data.artistId)));
+      allow create: if isSignedIn() && request.resource.data.artistId == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.artistId == request.auth.uid;
+    }
+
+    // subscriptionPlans/{planId} — admin-configured pricing, public read only.
+    match /subscriptionPlans/{planId} {
+      allow read: if true;
+      allow write: if false; // written only via adminUpsertSubscriptionPlan
+    }
+
+    match /platformSettings/{settingId} {
+      allow read: if true;
+      allow write: if false; // written only via adminUpdatePlatformSettings
+    }
+
+    // ---------------------------------------------------------------------
+    // Phase 2 — subscriptions, support allocation, revenue records.
+    // ---------------------------------------------------------------------
+    match /subscriptions/{userId} {
+      allow read: if isSelf(userId) || isAdmin();
+      allow write: if false; // Stripe webhook only
+    }
+
+    match /supportAllocations/{fanId} {
+      allow read: if isSelf(fanId);
+      allow write: if false; // updateSupportAllocations callable only
+    }
+
+    match /supportRelationships/{relationshipId} {
+      allow read: if isSignedIn() &&
+        (resource.data.fanId == request.auth.uid || resource.data.artistId == request.auth.uid);
+      allow write: if false; // updateSupportAllocations callable only
+    }
+
+    match /artistBalances/{artistId} {
+      allow read: if isSelf(artistId) || isAdmin();
+      allow write: if false; // Cloud Functions only
+    }
+
+    match /artistPayoutAccounts/{artistId} {
+      allow read: if isSelf(artistId) || isAdmin();
+      allow write: if false; // Stripe Connect callables/webhook only
+    }
+
+    // notifications/{notificationId} — owner-only, created server-side only.
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow create, delete: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // Phase 3-4 — DJ requests, messaging, agreements. All writes go through
+    // callables so status transitions, signatures, and payment gating can't
+    // be forged client-side.
+    // ---------------------------------------------------------------------
+    match /licenceRequests/{docId} {
+      allow read: if isSignedIn() && (resource.data.djId == request.auth.uid || resource.data.artistId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+    match /licenceAgreements/{docId} {
+      allow read: if isSignedIn() && (resource.data.djId == request.auth.uid || resource.data.artistId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+    match /licenceAgreementAcceptances/{docId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+    match /conversations/{conversationId} {
+      allow read: if isSignedIn() && request.auth.uid in resource.data.participantIds;
+      allow write: if false; // created by submitLicenceRequest, appended to by sendMessage
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
+        allow write: if false;
+      }
+    }
+    match /downloadLogs/{docId} {
+      allow read: if isSignedIn() && (resource.data.djId == request.auth.uid || resource.data.artistId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // Phase 5 — payouts, verification, moderation, admin.
+    // ---------------------------------------------------------------------
+    match /transactions/{docId} {
+      allow read: if isSignedIn() && (resource.data.artistId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+    match /payouts/{docId} {
+      allow read: if isSignedIn() && (resource.data.artistId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+    match /verificationRequests/{docId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+    match /reports/{docId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+    match /copyrightClaims/{docId} {
+      allow read: if isSignedIn() && (resource.data.reporterId == request.auth.uid || resource.data.artistId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+    match /auditLogs/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+  }
+}

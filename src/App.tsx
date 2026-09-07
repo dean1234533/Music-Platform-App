@@ -1,0 +1,189 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { AuthProvider } from '@/contexts/AuthContext'
+import { PlayerProvider } from '@/contexts/PlayerContext'
+import { ProtectedRoute, RequireOnboarding } from '@/components/auth/ProtectedRoute'
+import { RoleRoute } from '@/components/auth/RoleRoute'
+
+import { LandingPage } from '@/pages/marketing/LandingPage'
+import { SignInPage } from '@/pages/auth/SignInPage'
+import { SignUpPage } from '@/pages/auth/SignUpPage'
+import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
+import { VerifyEmailPage } from '@/pages/auth/VerifyEmailPage'
+import { OnboardingPage } from '@/pages/onboarding/OnboardingPage'
+import { AddRolePage } from '@/pages/onboarding/AddRolePage'
+
+import { FanDashboardLayout } from '@/pages/fan/FanDashboardLayout'
+import { HomePage } from '@/pages/fan/HomePage'
+import { DiscoverPage } from '@/pages/fan/DiscoverPage'
+import { SearchPage } from '@/pages/fan/SearchPage'
+import { FollowingPage } from '@/pages/fan/FollowingPage'
+import { SupportedPage } from '@/pages/fan/SupportedPage'
+import { LibraryPage } from '@/pages/fan/LibraryPage'
+import { PlaylistsPage } from '@/pages/fan/PlaylistsPage'
+import { PlaylistDetailPage } from '@/pages/fan/PlaylistDetailPage'
+import { NotificationsPage } from '@/pages/fan/NotificationsPage'
+import { SubscriptionPage } from '@/pages/fan/SubscriptionPage'
+import { ProfilePage } from '@/pages/fan/ProfilePage'
+import { SettingsPage } from '@/pages/fan/SettingsPage'
+
+import { ArtistPublicProfilePage } from '@/pages/artist/ArtistPublicProfilePage'
+import { ArtistDashboardLayout } from '@/pages/artist/dashboard/ArtistDashboardLayout'
+import { OverviewPage } from '@/pages/artist/dashboard/OverviewPage'
+import { MusicPage } from '@/pages/artist/dashboard/MusicPage'
+import { UploadTrackPage } from '@/pages/artist/dashboard/UploadTrackPage'
+import { CommunityPage } from '@/pages/artist/dashboard/CommunityPage'
+import { DJRequestsPage as ArtistDJRequestsPage } from '@/pages/artist/dashboard/DJRequestsPage'
+import { RevenuePage } from '@/pages/artist/dashboard/RevenuePage'
+import { ArtistSettingsPage } from '@/pages/artist/dashboard/ArtistSettingsPage'
+
+import { DJDashboardLayout } from '@/pages/dj/DJDashboardLayout'
+import { DJDiscoverPage } from '@/pages/dj/DJDiscoverPage'
+import { DJRequestsPage } from '@/pages/dj/DJRequestsPage'
+import { DJProfilePage } from '@/pages/dj/DJProfilePage'
+
+import { TrackPage } from '@/pages/track/TrackPage'
+import { RequestDetailPage } from '@/pages/requests/RequestDetailPage'
+
+import { AdminDashboardLayout } from '@/pages/admin/AdminDashboardLayout'
+import { AdminUsersPage } from '@/pages/admin/AdminUsersPage'
+import { AdminVerificationPage } from '@/pages/admin/AdminVerificationPage'
+import { AdminReportsPage } from '@/pages/admin/AdminReportsPage'
+import { AdminSettingsPage } from '@/pages/admin/AdminSettingsPage'
+import { AdminAuditLogPage } from '@/pages/admin/AdminAuditLogPage'
+
+import { NotFoundPage } from '@/pages/NotFoundPage'
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <PlayerProvider>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/sign-in" element={<SignInPage />} />
+            <Route path="/sign-up" element={<SignUpPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route
+              path="/verify-email"
+              element={
+                <ProtectedRoute>
+                  <VerifyEmailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/onboarding"
+              element={
+                <ProtectedRoute>
+                  <OnboardingPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/onboarding/add-role"
+              element={
+                <ProtectedRoute>
+                  <AddRolePage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route path="/artist/:slug" element={<ArtistPublicProfilePage />} />
+            <Route path="/track/:trackId" element={<TrackPage />} />
+            <Route
+              path="/requests/:requestId"
+              element={
+                <ProtectedRoute>
+                  <RequestDetailPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/app"
+              element={
+                <ProtectedRoute>
+                  <RequireOnboarding>
+                    <FanDashboardLayout />
+                  </RequireOnboarding>
+                </ProtectedRoute>
+              }
+            >
+              <Route path="home" element={<HomePage />} />
+              <Route path="discover" element={<DiscoverPage />} />
+              <Route path="search" element={<SearchPage />} />
+              <Route path="following" element={<FollowingPage />} />
+              <Route path="supported" element={<SupportedPage />} />
+              <Route path="library" element={<LibraryPage />} />
+              <Route path="playlists" element={<PlaylistsPage />} />
+              <Route path="playlists/:playlistId" element={<PlaylistDetailPage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="subscription" element={<SubscriptionPage />} />
+              <Route path="profile" element={<ProfilePage />} />
+              <Route path="settings" element={<SettingsPage />} />
+            </Route>
+
+            <Route
+              path="/dashboard/artist"
+              element={
+                <ProtectedRoute>
+                  <RequireOnboarding>
+                    <RoleRoute role="artist">
+                      <ArtistDashboardLayout />
+                    </RoleRoute>
+                  </RequireOnboarding>
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<OverviewPage />} />
+              <Route path="music" element={<MusicPage />} />
+              <Route path="upload" element={<UploadTrackPage />} />
+              <Route path="community" element={<CommunityPage />} />
+              <Route path="dj-requests" element={<ArtistDJRequestsPage />} />
+              <Route path="revenue" element={<RevenuePage />} />
+              <Route path="settings" element={<ArtistSettingsPage />} />
+            </Route>
+
+            <Route
+              path="/dj"
+              element={
+                <ProtectedRoute>
+                  <RequireOnboarding>
+                    <RoleRoute role="dj">
+                      <DJDashboardLayout />
+                    </RoleRoute>
+                  </RequireOnboarding>
+                </ProtectedRoute>
+              }
+            >
+              <Route path="discover" element={<DJDiscoverPage />} />
+              <Route path="requests" element={<DJRequestsPage />} />
+              <Route path="profile" element={<DJProfilePage />} />
+            </Route>
+
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <RoleRoute role="admin">
+                    <AdminDashboardLayout />
+                  </RoleRoute>
+                </ProtectedRoute>
+              }
+            >
+              <Route path="users" element={<AdminUsersPage />} />
+              <Route path="verification" element={<AdminVerificationPage />} />
+              <Route path="reports" element={<AdminReportsPage />} />
+              <Route path="settings" element={<AdminSettingsPage />} />
+              <Route path="audit-log" element={<AdminAuditLogPage />} />
+            </Route>
+
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </PlayerProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  )
+}
+
+export default App
