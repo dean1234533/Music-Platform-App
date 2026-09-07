@@ -1,23 +1,23 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif;
 
   /* Core surface tones — dark, premium, music-industry feel */
-  --color-surface-0: #08080b;
-  --color-surface-1: #0f0f14;
-  --color-surface-2: #16161d;
-  --color-surface-3: #1e1e27;
-  --color-surface-border: #2a2a35;
+  --color-surface-0: #050607;
+  --color-surface-1: #0a0c0f;
+  --color-surface-2: #11151a;
+  --color-surface-3: #181d24;
+  --color-surface-border: #242a32;
 
-  --color-ink-0: #f7f7fa;
-  --color-ink-1: #c8c8d4;
-  --color-ink-2: #8f8fa3;
-  --color-ink-3: #5f5f70;
+  --color-ink-0: #f6f7f4;
+  --color-ink-1: #c8cdd0;
+  --color-ink-2: #858d94;
+  --color-ink-3: #596169;
 
-  --color-brand-400: #a78bfa;
-  --color-brand-500: #8b5cf6;
-  --color-brand-600: #7c3aed;
+  --color-brand-400: #d9ff65;
+  --color-brand-500: #c8f33f;
+  --color-brand-600: #b6df2d;
 
   --color-support-400: #34d399;
   --color-support-500: #10b981;
@@ -41,6 +41,10 @@ body {
   color: var(--color-ink-0);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-image:
+    radial-gradient(circle at 78% -10%, rgba(39, 83, 255, 0.12), transparent 30rem),
+    radial-gradient(circle at 10% 110%, rgba(200, 243, 63, 0.05), transparent 28rem);
+  background-attachment: fixed;
 }
 
 * {
@@ -71,9 +75,38 @@ body {
 }
 
 .gradient-glow {
-  background: radial-gradient(60% 60% at 50% 0%, rgba(139, 92, 246, 0.25) 0%, rgba(139, 92, 246, 0) 70%);
+  background: radial-gradient(60% 70% at 70% 12%, rgba(43, 76, 255, 0.22) 0%, transparent 70%);
 }
 
 .text-balance {
   text-wrap: balance;
+}
+
+::selection { background: var(--color-brand-500); color: #070906; }
+
+.premium-panel {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018));
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.28), inset 0 1px rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(20px);
+}
+
+.eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-brand-400);
+}
+
+@keyframes slow-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-1deg); }
+  50% { transform: translate3d(0, -10px, 0) rotate(0deg); }
+}
+
+.art-drift { animation: slow-drift 9s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .art-drift { animation: none; }
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
 }

@@ -1,15 +1,15 @@
 import { Link } from 'react-router-dom'
-import { Bell, Music2 } from 'lucide-react'
+import { Bell } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { BrandMark } from '@/components/common/BrandMark'
 
 export function TopBar() {
   const { profile } = useAuth()
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between border-b border-surface-border bg-surface-0/90 px-4 py-3 backdrop-blur md:hidden">
+    <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/[0.07] bg-surface-0/80 px-4 py-3 backdrop-blur-xl md:hidden">
       <Link to="/app/home" className="flex items-center gap-2">
-        <Music2 className="h-5 w-5 text-brand-400" />
-        <span className="font-semibold text-ink-0">Wavelength</span>
+        <BrandMark />
       </Link>
       <div className="flex items-center gap-3">
         <Link to="/app/notifications" className="rounded-full p-2 text-ink-2 hover:bg-surface-2">

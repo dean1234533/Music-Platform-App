@@ -38,10 +38,11 @@ export function HomePage() {
   const firstName = profile?.displayName?.split(' ')[0]
 
   return (
-    <div className="flex flex-col gap-10">
-      <div>
-        <h1 className="text-2xl font-semibold text-ink-0">{firstName ? `Welcome back, ${firstName}` : 'Welcome back'}</h1>
-        <p className="mt-1 text-sm text-ink-2">Here's what's new from the artists you follow.</p>
+    <div className="flex flex-col gap-12">
+      <div className="border-b border-white/[0.08] pb-8 pt-2">
+        <p className="eyebrow">Your frequency</p>
+        <h1 className="mt-3 text-4xl font-medium tracking-[-0.045em] text-ink-0 sm:text-5xl">{firstName ? `Good to have you back, ${firstName}.` : 'Good to have you back.'}</h1>
+        <p className="mt-3 text-base text-ink-2">Fresh releases and familiar voices, selected around you.</p>
       </div>
 
       {fromFollowed.length > 0 ? (
@@ -67,15 +68,15 @@ function Section({ title, tracks }: { title: string; tracks: TrackDoc[] }) {
   if (tracks.length === 0) {
     return (
       <div>
-        <h2 className="mb-3 text-lg font-semibold text-ink-0">{title}</h2>
+        <h2 className="mb-5 text-xl font-medium tracking-[-0.025em] text-ink-0">{title}</h2>
         <EmptyState title="Nothing here yet" description="Check back once artists start releasing music." />
       </div>
     )
   }
   return (
     <div>
-      <h2 className="mb-3 text-lg font-semibold text-ink-0">{title}</h2>
-      <div className="scrollbar-none flex gap-4 overflow-x-auto pb-2">
+      <h2 className="mb-5 text-xl font-medium tracking-[-0.025em] text-ink-0">{title}</h2>
+      <div className="scrollbar-none flex gap-5 overflow-x-auto pb-5">
         {tracks.map((track) => (
           <TrackCard key={track.trackId} track={track} queue={tracks} />
         ))}

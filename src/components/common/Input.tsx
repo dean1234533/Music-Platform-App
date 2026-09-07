@@ -3,7 +3,7 @@ import type { InputHTMLAttributes, TextareaHTMLAttributes } from 'react'
 import { clsx } from 'clsx'
 
 const fieldClasses =
-  'w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 placeholder:text-ink-3 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 disabled:opacity-50'
+  'w-full rounded-xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-ink-0 placeholder:text-ink-3 outline-none transition focus:border-brand-500/70 focus:bg-white/[0.055] focus:ring-2 focus:ring-brand-500/10 disabled:opacity-50'
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className, ...rest }, ref) {

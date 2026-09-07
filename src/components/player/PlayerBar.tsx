@@ -36,7 +36,7 @@ export function PlayerBar() {
   }
 
   return (
-    <div className="fixed inset-x-0 bottom-14 z-40 border-t border-surface-border bg-surface-1/95 px-3 py-2 backdrop-blur md:bottom-0 md:left-64 md:px-6 md:py-3">
+    <div className="fixed inset-x-0 bottom-14 z-40 border-t border-white/[0.08] bg-[#090b0d]/90 px-3 py-2 shadow-[0_-20px_50px_rgba(0,0,0,.2)] backdrop-blur-2xl md:bottom-0 md:left-[264px] md:px-6 md:py-3">
       <div className="mb-1.5 flex items-center gap-2 md:hidden">
         <input
           type="range"
@@ -44,12 +44,12 @@ export function PlayerBar() {
           max={durationSec || currentTrack.previewDurationSec || 30}
           value={progressSec}
           onChange={(e) => seek(Number(e.target.value))}
-          className="h-1 w-full accent-brand-500"
+          className="h-1 w-full cursor-pointer accent-brand-500"
         />
       </div>
       <div className="flex items-center gap-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-surface-2">
+          <div className="h-11 w-11 shrink-0 overflow-hidden rounded-[10px] bg-surface-2 ring-1 ring-white/10">
             {currentTrack.artworkURL ? (
               <img src={currentTrack.artworkURL} alt="" className="h-full w-full object-cover" />
             ) : null}
@@ -72,13 +72,13 @@ export function PlayerBar() {
         </div>
 
         <div className="flex shrink-0 items-center gap-1 md:gap-2">
-          <button onClick={previous} className="rounded-full p-2 text-ink-2 hover:bg-surface-2 hover:text-ink-0" aria-label="Previous">
+          <button onClick={previous} className="rounded-full p-2 text-ink-2 transition hover:bg-white/[0.06] hover:text-ink-0" aria-label="Previous">
             <SkipBack className="h-4 w-4" />
           </button>
           <button
             onClick={togglePlay}
             disabled={isLoading}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-60"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-ink-0 text-surface-0 shadow-lg transition hover:scale-105 hover:bg-brand-400 disabled:opacity-60"
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isLoading ? (
@@ -89,7 +89,7 @@ export function PlayerBar() {
               <Play className="h-4 w-4 translate-x-0.5" fill="currentColor" />
             )}
           </button>
-          <button onClick={next} className="rounded-full p-2 text-ink-2 hover:bg-surface-2 hover:text-ink-0" aria-label="Next">
+          <button onClick={next} className="rounded-full p-2 text-ink-2 transition hover:bg-white/[0.06] hover:text-ink-0" aria-label="Next">
             <SkipForward className="h-4 w-4" />
           </button>
         </div>
@@ -104,7 +104,7 @@ export function PlayerBar() {
             max={durationSec || currentTrack.previewDurationSec || 30}
             value={progressSec}
             onChange={(e) => seek(Number(e.target.value))}
-            className="h-1 w-full accent-brand-500"
+            className="h-1 w-full cursor-pointer accent-brand-500"
           />
           <span className="w-10 shrink-0 text-xs tabular-nums text-ink-3">
             {formatDuration(durationSec || currentTrack.previewDurationSec)}

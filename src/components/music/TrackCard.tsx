@@ -10,22 +10,22 @@ export function TrackCard({ track, queue }: { track: TrackDoc; queue?: TrackDoc[
   const isCurrent = currentTrack?.trackId === track.trackId
 
   return (
-    <div className="group w-40 shrink-0 sm:w-48">
+    <div className="group w-44 shrink-0 sm:w-52">
       <button
         type="button"
         onClick={() => playTrack(track, queue)}
-        className="relative block aspect-square w-full overflow-hidden rounded-xl bg-surface-2"
+        className="relative block aspect-square w-full overflow-hidden rounded-[1.25rem] bg-surface-2 shadow-[0_18px_45px_rgba(0,0,0,.22)] ring-1 ring-white/[0.07] transition duration-500 group-hover:-translate-y-1 group-hover:shadow-[0_26px_65px_rgba(0,0,0,.4)]"
       >
         {track.artworkURL ? (
-          <img src={track.artworkURL} alt="" className="h-full w-full object-cover" />
+          <img src={track.artworkURL} alt="" className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-ink-3">
             <Play className="h-8 w-8" />
           </div>
         )}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="absolute inset-0 flex items-end justify-end bg-gradient-to-t from-black/65 via-transparent to-transparent p-4 opacity-0 transition-opacity group-hover:opacity-100">
           <span
-            className={`flex h-11 w-11 items-center justify-center rounded-full bg-brand-500 text-white shadow-lg ${
+            className={`flex h-12 w-12 items-center justify-center rounded-full bg-brand-500 text-surface-0 shadow-xl transition-transform hover:scale-105 ${
               isCurrent && isPlaying ? 'opacity-100' : ''
             }`}
           >
@@ -35,14 +35,14 @@ export function TrackCard({ track, queue }: { track: TrackDoc; queue?: TrackDoc[
       </button>
       <Link
         to={`/track/${track.trackId}`}
-        className="mt-2 block truncate text-sm font-medium text-ink-0 hover:underline"
+        className="mt-3 block truncate text-[15px] font-semibold tracking-[-0.01em] text-ink-0 hover:text-brand-400"
       >
         {track.title}
       </Link>
       {artist ? (
         <Link
           to={`/artist/${artist.slug}`}
-          className="block truncate text-xs text-ink-2 hover:text-ink-1 hover:underline"
+          className="mt-0.5 block truncate text-[13px] text-ink-2 hover:text-ink-1"
         >
           {artist.name}
         </Link>

@@ -44,10 +44,11 @@ export function DiscoverPage() {
   if (loading) return <LoadingState label="Loading discovery…" />
 
   return (
-    <div className="flex flex-col gap-10">
-      <div>
-        <h1 className="text-2xl font-semibold text-ink-0">Discover</h1>
-        <p className="mt-1 text-sm text-ink-2">Real releases from real independent artists — no fabricated charts.</p>
+    <div className="flex flex-col gap-12">
+      <div className="border-b border-white/[0.08] pb-8 pt-2">
+        <p className="eyebrow">Beyond the algorithm</p>
+        <h1 className="mt-3 text-4xl font-medium tracking-[-0.045em] text-ink-0 sm:text-5xl">Find your next obsession.</h1>
+        <p className="mt-3 text-base text-ink-2">Independent releases, real momentum, no fabricated charts.</p>
       </div>
 
       <TrackSection title="New releases" tracks={newReleases} />
@@ -69,11 +70,11 @@ export function DiscoverPage() {
 function TrackSection({ title, tracks, emptyLabel }: { title: string; tracks: TrackDoc[]; emptyLabel?: string }) {
   return (
     <div>
-      <h2 className="mb-3 text-lg font-semibold text-ink-0">{title}</h2>
+      <h2 className="mb-5 text-xl font-medium tracking-[-0.025em] text-ink-0">{title}</h2>
       {tracks.length === 0 ? (
         <EmptyState title={emptyLabel ?? 'Nothing here yet'} />
       ) : (
-        <div className="scrollbar-none flex gap-4 overflow-x-auto pb-2">
+        <div className="scrollbar-none flex gap-5 overflow-x-auto pb-5">
           {tracks.map((track) => (
             <TrackCard key={track.trackId} track={track} queue={tracks} />
           ))}
@@ -86,11 +87,11 @@ function TrackSection({ title, tracks, emptyLabel }: { title: string; tracks: Tr
 function ArtistSection({ title, artists, emptyLabel }: { title: string; artists: ArtistProfile[]; emptyLabel?: string }) {
   return (
     <div>
-      <h2 className="mb-3 text-lg font-semibold text-ink-0">{title}</h2>
+      <h2 className="mb-5 text-xl font-medium tracking-[-0.025em] text-ink-0">{title}</h2>
       {artists.length === 0 ? (
         <EmptyState title={emptyLabel ?? 'Nothing here yet'} />
       ) : (
-        <div className="scrollbar-none flex gap-4 overflow-x-auto pb-2">
+        <div className="scrollbar-none flex gap-5 overflow-x-auto pb-5">
           {artists.map((artist) => (
             <ArtistCard key={artist.artistId} artist={artist} />
           ))}
