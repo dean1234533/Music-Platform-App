@@ -28,16 +28,20 @@ export async function listRisingArtists(count = 12): Promise<ArtistProfile[]> {
 }
 
 /**
- * DJ Discover feed. `filters`/`includeProPlusOnly` are only meaningful for
- * DJ Pro (advancedFiltering) / Pro+ (privatePromoPools) — pass neither for
- * DJ Free's plain feed. See listDJPromotionTracksFiltered in trackService.ts.
+ * Tracks open for DJ promotion. Used both by the fan-facing Discover page
+ * (public only — leave includeDjOnly false) and the DJ Discover page (DJs
+ * may also see dj_only tracks — pass includeDjOnly true there).
+ * `filters`/`includeProPlusOnly` are only meaningful for DJ Pro
+ * (advancedFiltering) / Pro+ (privatePromoPools) — pass neither otherwise.
+ * See listDJPromotionTracksFiltered in trackService.ts.
  */
 export async function listArtistsSeekingDJExposure(
   count = 12,
   filters: DjTrackFilters = {},
   includeProPlusOnly = false,
+  includeDjOnly = false,
 ): Promise<TrackDoc[]> {
-  return listDJPromotionTracksFiltered(filters, { includeProPlusOnly, count })
+  return listDJPromotionTracksFiltered(filters, { includeProPlusOnly, includeDjOnly, count })
 }
 
 export async function listByGenre(genre: string, count = 20): Promise<TrackDoc[]> {

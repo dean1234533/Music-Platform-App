@@ -26,7 +26,7 @@ export function DJDiscoverPage() {
 
   useEffect(() => {
     if (status === 'loading') return
-    void listArtistsSeekingDJExposure(30, canFilter ? filters : {}, canSeePrivatePools).then(setTracks)
+    void listArtistsSeekingDJExposure(30, canFilter ? filters : {}, canSeePrivatePools, true).then(setTracks)
   }, [filters, canFilter, canSeePrivatePools, status])
 
   return (

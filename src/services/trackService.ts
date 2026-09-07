@@ -173,12 +173,19 @@ export interface DjTrackFilters {
  * query (the one equality field worth an index at this app's scale) — the
  * rest are applied client-side over a bounded page. Not a scalable search
  * solution; fine for the catalogue sizes this app runs at today.
+ *
+ * `includeDjOnly` must be false for any non-DJ caller (e.g. the fan-facing
+ * Discover page): Firestore validates a list query against rules for every
+ * value the `in` filter could match, not just what's actually returned —
+ * including 'dj_only' when the requester lacks the dj role makes the whole
+ * query fail with permission-denied, even if no dj_only track exists.
  */
 export async function listDJPromotionTracksFiltered(
   filters: DjTrackFilters = {},
-  opts: { includeProPlusOnly?: boolean; count?: number } = {},
+  opts: { includeProPlusOnly?: boolean; includeDjOnly?: boolean; count?: number } = {},
 ): Promise<TrackDoc[]> {
-  const constraints = [where('djPromotion', '==', true), where('visibility', 'in', ['public', 'dj_only'])]
+  const visibilities = opts.includeDjOnly ? ['public', 'dj_only'] : ['public']
+  const constraints = [where('djPromotion', '==', true), where('visibility', 'in', visibilities)]
   if (filters.genre) constraints.push(where('genre', '==', filters.genre))
 
   const q = query(collection(db, 'tracks'), ...constraints, orderBy('createdAt', 'desc'), limit(opts.count ?? 100))
@@ -199,7 +206,7 @@ export async function listDJPromotionTracksFiltered(
 
 /** DJ Free — unfiltered discovery, still embargo/promo-tier-respecting. */
 export async function listDJPromotionTracks(count = 20): Promise<TrackDoc[]> {
-  return listDJPromotionTracksFiltered({}, { includeProPlusOnly: false, count })
+  return listDJPromotionTracksFiltered({}, { includeProPlusOnly: false, includeDjOnly: true, count })
 }
 
 /** Server-side play counting keeps playCount out of reach of client tampering. */
