@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { CreditCard } from 'lucide-react'
+import { Check, CreditCard, Sparkles } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { listActiveSubscriptionPlansForRole } from '@/services/platformSettingsService'
 import { openBillingPortal, subscribeToOwnSubscription, subscribeToPlan } from '@/services/subscriptionService'
@@ -13,6 +13,22 @@ import { formatCurrency } from '@/utils/format'
 import type { SubscriptionPlan } from '@/types/platformSettings'
 import type { SubscriptionDoc, SupportAllocationDoc } from '@/types/subscription'
 import type { ArtistProfile } from '@/types/artist'
+
+const FAN_FEATURE_LABELS: Record<string, string> = {
+  supporterContent: 'Supporter-only posts and tracks',
+  earlyAccess: 'Early access to new releases',
+  polls: 'Take part in artist polls',
+  artistDefinedPerks: 'Perks chosen by the artist',
+}
+
+function planHighlights(plan: SubscriptionPlan): string[] {
+  const enabled = Object.entries(plan.features)
+    .filter(([, value]) => value)
+    .map(([key]) => FAN_FEATURE_LABELS[key] ?? key)
+
+  if (plan.priceMinor === 0) return ['Discover independent artists', 'Follow artists and save music', 'Build your personal library']
+  return enabled.length > 0 ? enabled : ['Direct a share to artists', 'Unlock supporter experiences', 'Cancel whenever you like']
+}
 
 export function SubscriptionPage() {
   const { firebaseUser } = useAuth()
@@ -71,9 +87,8 @@ export function SubscriptionPage() {
         </div>
       ) : (
         <>
-          <div className="rounded-xl border border-warning-500/30 bg-warning-500/5 px-4 py-3 text-sm text-ink-1">
-            Subscribing requires a live Stripe account connected to this Firebase project (test mode
-            works fine for trying it out).
+          <div className="rounded-2xl border border-warning-500/25 bg-warning-500/[0.06] px-5 py-4 text-sm leading-6 text-ink-1">
+            Payments are not connected yet. You can compare plans now; checkout will become available when billing is enabled.
           </div>
 
           {checkoutError ? <p className="text-sm text-danger-500">{checkoutError}</p> : null}
@@ -87,22 +102,46 @@ export function SubscriptionPage() {
               description="The platform admin hasn't published pricing yet. Check back soon."
             />
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
-              {plans.map((plan) => (
-                <div key={plan.planId} className="rounded-2xl border border-surface-border bg-surface-1 p-6">
-                  <h2 className="text-lg font-semibold text-ink-0">{plan.name}</h2>
-                  <p className="mt-2 text-2xl font-semibold text-ink-0">
+            <div className="grid items-stretch gap-3 lg:grid-cols-3">
+              {plans.map((plan, index) => (
+                <div
+                  key={plan.planId}
+                  className={`relative flex min-h-[27rem] flex-col overflow-hidden rounded-[1.75rem] border p-7 transition duration-300 hover:-translate-y-1 ${
+                    plan.recommended
+                      ? 'border-brand-400/35 bg-[radial-gradient(circle_at_80%_0%,rgba(200,243,63,.16),transparent_17rem),linear-gradient(145deg,rgba(255,255,255,.07),rgba(255,255,255,.025))] shadow-[0_28px_80px_rgba(200,243,63,.08)]'
+                      : 'border-white/[0.08] bg-[linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.015))]'
+                  }`}
+                >
+                  <div className="absolute right-6 top-6 text-xs tabular-nums text-ink-3">0{index + 1}</div>
+                  {plan.recommended ? (
+                    <span className="mb-5 flex w-fit items-center gap-1.5 rounded-full bg-brand-500 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.13em] text-[#090b06]"><Sparkles className="h-3 w-3" /> Recommended</span>
+                  ) : (
+                    <span className="mb-5 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-ink-3">Wavelength plan</span>
+                  )}
+                  <h2 className="text-xl font-semibold tracking-[-0.02em] text-ink-0">{plan.name}</h2>
+                  <p className="mt-4 text-4xl font-medium tracking-[-0.05em] text-ink-0">
                     {plan.priceMinor === 0 ? 'Free' : formatCurrency(plan.priceMinor, plan.currency)}
-                    {plan.priceMinor > 0 ? <span className="text-sm font-normal text-ink-2">/{plan.interval}</span> : null}
+                    {plan.priceMinor > 0 ? <span className="ml-1 text-sm font-normal tracking-normal text-ink-2">/{plan.interval}</span> : null}
                   </p>
+                  <p className="mt-3 text-sm leading-6 text-ink-2">
+                    {plan.priceMinor === 0 ? 'Start listening and build your world around independent music.' : 'Turn your subscription into meaningful support for artists.'}
+                  </p>
+                  <ul className="mt-7 space-y-3 border-t border-white/[0.08] pt-6">
+                    {planHighlights(plan).slice(0, 4).map((feature) => (
+                      <li key={feature} className="flex items-start gap-3 text-sm leading-5 text-ink-1">
+                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-brand-400"><Check className="h-3 w-3" /></span>
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
                   <Button
-                    className="mt-4 w-full"
+                    className="mt-auto w-full"
                     variant={plan.priceMinor === 0 ? 'secondary' : 'primary'}
                     disabled={plan.priceMinor === 0}
                     loading={checkoutLoading === plan.planId}
                     onClick={() => handleSubscribe(plan.planId)}
                   >
-                    {plan.priceMinor === 0 ? 'Included' : 'Subscribe'}
+                    {plan.priceMinor === 0 ? 'Your current access' : `Choose ${plan.name}`}
                   </Button>
                 </div>
               ))}
