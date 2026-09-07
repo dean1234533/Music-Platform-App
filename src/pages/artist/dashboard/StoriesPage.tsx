@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Star, Trash2 } from 'lucide-react'
+import { AudioLines, Film, ImagePlus, Star, Trash2, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeArtistTracks } from '@/services/artistService'
 import { createStory, deleteStory, toggleStoryHighlight, uploadStoryMedia } from '@/services/storyService'
@@ -49,6 +49,7 @@ export function StoriesPage() {
   const [visibility, setVisibility] = useState<StoryVisibility>('public')
   const [caption, setCaption] = useState('')
   const [file, setFile] = useState<File | null>(null)
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null)
   const [expiresInHours, setExpiresInHours] = useState(STORY_DEFAULT_DURATION_HOURS)
   const [ctaType, setCtaType] = useState<StoryCtaType | ''>('')
   const [ctaTargetId, setCtaTargetId] = useState('')
@@ -57,6 +58,7 @@ export function StoriesPage() {
   const [error, setError] = useState<string | null>(null)
 
   const mediaUpload = useMediaUpload()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!firebaseUser) return
@@ -68,9 +70,29 @@ export function StoriesPage() {
     return subscribeArtistStories(firebaseUser.uid, setStories)
   }, [firebaseUser])
 
+  useEffect(() => {
+    if (mediaKind !== 'image' || !file) {
+      setFilePreviewUrl(null)
+      return
+    }
+    const previewUrl = URL.createObjectURL(file)
+    setFilePreviewUrl(previewUrl)
+    return () => URL.revokeObjectURL(previewUrl)
+  }, [file, mediaKind])
+
+  function clearSelectedFile() {
+    setFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function handleMediaKindChange(nextKind: StoryMediaKind) {
+    setMediaKind(nextKind)
+    clearSelectedFile()
+  }
+
   function resetForm() {
     setCaption('')
-    setFile(null)
+    clearSelectedFile()
     setCtaType('')
     setCtaTargetId('')
     setPollOptions(['', ''])
@@ -139,7 +161,7 @@ export function StoriesPage() {
             <Label>Type</Label>
             <select
               value={mediaKind}
-              onChange={(e) => setMediaKind(e.target.value as StoryMediaKind)}
+              onChange={(e) => handleMediaKindChange(e.target.value as StoryMediaKind)}
               className="w-full rounded-xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-ink-0"
             >
               {MEDIA_KINDS.map((k) => (
@@ -166,14 +188,64 @@ export function StoriesPage() {
         </div>
 
         {mediaKind === 'image' || mediaKind === 'video' || mediaKind === 'audio' ? (
-          <div>
-            <Label>File</Label>
+          <div className="flex flex-col gap-2">
+            <Label>Story media</Label>
             <input
+              ref={fileInputRef}
               type="file"
               accept={mediaKind === 'image' ? 'image/*' : mediaKind === 'video' ? 'video/*' : 'audio/*'}
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="block w-full text-sm text-ink-2 file:mr-4 file:rounded-full file:border-0 file:bg-white/[0.06] file:px-4 file:py-2 file:text-sm file:font-medium file:text-ink-0 hover:file:bg-white/[0.09]"
+              className="sr-only"
             />
+            {file ? (
+              <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025]">
+                {filePreviewUrl ? (
+                  <div className="relative aspect-[16/9] max-h-80 overflow-hidden bg-black/20">
+                    <img src={filePreviewUrl} alt="Selected story" className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={clearSelectedFile}
+                      aria-label="Remove selected image"
+                      className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-black/65 text-white backdrop-blur transition hover:bg-black/80"
+                    >
+                      <X size={17} />
+                    </button>
+                  </div>
+                ) : null}
+                <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-ink-0">{file.name}</p>
+                    <p className="mt-0.5 text-xs text-ink-3">{(file.size / 1024 / 1024).toFixed(1)} MB selected</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
+                      Change {mediaKind === 'image' ? 'image' : mediaKind}
+                    </Button>
+                    {!filePreviewUrl ? (
+                      <Button type="button" variant="ghost" size="sm" onClick={clearSelectedFile} aria-label="Remove selected file">
+                        <X size={16} />
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="group flex min-h-44 w-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-white/15 bg-white/[0.02] px-5 py-7 text-center transition hover:border-brand-400/55 hover:bg-brand-500/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+              >
+                <span className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-white/[0.055] text-brand-400 transition group-hover:scale-105 group-hover:border-brand-400/30">
+                  {mediaKind === 'image' ? <ImagePlus size={23} /> : mediaKind === 'video' ? <Film size={23} /> : <AudioLines size={23} />}
+                </span>
+                <span>
+                  <span className="block text-sm font-semibold text-ink-0">
+                    Choose {mediaKind === 'image' ? 'a story image' : mediaKind === 'video' ? 'a story video' : 'an audio clip'}
+                  </span>
+                  <span className="mt-1 block text-xs text-ink-3">Select a file from your device</span>
+                </span>
+              </button>
+            )}
           </div>
         ) : null}
 
