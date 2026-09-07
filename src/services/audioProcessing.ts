@@ -33,11 +33,20 @@ async function loadFFmpeg(): Promise<FFmpeg> {
   return ffmpeg
 }
 
-/** navigator.deviceMemory is Chromium-only — absence just means "unknown", not "fine". */
+/**
+ * navigator.deviceMemory is Chromium-only — absence just means "unknown",
+ * not "fine". The API also deliberately reports coarse, capped values
+ * (0.25/0.5/1/2/4/8 GiB) for privacy, so a large share of perfectly capable
+ * phones report 2 or 4 — a `< 4` threshold was skipping compression for
+ * most real devices before ever attempting it. Only bail out for genuinely
+ * constrained ones.
+ */
 function looksMemoryConstrained(): boolean {
   try {
     const mem = (navigator as unknown as { deviceMemory?: number }).deviceMemory
-    return typeof mem === 'number' && mem < 4
+    const constrained = typeof mem === 'number' && mem < 1
+    if (constrained) console.warn(`Skipping client-side audio compression — navigator.deviceMemory reports ${mem}GiB.`)
+    return constrained
   } catch {
     return false
   }
