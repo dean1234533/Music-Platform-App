@@ -105,22 +105,36 @@ export function SettingsPage() {
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Roles</h2>
         <div className="flex flex-col gap-2">
-          {!profile?.roles.includes('artist') ? (
+          {profile?.roles.includes('artist') ? (
+            <Link
+              to="/dashboard/artist"
+              className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
+            >
+              Go to Artist dashboard →
+            </Link>
+          ) : (
             <Link
               to="/onboarding/add-role?role=artist"
               className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
             >
               + Add an artist profile
             </Link>
-          ) : null}
-          {!profile?.roles.includes('dj') ? (
+          )}
+          {profile?.roles.includes('dj') ? (
+            <Link
+              to="/dj/discover"
+              className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
+            >
+              Go to DJ dashboard →
+            </Link>
+          ) : (
             <Link
               to="/onboarding/add-role?role=dj"
               className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
             >
               + Add a DJ profile
             </Link>
-          ) : null}
+          )}
         </div>
       </section>
 

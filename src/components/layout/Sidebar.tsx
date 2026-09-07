@@ -1,12 +1,14 @@
 import { NavLink } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { BrandMark } from '@/components/common/BrandMark'
+import { DashboardSwitcherSidebar } from './DashboardSwitcher'
 import type { NavItem } from './navConfig'
 
 export function Sidebar({ items, title }: { items: NavItem[]; title?: string }) {
   return (
     <aside className="hidden w-[264px] shrink-0 flex-col border-r border-white/[0.06] bg-surface-1/75 px-4 py-6 backdrop-blur-xl md:flex">
       <div className="mb-9 px-2"><BrandMark /></div>
+      <DashboardSwitcherSidebar />
       {title ? (
         <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-ink-3">{title}</p>
       ) : null}
