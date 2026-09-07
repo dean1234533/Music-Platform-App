@@ -105,6 +105,80 @@ body {
   letter-spacing: -0.075em;
 }
 
+.price-grid > * {
+  opacity: 0;
+  transform: translateY(2rem);
+  transition: opacity 700ms cubic-bezier(.22, 1, .36, 1), transform 700ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.price-grid.is-visible > * { opacity: 1; transform: translateY(0); }
+.price-grid.is-visible > :nth-child(2) { transition-delay: 120ms; }
+.price-grid.is-visible > :nth-child(3) { transition-delay: 240ms; }
+
+@media (max-width: 1279px) {
+  .hero-shell {
+    display: block;
+    min-height: 880px;
+    padding-bottom: 31rem;
+  }
+
+  .hero-copy { max-width: 42rem; }
+
+  .hero-art {
+    position: absolute;
+    right: 1.25rem;
+    bottom: 3rem;
+    left: 1.25rem;
+    height: 28rem;
+    min-height: 0;
+  }
+
+  .hero-art::after {
+    position: absolute;
+    inset: 0;
+    content: "";
+    pointer-events: none;
+    border-radius: 2.25rem;
+    background: linear-gradient(to bottom, rgba(5, 6, 7, .22), transparent 35%);
+  }
+
+  .audience-slider {
+    display: flex;
+    margin-right: -2rem;
+    overflow-x: auto;
+    padding-right: 2rem;
+    padding-bottom: 1.25rem;
+    scroll-padding-left: 0;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .audience-slider::-webkit-scrollbar { display: none; }
+  .audience-slider > * {
+    flex: 0 0 clamp(18rem, 72vw, 34rem);
+    scroll-snap-align: start;
+  }
+}
+
+@media (max-width: 639px) {
+  .hero-shell {
+    min-height: 920px;
+    padding-bottom: 27rem;
+  }
+
+  .hero-art {
+    right: .75rem;
+    bottom: 2rem;
+    left: .75rem;
+    height: 24rem;
+  }
+
+  .hero-art .art-drift { animation: none; }
+  .audience-slider { margin-right: -1.25rem; padding-right: 1.25rem; }
+  .audience-slider > * { flex-basis: 84vw; }
+}
+
 @keyframes slow-drift {
   0%, 100% { transform: translate3d(0, 0, 0) rotate(-1deg); }
   50% { transform: translate3d(0, -10px, 0) rotate(0deg); }
@@ -115,4 +189,5 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .art-drift { animation: none; }
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+  .price-grid > * { opacity: 1; transform: none; }
 }

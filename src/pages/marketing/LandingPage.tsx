@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Check, Headphones, Mic2, Radio, Sparkles } from 'lucide-react'
 import { BrandMark } from '@/components/common/BrandMark'
@@ -15,6 +16,28 @@ const steps = [
 ]
 
 export function LandingPage() {
+  const pricingRef = useRef<HTMLDivElement>(null)
+  const [pricingVisible, setPricingVisible] = useState(false)
+
+  useEffect(() => {
+    const element = pricingRef.current
+    if (!element || !('IntersectionObserver' in window)) {
+      setPricingVisible(true)
+      return
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setPricingVisible(true)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.18 },
+    )
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
   return (
     <div className="min-h-svh overflow-hidden bg-surface-0 text-ink-0">
       <header className="relative z-20 mx-auto flex max-w-[1440px] items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
@@ -28,8 +51,8 @@ export function LandingPage() {
       </header>
 
       <main>
-        <section className="relative mx-auto grid min-h-[720px] max-w-[1440px] items-center gap-10 px-5 pb-20 pt-14 sm:px-8 lg:grid-cols-[0.86fr_1.14fr] lg:px-12 lg:py-20">
-          <div className="relative z-10 max-w-2xl">
+        <section className="hero-shell relative mx-auto grid min-h-[720px] max-w-[1440px] items-center gap-10 overflow-hidden px-5 pb-20 pt-14 sm:px-8 xl:grid-cols-[0.86fr_1.14fr] xl:overflow-visible xl:px-12 xl:py-20">
+          <div className="hero-copy relative z-10 max-w-2xl">
             <p className="eyebrow flex items-center gap-2"><Sparkles className="h-3.5 w-3.5" /> Independent sounds. Direct support.</p>
             <h1 className="mt-7 text-balance text-[clamp(3.6rem,8vw,7.6rem)] font-medium leading-[0.84] tracking-[-0.07em]">
               Music with<br /><span className="text-brand-400">a pulse.</span>
@@ -48,7 +71,7 @@ export function LandingPage() {
             </div>
           </div>
 
-          <div className="relative min-h-[420px] lg:min-h-[620px]">
+          <div className="hero-art relative min-h-[420px] xl:min-h-[620px]">
             <div className="absolute -inset-24 bg-[radial-gradient(circle,rgba(43,78,255,.22),transparent_55%)]" />
             <div className="art-drift premium-panel absolute inset-0 overflow-hidden rounded-[2.25rem] p-2">
               <img src="/wavelength-hero.png" alt="A curated collection of translucent vinyl and sculptural record sleeves" className="h-full w-full rounded-[1.85rem] object-cover object-[68%_center]" />
@@ -65,7 +88,7 @@ export function LandingPage() {
             <div><p className="eyebrow">One ecosystem</p><h2 className="mt-3 text-3xl font-medium tracking-[-0.04em] sm:text-4xl">Built around the people who move music.</h2></div>
             <p className="max-w-sm text-sm leading-6 text-ink-2">From first play to fair payment, every part of the relationship stays connected.</p>
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="audience-slider grid gap-3 xl:grid-cols-3" role="region" aria-label="Ways to join Wavelength">
             {roles.map((role, index) => (
               <Link key={role.label} to={role.to} className="group premium-panel relative min-h-72 overflow-hidden rounded-[1.5rem] p-7 transition duration-300 hover:-translate-y-1 hover:border-white/20">
                 <div className="flex items-start justify-between"><role.icon className="h-6 w-6 text-brand-400" /><span className="text-xs tabular-nums text-ink-3">0{index + 1}</span></div>
@@ -101,7 +124,7 @@ export function LandingPage() {
             <h2 className="mt-4 text-4xl font-medium tracking-[-0.045em] sm:text-5xl">Join free. Support when it matters.</h2>
             <p className="mx-auto mt-5 max-w-xl text-base leading-7 text-ink-2">Explore the platform without a membership. Subscribe when you’re ready to direct meaningful monthly support to artists.</p>
           </div>
-          <div className="mx-auto mt-12 grid max-w-5xl gap-3 md:grid-cols-3">
+          <div ref={pricingRef} className={`price-grid mx-auto mt-12 grid max-w-5xl gap-3 md:grid-cols-3 ${pricingVisible ? 'is-visible' : ''}`}>
             <PriceCard title="Listener" price="Free" description="Discover, follow, save, and build playlists." features={['Full discovery catalogue', 'Personal library and playlists', 'Follow independent artists']} cta="Create free account" to="/sign-up?role=fan" />
             <PriceCard featured title="Supporter" price="£10" suffix="/month" description="Turn listening into direct artist support." features={['Everything in Listener', 'Allocate support each month', 'Access supporter-only posts']} cta="Become a supporter" to="/sign-up?role=fan" />
             <PriceCard title="Artist & DJ" price="Free" description="Publish, connect, and agree opportunities directly." features={['Artist profiles and releases', 'DJ discovery and requests', 'Documented licensing flow']} cta="Join the platform" to="/sign-up" />
