@@ -51,14 +51,6 @@ export const fanNavItems: NavItem[] = [
   { label: 'Settings', to: '/app/settings', icon: Settings },
 ]
 
-export const fanMobileNavItems: NavItem[] = [
-  { label: 'Home', to: '/app/home', icon: Home, end: true },
-  { label: 'Discover', to: '/app/discover', icon: Compass },
-  { label: 'Search', to: '/app/search', icon: Search },
-  { label: 'Following', to: '/app/following', icon: Users },
-  { label: 'You', to: '/app/profile', icon: User },
-]
-
 export const artistDashboardNavItems: NavItem[] = [
   { label: 'Overview', to: '/dashboard/artist', icon: BarChart3, end: true },
   { label: 'Music', to: '/dashboard/artist/music', icon: Disc3 },
