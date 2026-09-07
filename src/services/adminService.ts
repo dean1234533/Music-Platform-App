@@ -6,6 +6,7 @@ import { OPEN_CLAIM_STATUSES, type CopyrightClaimDoc, type ReportDoc, type Verif
 import type { RestrictedCapability } from '@/types/track'
 import type { SubscriptionPlan } from '@/types/platformSettings'
 import type { PlanFeatureKey, PlanLimitKey, PlanTier } from '@/types/entitlements'
+import type { DataRetentionSettings } from '@/types/platformSettings'
 
 export async function listUsers(count = 50): Promise<UserProfile[]> {
   const snap = await getDocs(query(collection(db, 'users'), limit(count)))
@@ -76,3 +77,10 @@ export const adminUpdatePlatformSettings = callable<Record<string, unknown>, { o
 export const adminSeedSubscriptionPlans = callable<void, { ok: boolean; seeded: string[]; skipped: string[]; retired: string[] }>(
   'adminSeedSubscriptionPlans',
 )
+export const adminUpdateDataRetentionSettings = callable<Partial<DataRetentionSettings>, { ok: boolean }>(
+  'adminUpdateDataRetentionSettings',
+)
+export const adminSetLegalHold = callable<
+  { collection: 'licenceRequests' | 'licenceAgreements' | 'tracks'; docId: string; legalHold: boolean; reason?: string },
+  { ok: boolean }
+>('adminSetLegalHold')

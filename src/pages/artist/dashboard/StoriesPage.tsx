@@ -83,12 +83,15 @@ export function StoriesPage() {
     setError(null)
     try {
       let mediaUrl: string | undefined
+      let mediaStoragePath: string | undefined
       if (mediaKind === 'image' || mediaKind === 'video' || mediaKind === 'audio') {
         if (!file) throw new Error('Choose a file first.')
         mediaUpload.setProcessing(0)
-        mediaUrl = await uploadStoryMedia(firebaseUser.uid, visibility, mediaKind, file, (pct) =>
+        const uploaded = await uploadStoryMedia(firebaseUser.uid, visibility, mediaKind, file, (pct) =>
           mediaUpload.setUploadProgress(pct),
         )
+        mediaUrl = uploaded.url
+        mediaStoragePath = uploaded.path
         mediaUpload.setDone()
       }
 
@@ -96,6 +99,7 @@ export function StoriesPage() {
         mediaKind,
         storyCategory,
         mediaUrl,
+        mediaStoragePath,
         caption,
         visibility,
         expiresInHours,

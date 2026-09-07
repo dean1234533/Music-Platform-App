@@ -5,6 +5,8 @@ import { BrandMark } from '@/components/common/BrandMark'
 import { Button } from '@/components/common/Button'
 import { useAuth } from '@/contexts/AuthContext'
 import { hasAcceptedLegal, recordLegalAcceptance } from '@/services/legalService'
+import { getDataRetentionSettings } from '@/services/platformSettingsService'
+import { DEFAULT_DATA_RETENTION, type DataRetentionSettings } from '@/types/platformSettings'
 
 const DOC_VERSION = '2026-09-07'
 
@@ -24,10 +26,23 @@ const privacy = [
   ['How we use information', 'We use information to operate accounts, personalise discovery, play and protect content, process subscriptions and licences, allocate artist support, prevent abuse, provide support, and meet legal obligations.'],
   ['Payments', 'Payments and payouts are processed by specialist payment providers. Wavelength receives identifiers and transaction status information needed to operate the service, but does not store full payment-card details.'],
   ['Who receives information', 'Information is shared only where needed with service providers, with artists or DJs as part of a user-requested interaction, for a business transfer, or when law and safety require it. We do not sell personal information.'],
-  ['Retention and security', 'We keep information only for as long as it serves the purposes described here or satisfies legal, accounting, fraud-prevention, and dispute requirements. We use technical and organisational safeguards appropriate to the information involved.'],
-  ['Your choices', 'You can update profile information and notification choices in your account. Depending on where you live, you may also have rights to access, correct, delete, restrict, or export personal information and to object to certain processing.'],
+  ['Retention', 'We keep information only for as long as it serves the purposes described here, or satisfies legal, accounting, fraud-prevention, and dispute requirements. The table below shows the configured periods our automated cleanup jobs use — kept here rather than restated separately, so this page can never drift from what the backend actually does.'],
+  ['Account deletion', 'You can permanently delete your account from Settings → Account at any time, after re-confirming your identity. This removes your profile, uploaded content, and other personal data we are not legally required to retain. Signed DJ licence agreements you are a party to, and the minimum records needed for accounting, tax, or dispute purposes, are kept for the periods below rather than destroyed — deleting your account never destroys the other party’s licence evidence.'],
+  ['Your rights and data export', 'You can update profile information and notification choices in your account, and download a copy of your account, content, and activity data at any time from Settings → Privacy → Download my data. Depending on where you live, you may also have rights to correct, restrict, or object to certain processing — use the contact method below to make a request.'],
+  ['Legal retention exceptions', 'Some information is kept beyond normal account activity where the law, an open dispute, or a signed contract requires it — for example an active copyright claim, a payment dispute, or a licence agreement under legal hold. That information is restricted to authorised backend/admin access, excluded from discovery, marketing, and ordinary analytics, and deleted once the applicable retention period ends.'],
   ['Cookies and local storage', 'Wavelength uses essential browser storage for sign-in, security, preferences, and reliable service operation. Any optional analytics or marketing technologies should be presented with appropriate controls before use.'],
   ['Questions and requests', 'Use the support options available inside your account for privacy questions or requests. We may need to verify your identity before completing a request.'],
+]
+
+const RETENTION_ROWS: { label: string; key: keyof DataRetentionSettings; unit: string }[] = [
+  { label: 'Notifications', key: 'notificationsDays', unit: 'days' },
+  { label: 'Unsaved Story recovery buffer', key: 'storyRecoveryDays', unit: 'days' },
+  { label: 'Inactive chat threads', key: 'inactiveChatMonths', unit: 'months' },
+  { label: 'Abandoned/rejected DJ requests', key: 'abandonedRequestMonths', unit: 'months' },
+  { label: 'Unsigned draft offers', key: 'draftOfferMonths', unit: 'months' },
+  { label: 'Security/audit logs', key: 'auditLogMonths', unit: 'months' },
+  { label: 'Signed DJ licence contracts (after they end)', key: 'contractYears', unit: 'years' },
+  { label: 'Resolved copyright claims', key: 'copyrightClaimYears', unit: 'years' },
 ]
 
 export function LegalPage({ type }: { type: 'terms' | 'privacy' }) {
@@ -37,6 +52,11 @@ export function LegalPage({ type }: { type: 'terms' | 'privacy' }) {
   const { firebaseUser } = useAuth()
   const [accepted, setAccepted] = useState(false)
   const [accepting, setAccepting] = useState(false)
+  const [retention, setRetention] = useState<DataRetentionSettings>(DEFAULT_DATA_RETENTION)
+
+  useEffect(() => {
+    if (!isTerms) void getDataRetentionSettings().then(setRetention)
+  }, [isTerms])
 
   useEffect(() => {
     if (!firebaseUser) {
@@ -82,6 +102,34 @@ export function LegalPage({ type }: { type: 'terms' | 'privacy' }) {
         <div className="mt-16 divide-y divide-white/[0.08] border-y border-white/[0.08]">
           {sections.map(([title, copy], index) => <section key={title} className="grid gap-4 py-8 sm:grid-cols-[3rem_1fr_2fr]"><span className="text-xs text-brand-400">{String(index + 1).padStart(2, '0')}</span><h2 className="text-lg font-medium">{title}</h2><p className="text-base leading-7 text-ink-2">{copy}</p></section>)}
         </div>
+        {!isTerms ? (
+          <div className="mt-12">
+            <h2 className="mb-4 text-lg font-medium">Retention periods</h2>
+            <div className="overflow-x-auto rounded-xl border border-white/[0.08]">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-white/[0.08] text-xs uppercase tracking-wide text-ink-3">
+                    <th className="px-4 py-3 font-medium">Category</th>
+                    <th className="px-4 py-3 font-medium">Kept for</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {RETENTION_ROWS.map((row) => (
+                    <tr key={row.key} className="border-b border-white/[0.05] last:border-0">
+                      <td className="px-4 py-3 text-ink-1">{row.label}</td>
+                      <td className="px-4 py-3 text-ink-0">{retention[row.key]} {row.unit}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 text-xs leading-5 text-ink-3">
+              These are the actual configured values our scheduled cleanup jobs use, not just suggested figures — an
+              admin change to these settings updates this table too. They are suggested defaults pending review by a
+              qualified solicitor/accountant, not a final legal determination.
+            </p>
+          </div>
+        ) : null}
         <p className="mt-8 text-xs leading-5 text-ink-3">This page is a product-ready general policy template and should be reviewed against the operating company, jurisdiction, payment model, and final data practices before a public launch.</p>
       </main>
     </div>

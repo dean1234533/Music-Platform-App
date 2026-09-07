@@ -174,5 +174,13 @@ service firebase.storage {
         (isPartyToAgreement(agreementId) || ('admin' in firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.roles));
       allow write: if isSignedIn() && isPartyToAgreement(agreementId) && underImageUploadLimit() && isImage();
     }
+
+    // exports/{uid}/{fileName} — user data exports (exportUserData). Never
+    // directly readable or writable by any client, even the owner — the
+    // callable hands back a short-lived signed URL instead, since this path
+    // can combine several collections' worth of personal data in one file.
+    match /exports/{uid}/{fileName} {
+      allow read, write: if false;
+    }
   }
 }

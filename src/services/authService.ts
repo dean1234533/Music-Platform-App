@@ -1,11 +1,15 @@
 import {
   createUserWithEmailAndPassword,
+  EmailAuthProvider,
   GoogleAuthProvider,
+  reauthenticateWithCredential,
+  reauthenticateWithPopup,
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut as firebaseSignOut,
+  updatePassword,
   updateProfile,
 } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
@@ -40,4 +44,33 @@ export async function requestPasswordReset(email: string): Promise<void> {
 
 export async function signOut(): Promise<void> {
   await firebaseSignOut(auth)
+}
+
+/** True if the signed-in user can reauthenticate with an email/password credential. */
+export function hasPasswordProvider(): boolean {
+  return auth.currentUser?.providerData.some((p) => p.providerId === 'password') ?? false
+}
+
+export function hasGoogleProvider(): boolean {
+  return auth.currentUser?.providerData.some((p) => p.providerId === 'google.com') ?? false
+}
+
+export async function reauthenticateWithPassword(currentPassword: string): Promise<void> {
+  const user = auth.currentUser
+  if (!user?.email) throw new Error('No signed-in user')
+  const credential = EmailAuthProvider.credential(user.email, currentPassword)
+  await reauthenticateWithCredential(user, credential)
+}
+
+export async function reauthenticateWithGoogle(): Promise<void> {
+  const user = auth.currentUser
+  if (!user) throw new Error('No signed-in user')
+  await reauthenticateWithPopup(user, new GoogleAuthProvider())
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  await reauthenticateWithPassword(currentPassword)
+  const user = auth.currentUser
+  if (!user) throw new Error('No signed-in user')
+  await updatePassword(user, newPassword)
 }
