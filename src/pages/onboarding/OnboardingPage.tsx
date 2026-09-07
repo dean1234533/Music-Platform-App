@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Disc3, Headphones, Radio } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -20,56 +20,32 @@ type Step = 'roles' | 'artist' | 'dj' | 'saving'
 export function OnboardingPage() {
   const { firebaseUser, profile } = useAuth()
   const navigate = useNavigate()
-  const [selectedRoles, setSelectedRoles] = useState<UserRole[]>([])
+  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null)
   const [step, setStep] = useState<Step>('roles')
   const [error, setError] = useState<string | null>(null)
 
   const [artistForm, setArtistForm] = useState({ name: profile?.displayName ?? '', bio: '', genres: '', location: '' })
   const [djForm, setDjForm] = useState({ name: profile?.displayName ?? '', bio: '', genres: '', country: '', city: '' })
 
-  const remainingSteps = useMemo(() => {
-    const steps: Step[] = []
-    if (selectedRoles.includes('artist')) steps.push('artist')
-    if (selectedRoles.includes('dj')) steps.push('dj')
-    return steps
-  }, [selectedRoles])
-
-  function toggleRole(role: UserRole) {
-    setSelectedRoles((prev) => (prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]))
-  }
-
-  function goToNextStep(from: Step) {
-    const currentIndex = remainingSteps.indexOf(from)
-    const next = remainingSteps[currentIndex + 1]
-    if (next) {
-      setStep(next)
-    } else {
-      void finish()
-    }
-  }
-
   async function handleRolesContinue() {
-    if (selectedRoles.length === 0) {
-      setError('Select at least one option to continue.')
+    if (!selectedRole) {
+      setError('Select one option to continue.')
       return
     }
     setError(null)
-    const next = remainingSteps[0]
-    if (next) {
-      setStep(next)
-    } else {
-      await finish()
-    }
+    if (selectedRole === 'artist') setStep('artist')
+    else if (selectedRole === 'dj') setStep('dj')
+    else await finish()
   }
 
   async function finish() {
-    if (!firebaseUser) return
+    if (!firebaseUser || !selectedRole) return
     setStep('saving')
     setError(null)
     try {
-      await completeOnboarding(firebaseUser.uid, selectedRoles)
+      await completeOnboarding(firebaseUser.uid, [selectedRole])
 
-      if (selectedRoles.includes('artist')) {
+      if (selectedRole === 'artist') {
         await createArtistProfile(firebaseUser.uid, {
           name: artistForm.name || firebaseUser.displayName || 'Untitled Artist',
           bio: artistForm.bio,
@@ -78,7 +54,7 @@ export function OnboardingPage() {
         })
       }
 
-      if (selectedRoles.includes('dj')) {
+      if (selectedRole === 'dj') {
         await createDJProfile(firebaseUser.uid, {
           name: djForm.name || firebaseUser.displayName || 'Untitled DJ',
           bio: djForm.bio,
@@ -88,14 +64,16 @@ export function OnboardingPage() {
         })
       }
 
-      if (selectedRoles.includes('artist')) {
+      if (selectedRole === 'artist') {
         navigate('/dashboard/artist')
+      } else if (selectedRole === 'dj') {
+        navigate('/dj/discover')
       } else {
         navigate('/app/home')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong finishing setup.')
-      setStep(remainingSteps[remainingSteps.length - 1] ?? 'roles')
+      setStep(selectedRole === 'artist' ? 'artist' : selectedRole === 'dj' ? 'dj' : 'roles')
     }
   }
 
@@ -105,15 +83,15 @@ export function OnboardingPage() {
         {step === 'roles' ? (
           <>
             <h1 className="text-xl font-semibold text-ink-0">What do you want to do?</h1>
-            <p className="mt-1 text-sm text-ink-2">Choose everything that applies — you can add more later.</p>
+            <p className="mt-1 text-sm text-ink-2">Choose one to start — you can add more later from Settings.</p>
             <div className="mt-6 flex flex-col gap-3">
               {ROLE_OPTIONS.map((option) => {
-                const selected = selectedRoles.includes(option.role)
+                const selected = selectedRole === option.role
                 return (
                   <button
                     key={option.role}
                     type="button"
-                    onClick={() => toggleRole(option.role)}
+                    onClick={() => setSelectedRole(option.role)}
                     className={`flex items-start gap-3 rounded-xl border p-4 text-left transition-colors ${
                       selected ? 'border-brand-500 bg-brand-500/10' : 'border-surface-border bg-surface-2 hover:bg-surface-3'
                     }`}
@@ -176,8 +154,8 @@ export function OnboardingPage() {
               </div>
             </div>
             {error ? <p className="mt-4 text-sm text-danger-500">{error}</p> : null}
-            <Button className="mt-6 w-full" onClick={() => goToNextStep('artist')} disabled={!artistForm.name}>
-              Continue
+            <Button className="mt-6 w-full" onClick={() => void finish()} disabled={!artistForm.name}>
+              Finish
             </Button>
           </>
         ) : null}
@@ -218,7 +196,7 @@ export function OnboardingPage() {
               </div>
             </div>
             {error ? <p className="mt-4 text-sm text-danger-500">{error}</p> : null}
-            <Button className="mt-6 w-full" onClick={() => goToNextStep('dj')} disabled={!djForm.name}>
+            <Button className="mt-6 w-full" onClick={() => void finish()} disabled={!djForm.name}>
               Finish
             </Button>
           </>
