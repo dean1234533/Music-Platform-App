@@ -16,6 +16,7 @@ export function ArtistPlanPage() {
   const [plans, setPlans] = useState<SubscriptionPlan[] | null>(null)
   const [subscription, setSubscription] = useState<SubscriptionDoc | null | undefined>(undefined)
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
   useEffect(() => {
     void listActiveSubscriptionPlansForRole('artist').then(setPlans)
@@ -31,8 +32,11 @@ export function ArtistPlanPage() {
 
   async function handleSubscribe(planId: string) {
     setCheckoutLoading(planId)
+    setCheckoutError(null)
     try {
       await subscribeToPlan(planId, 'artist')
+    } catch (err) {
+      setCheckoutError(err instanceof Error ? err.message : 'Could not start checkout. Please try again.')
     } finally {
       setCheckoutLoading(null)
     }
@@ -60,6 +64,8 @@ export function ArtistPlanPage() {
           </div>
         </div>
       ) : null}
+
+      {checkoutError ? <p className="text-sm text-danger-500">{checkoutError}</p> : null}
 
       {plans === null ? (
         <LoadingState />

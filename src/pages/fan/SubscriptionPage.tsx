@@ -20,6 +20,7 @@ export function SubscriptionPage() {
   const [plans, setPlans] = useState<SubscriptionPlan[] | null>(null)
   const [subscription, setSubscription] = useState<SubscriptionDoc | null | undefined>(undefined)
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
   useEffect(() => {
     void listActiveSubscriptionPlansForRole('fan').then(setPlans)
@@ -35,8 +36,11 @@ export function SubscriptionPage() {
 
   async function handleSubscribe(planId: string) {
     setCheckoutLoading(planId)
+    setCheckoutError(null)
     try {
       await subscribeToPlan(planId, 'fan')
+    } catch (err) {
+      setCheckoutError(err instanceof Error ? err.message : 'Could not start checkout. Please try again.')
     } finally {
       setCheckoutLoading(null)
     }
@@ -72,6 +76,8 @@ export function SubscriptionPage() {
             works fine for trying it out).
           </div>
 
+          {checkoutError ? <p className="text-sm text-danger-500">{checkoutError}</p> : null}
+
           {plans === null ? (
             <LoadingState />
           ) : plans.length === 0 ? (
@@ -86,15 +92,17 @@ export function SubscriptionPage() {
                 <div key={plan.planId} className="rounded-2xl border border-surface-border bg-surface-1 p-6">
                   <h2 className="text-lg font-semibold text-ink-0">{plan.name}</h2>
                   <p className="mt-2 text-2xl font-semibold text-ink-0">
-                    {formatCurrency(plan.priceMinor, plan.currency)}
-                    <span className="text-sm font-normal text-ink-2">/{plan.interval}</span>
+                    {plan.priceMinor === 0 ? 'Free' : formatCurrency(plan.priceMinor, plan.currency)}
+                    {plan.priceMinor > 0 ? <span className="text-sm font-normal text-ink-2">/{plan.interval}</span> : null}
                   </p>
                   <Button
                     className="mt-4 w-full"
+                    variant={plan.priceMinor === 0 ? 'secondary' : 'primary'}
+                    disabled={plan.priceMinor === 0}
                     loading={checkoutLoading === plan.planId}
                     onClick={() => handleSubscribe(plan.planId)}
                   >
-                    Subscribe
+                    {plan.priceMinor === 0 ? 'Included' : 'Subscribe'}
                   </Button>
                 </div>
               ))}
