@@ -1,6 +1,7 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreGraphics/CoreGraphics.h>
 #include <ImageIO/ImageIO.h>
+#include <math.h>
 #include <string.h>
 
 static CGColorRef colour(CGFloat red, CGFloat green, CGFloat blue, CGFloat alpha) {
@@ -17,11 +18,11 @@ static void draw_disc(CGContextRef context, CGFloat x, CGFloat y, CGFloat radius
   CGContextAddEllipseInRect(context, CGRectMake(x - radius, y - radius, radius * 2, radius * 2));
   CGContextClip(context);
   CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
-  CGFloat locations[] = {0, .48, 1};
+  CGFloat locations[] = {0, .46, 1};
   CGFloat components[] = {
-      1, 1, 1, .92,
+      fmin(1, red / 170.0), fmin(1, green / 170.0), fmin(1, blue / 170.0), 1,
       red / 255.0, green / 255.0, blue / 255.0, 1,
-      red / 1020.0, green / 1020.0, blue / 1020.0, 1,
+      red / 1275.0, green / 1275.0, blue / 1275.0, 1,
   };
   CGGradientRef gradient = CGGradientCreateWithColorComponents(space, components, locations, 3);
   CGContextDrawRadialGradient(context, gradient, CGPointMake(x - radius * .28, y - radius * .34), 0,
@@ -38,9 +39,16 @@ static void draw_disc(CGContextRef context, CGFloat x, CGFloat y, CGFloat radius
   CGContextFillEllipseInRect(context, CGRectMake(x - radius * .15, y - radius * .15, radius * .3, radius * .3));
 }
 
-static void draw_sleeve(CGContextRef context, CGRect rect, CGFloat radius,
+static void draw_sleeve(CGContextRef context, CGRect rect, CGFloat radius, CGFloat angle, int artwork,
                         CGFloat red, CGFloat green, CGFloat blue,
                         CGFloat border_red, CGFloat border_green, CGFloat border_blue) {
+  CGFloat centre_x = CGRectGetMidX(rect);
+  CGFloat centre_y = CGRectGetMidY(rect);
+  CGContextSaveGState(context);
+  CGContextTranslateCTM(context, centre_x, centre_y);
+  CGContextRotateCTM(context, angle);
+  CGContextTranslateCTM(context, -centre_x, -centre_y);
+
   CGPathRef path = CGPathCreateWithRoundedRect(rect, radius, radius, NULL);
   CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
   CGColorRef top = colour(red, green, blue, 1);
@@ -62,28 +70,68 @@ static void draw_sleeve(CGContextRef context, CGRect rect, CGFloat radius,
   CGContextSetLineWidth(context, 3);
   CGContextStrokePath(context);
 
+  if (artwork == 0) {
+    CGContextSetRGBFillColor(context, 36.0 / 255.0, 75.0 / 255.0, 1, .7);
+    CGContextFillEllipseInRect(context, CGRectMake(centre_x - 23, rect.origin.y + 72, 46, 46));
+    CGContextSetRGBFillColor(context, 36.0 / 255.0, 75.0 / 255.0, 1, .22);
+    CGContextBeginPath(context);
+    CGContextMoveToPoint(context, rect.origin.x + 16, rect.origin.y + 160);
+    CGContextAddCurveToPoint(context, rect.origin.x + 45, rect.origin.y + 132,
+                             rect.origin.x + 82, rect.origin.y + 170,
+                             CGRectGetMaxX(rect) - 16, rect.origin.y + 150);
+    CGContextAddLineToPoint(context, CGRectGetMaxX(rect) - 16, CGRectGetMaxY(rect) - 16);
+    CGContextAddLineToPoint(context, rect.origin.x + 16, CGRectGetMaxY(rect) - 16);
+    CGContextClosePath(context);
+    CGContextFillPath(context);
+  } else if (artwork == 1) {
+    CGContextSetRGBStrokeColor(context, 246.0 / 255.0, 247.0 / 255.0, 244.0 / 255.0, .2);
+    CGContextSetLineWidth(context, 2);
+    CGContextStrokeEllipseInRect(context, CGRectMake(centre_x - 42, rect.origin.y + 68, 84, 84));
+    CGContextSetLineWidth(context, 3);
+    CGContextBeginPath(context);
+    CGContextMoveToPoint(context, centre_x - 12, rect.origin.y + 70);
+    CGContextAddLineToPoint(context, centre_x + 6, rect.origin.y + 96);
+    CGContextAddLineToPoint(context, centre_x - 6, rect.origin.y + 115);
+    CGContextAddLineToPoint(context, centre_x + 12, rect.origin.y + 142);
+    CGContextStrokePath(context);
+    CGContextSetRGBFillColor(context, 200.0 / 255.0, 243.0 / 255.0, 63.0 / 255.0, 1);
+    CGContextFillEllipseInRect(context, CGRectMake(centre_x - 6, rect.origin.y + 104, 12, 12));
+  } else {
+    CGContextSetRGBFillColor(context, 5.0 / 255.0, 6.0 / 255.0, 7.0 / 255.0, 1);
+    CGContextFillEllipseInRect(context, CGRectMake(centre_x - 29, rect.origin.y + 68, 58, 58));
+    CGContextSetRGBStrokeColor(context, 200.0 / 255.0, 243.0 / 255.0, 63.0 / 255.0, .3);
+    CGContextSetLineWidth(context, 2);
+    CGContextStrokeEllipseInRect(context, CGRectMake(centre_x - 29, rect.origin.y + 68, 58, 58));
+    CGContextSetRGBFillColor(context, 200.0 / 255.0, 243.0 / 255.0, 63.0 / 255.0, .16);
+    CGContextBeginPath(context);
+    CGContextMoveToPoint(context, rect.origin.x + 16, CGRectGetMaxY(rect) - 31);
+    CGContextAddLineToPoint(context, rect.origin.x + 48, CGRectGetMaxY(rect) - 65);
+    CGContextAddLineToPoint(context, rect.origin.x + 72, CGRectGetMaxY(rect) - 41);
+    CGContextAddLineToPoint(context, rect.origin.x + 95, CGRectGetMaxY(rect) - 72);
+    CGContextAddLineToPoint(context, CGRectGetMaxX(rect) - 16, CGRectGetMaxY(rect) - 28);
+    CGContextAddLineToPoint(context, CGRectGetMaxX(rect) - 16, CGRectGetMaxY(rect) - 16);
+    CGContextAddLineToPoint(context, rect.origin.x + 16, CGRectGetMaxY(rect) - 16);
+    CGContextClosePath(context);
+    CGContextFillPath(context);
+  }
+
   CGGradientRelease(gradient);
   CFRelease(colours);
   CGColorRelease(top);
   CGColorRelease(bottom);
   CGColorSpaceRelease(space);
   CGPathRelease(path);
+  CGContextRestoreGState(context);
 }
 
 static void draw_brand_mark(CGContextRef context) {
-  draw_disc(context, 154, 214, 86, 36, 75, 255);
-  draw_disc(context, 358, 214, 86, 168, 205, 36);
-  draw_disc(context, 256, 196, 98, 174, 179, 175);
+  draw_disc(context, 145, 210, 78, 36, 75, 255);
+  draw_disc(context, 367, 210, 78, 145, 181, 26);
+  draw_disc(context, 256, 190, 92, 133, 139, 136);
 
-  draw_sleeve(context, CGRectMake(76, 226, 150, 190), 20, 16, 27, 57, 36, 75, 255);
-  draw_sleeve(context, CGRectMake(286, 226, 150, 190), 20, 29, 38, 11, 200, 243, 63);
-  draw_sleeve(context, CGRectMake(181, 216, 150, 208), 20, 26, 28, 28, 246, 247, 244);
-
-  CGContextSetRGBStrokeColor(context, 246.0 / 255.0, 247.0 / 255.0, 244.0 / 255.0, .2);
-  CGContextSetLineWidth(context, 3);
-  CGContextStrokeEllipseInRect(context, CGRectMake(210, 274, 92, 92));
-  CGContextSetRGBFillColor(context, 200.0 / 255.0, 243.0 / 255.0, 63.0 / 255.0, 1);
-  CGContextFillEllipseInRect(context, CGRectMake(249, 313, 14, 14));
+  draw_sleeve(context, CGRectMake(76, 226, 150, 204), 15, -.0872665, 0, 17, 26, 46, 36, 75, 255);
+  draw_sleeve(context, CGRectMake(286, 226, 150, 204), 15, .0872665, 2, 28, 35, 14, 200, 243, 63);
+  draw_sleeve(context, CGRectMake(181, 208, 150, 228), 15, 0, 1, 32, 34, 34, 246, 247, 244);
 }
 
 static void write_icon(const char *path, size_t size) {
