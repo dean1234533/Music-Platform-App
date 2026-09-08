@@ -197,7 +197,7 @@ export function LandingPage() {
         </section>
 
         <section className="px-5 pb-24 sm:px-8 lg:px-12 lg:pb-32">
-          <div className="premium-panel relative mx-auto flex min-h-[22rem] max-w-[1344px] flex-col items-start justify-end gap-8 overflow-hidden rounded-[2rem] px-7 py-10 sm:min-h-[25rem] sm:px-10 lg:flex-row lg:items-end lg:justify-between lg:px-14 lg:py-14">
+          <div className="premium-panel relative mx-auto flex min-h-[22rem] max-w-[1344px] flex-col items-start justify-end gap-8 overflow-hidden rounded-[2rem] px-7 py-10 sm:min-h-[25rem] sm:px-10 lg:aspect-[2/1] lg:min-h-0 lg:flex-row lg:items-end lg:justify-between lg:px-14 lg:py-14">
             <img src="/wavelength-cta-instruments.jpg" alt="A cobalt guitar, microphone, amplifier and drum kit ready on stage" loading="lazy" className="absolute inset-0 h-full w-full object-cover object-center" />
             <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/20 to-transparent" />
             <div className="relative z-10"><p className="eyebrow">Your music, better connected</p><h2 className="mt-3 text-3xl font-medium tracking-[-0.04em] text-white sm:text-4xl">Ready to tune in?</h2></div>
