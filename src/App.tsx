@@ -14,6 +14,10 @@ import { LoadingState } from '@/components/common/StateViews'
 // role-gated, most people never touching most of them) they'll ever visit.
 const LandingPage = lazy(() => import('@/pages/marketing/LandingPage').then((m) => ({ default: m.LandingPage })))
 const PricingPage = lazy(() => import('@/pages/marketing/PricingPage').then((m) => ({ default: m.PricingPage })))
+const ForDjsPage = lazy(() => import('@/pages/marketing/ForDjsPage').then((m) => ({ default: m.ForDjsPage })))
+const ForArtistsPage = lazy(() => import('@/pages/marketing/ForArtistsPage').then((m) => ({ default: m.ForArtistsPage })))
+const BlogIndexPage = lazy(() => import('@/pages/blog/BlogIndexPage').then((m) => ({ default: m.BlogIndexPage })))
+const BlogPostPage = lazy(() => import('@/pages/blog/BlogPostPage').then((m) => ({ default: m.BlogPostPage })))
 const LegalPage = lazy(() => import('@/pages/marketing/LegalPage').then((m) => ({ default: m.LegalPage })))
 const CopyrightPolicyPage = lazy(() => import('@/pages/legal/CopyrightPolicyPage').then((m) => ({ default: m.CopyrightPolicyPage })))
 const CopyrightClaimPage = lazy(() => import('@/pages/legal/CopyrightClaimPage').then((m) => ({ default: m.CopyrightClaimPage })))
@@ -87,6 +91,10 @@ function App() {
             <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/for-djs" element={<ForDjsPage />} />
+            <Route path="/for-artists" element={<ForArtistsPage />} />
+            <Route path="/blog" element={<BlogIndexPage />} />
+            <Route path="/blog/:slug" element={<BlogPostPage />} />
             <Route path="/terms" element={<LegalPage type="terms" />} />
             <Route path="/privacy" element={<LegalPage type="privacy" />} />
             <Route path="/copyright" element={<CopyrightPolicyPage />} />

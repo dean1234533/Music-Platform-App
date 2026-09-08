@@ -6,6 +6,7 @@ import { LoadingState } from '@/components/common/StateViews'
 import { BrandMark } from '@/components/common/BrandMark'
 import { PriceCard } from '@/components/marketing/PriceCard'
 import { formatCurrency } from '@/utils/format'
+import { useSeo } from '@/lib/seo'
 import type { PlanFeatureKey } from '@/types/entitlements'
 import type { SubscriptionPlan } from '@/types/platformSettings'
 
@@ -26,6 +27,12 @@ function featureLabels(plan: SubscriptionPlan): string[] {
 export function PricingPage() {
   const { firebaseUser, hasRole } = useAuth()
   const [plans, setPlans] = useState<SubscriptionPlan[] | null>(null)
+
+  useSeo({
+    title: 'Pricing',
+    description: 'Listeners and DJs join free. Artists publish for £29.99/year — no revenue percentage. Fans keep 80% of support going straight to artists; DJs pay only for the licences they agree to.',
+    path: '/pricing',
+  })
 
   useEffect(() => { void listActiveSubscriptionPlansForRole('fan').then(setPlans) }, [])
 

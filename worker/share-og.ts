@@ -8,6 +8,9 @@
  * can never break the real site.
  */
 
+import { BLOG_POSTS } from '../src/content/blog.ts'
+import { DJ_FAQS, ARTIST_FAQS } from '../src/content/faqs.ts'
+
 export interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> }
   FIREBASE_PROJECT_ID: string
@@ -27,9 +30,35 @@ const CRAWLER_USER_AGENTS = [
   'Pinterest',
 ]
 
+// GEO: AI answer-engine / LLM crawlers. These generally don't execute JS and
+// benefit from real body text (for citation), not just OG meta — handled
+// separately below via renderContentHtml rather than the redirect-stub
+// renderMetaHtml used for social-card unfurling bots.
+const AI_CRAWLER_USER_AGENTS = [
+  'GPTBot',
+  'ChatGPT-User',
+  'OAI-SearchBot',
+  'ClaudeBot',
+  'Claude-Web',
+  'anthropic-ai',
+  'PerplexityBot',
+  'Perplexity-User',
+  'Google-Extended',
+  'CCBot',
+  'Bytespider',
+  'cohere-ai',
+  'Amazonbot',
+  'meta-externalagent',
+]
+
 function isCrawler(userAgent: string | null): boolean {
   if (!userAgent) return false
-  return CRAWLER_USER_AGENTS.some((needle) => userAgent.includes(needle))
+  return CRAWLER_USER_AGENTS.some((needle) => userAgent.includes(needle)) || isAiCrawler(userAgent)
+}
+
+function isAiCrawler(userAgent: string | null): boolean {
+  if (!userAgent) return false
+  return AI_CRAWLER_USER_AGENTS.some((needle) => userAgent.includes(needle))
 }
 
 // --- Firestore REST wire-format decoding -----------------------------------
@@ -112,6 +141,54 @@ ${safeImage ? `<meta name="twitter:image" content="${safeImage}" />` : ''}
 </html>`
 }
 
+/**
+ * Full static HTML with real body text — for content pages (home, pricing,
+ * /for-djs, /for-artists, blog) rather than the redirect-stub renderMetaHtml
+ * used for social-unfurl cards. A non-JS-executing crawler (most AI/GEO
+ * bots) needs actual readable content here, not just meta tags plus a
+ * meta-refresh to a URL it likely won't re-fetch.
+ */
+function renderContentHtml(opts: { title: string; description: string; url: string; bodyHtml: string; jsonLd?: object }): string {
+  const { title, description, url, bodyHtml, jsonLd } = opts
+  const safeTitle = escapeHtml(title)
+  const safeDescription = escapeHtml(description)
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>${safeTitle}</title>
+<meta name="description" content="${safeDescription}" />
+<link rel="canonical" href="${escapeHtml(url)}" />
+<meta property="og:type" content="article" />
+<meta property="og:site_name" content="BackTheVibes" />
+<meta property="og:title" content="${safeTitle}" />
+<meta property="og:description" content="${safeDescription}" />
+<meta property="og:url" content="${escapeHtml(url)}" />
+${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>` : ''}
+</head>
+<body>
+<main>
+<h1>${safeTitle}</h1>
+${bodyHtml}
+</main>
+</body>
+</html>`
+}
+
+function renderParagraphs(paragraphs: string[]): string {
+  return paragraphs
+    .map((p) => (p.startsWith('## ') ? `<h2>${escapeHtml(p.slice(3))}</h2>` : `<p>${escapeHtml(p)}</p>`))
+    .join('\n')
+}
+
+function renderFaqs(faqs: [string, string][]): string {
+  return faqs.map(([q, a]) => `<h2>${escapeHtml(q)}</h2>\n<p>${escapeHtml(a)}</p>`).join('\n')
+}
+
+function contentResponse(html: string): Response {
+  return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })
+}
+
 // --- Route handling -----------------------------------------------------------
 
 async function buildArtistCard(projectId: string, slug: string, url: string): Promise<Response | null> {
@@ -162,6 +239,126 @@ export default {
       const requestUrl = new URL(request.url)
       const parts = requestUrl.pathname.split('/').filter(Boolean)
       const projectId = env.FIREBASE_PROJECT_ID
+      const url = requestUrl.toString()
+
+      // Home
+      if (parts.length === 0) {
+        return contentResponse(
+          renderContentHtml({
+            title: 'BackTheVibes — Music with a pulse',
+            description:
+              'Support the artists you actually listen to. Discover independent music, support artists directly, and give DJs a better way to find what comes next.',
+            url,
+            bodyHtml:
+              '<p>BackTheVibes connects independent musicians, listeners, and DJs directly. Fans discover and support artists with direct monthly memberships. DJs license tracks directly from the artist who made them, with a real e-signed agreement. Artists publish music and keep control of their own licensing terms.</p><ul><li><a href="/for-artists">For artists</a></li><li><a href="/for-djs">For DJs</a></li><li><a href="/pricing">Pricing</a></li><li><a href="/blog">Blog</a></li></ul>',
+            jsonLd: {
+              '@context': 'https://schema.org',
+              '@type': 'Organization',
+              name: 'BackTheVibes',
+              url: requestUrl.origin,
+            },
+          }),
+        )
+      }
+
+      // /pricing
+      if (parts[0] === 'pricing' && parts.length === 1) {
+        return contentResponse(
+          renderContentHtml({
+            title: 'Pricing — BackTheVibes',
+            description:
+              'Listeners and DJs join free. Artists publish for £29.99/year — no revenue percentage. Fans keep 80% of support going straight to artists; DJs pay only for the licences they agree to.',
+            url,
+            bodyHtml:
+              '<p>Listening, following artists, and building a library is free. An optional Supporter membership from £4.99/month lets a fan direct monthly support to artists they follow — artists receive 80% of net supporter revenue directed to them.</p><p>Joining as a DJ is free. DJs pay only for the licences they agree to, on terms the artist sets per track.</p><p>Artists publish for a flat £29.99/year — not a percentage of earnings — and keep 85% of net DJ licensing revenue.</p>',
+          }),
+        )
+      }
+
+      // /for-djs
+      if (parts[0] === 'for-djs' && parts.length === 1) {
+        return contentResponse(
+          renderContentHtml({
+            title: 'License Music for DJ Sets — Direct From the Artist — BackTheVibes',
+            description:
+              'Discover independent tracks and get a real, e-signed licence directly from the artist — for live sets, recorded mixtapes, or streaming. Free to join.',
+            url,
+            bodyHtml: `<p>Discover independent tracks, agree terms directly with the artist, and get a real e-signed licence — not a blanket "DJ pool" download with terms nobody read. Free to join.</p>${renderFaqs(DJ_FAQS)}`,
+            jsonLd: {
+              '@context': 'https://schema.org',
+              '@type': 'FAQPage',
+              mainEntity: DJ_FAQS.map(([question, answer]) => ({
+                '@type': 'Question',
+                name: question,
+                acceptedAnswer: { '@type': 'Answer', text: answer },
+              })),
+            },
+          }),
+        )
+      }
+
+      // /for-artists
+      if (parts[0] === 'for-artists' && parts.length === 1) {
+        return contentResponse(
+          renderContentHtml({
+            title: 'Get Paid Directly by Fans and DJs — No Label Needed — BackTheVibes',
+            description:
+              'Publish your music, keep 80–85% of what fans and DJs pay you directly, and set your own terms for DJ licensing. £29.99/year, no revenue percentage.',
+            url,
+            bodyHtml: `<p>No label, no percentage of every stream. Publish for a flat £29.99 a year, keep 80% of direct fan support and 85% of DJ licensing revenue — on terms you set.</p>${renderFaqs(ARTIST_FAQS)}`,
+            jsonLd: {
+              '@context': 'https://schema.org',
+              '@type': 'FAQPage',
+              mainEntity: ARTIST_FAQS.map(([question, answer]) => ({
+                '@type': 'Question',
+                name: question,
+                acceptedAnswer: { '@type': 'Answer', text: answer },
+              })),
+            },
+          }),
+        )
+      }
+
+      // /blog
+      if (parts[0] === 'blog' && parts.length === 1) {
+        const list = BLOG_POSTS.slice()
+          .reverse()
+          .map((post) => `<li><a href="/blog/${post.slug}">${escapeHtml(post.title)}</a> — ${escapeHtml(post.description)}</li>`)
+          .join('\n')
+        return contentResponse(
+          renderContentHtml({
+            title: 'Blog — BackTheVibes',
+            description: 'Guides on DJ licensing, independent artist earnings, and music discovery — from the team behind BackTheVibes.',
+            url,
+            bodyHtml: `<ul>${list}</ul>`,
+          }),
+        )
+      }
+
+      // /blog/:slug
+      if (parts[0] === 'blog' && parts.length === 2) {
+        const post = BLOG_POSTS.find((p) => p.slug === parts[1])
+        if (post) {
+          return contentResponse(
+            renderContentHtml({
+              title: `${post.title} — BackTheVibes`,
+              description: post.description,
+              url,
+              bodyHtml: renderParagraphs(post.body),
+              jsonLd: {
+                '@context': 'https://schema.org',
+                '@type': 'BlogPosting',
+                headline: post.title,
+                description: post.description,
+                datePublished: post.date,
+                author: { '@type': 'Organization', name: post.author },
+                publisher: { '@type': 'Organization', name: 'BackTheVibes' },
+                url,
+              },
+            }),
+          )
+        }
+      }
 
       // /artist/:slug/track/:trackId
       if (parts[0] === 'artist' && parts.length === 4 && parts[2] === 'track') {

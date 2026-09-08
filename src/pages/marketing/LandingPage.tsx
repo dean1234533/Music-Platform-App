@@ -5,6 +5,7 @@ import { BrandMark } from '@/components/common/BrandMark'
 import { MusicGlyph } from '@/components/common/MusicGlyph'
 import { listActiveSubscriptionPlansForRole } from '@/services/platformSettingsService'
 import { formatCurrency } from '@/utils/format'
+import { useSeo } from '@/lib/seo'
 import type { SubscriptionPlan } from '@/types/platformSettings'
 
 const roles = [
@@ -22,6 +23,27 @@ const steps = [
 export function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [supporterPlan, setSupporterPlan] = useState<SubscriptionPlan | null>(null)
+
+  useSeo({
+    title: 'BackTheVibes — Music with a pulse',
+    description: 'Support the artists you actually listen to. Discover independent music, support artists directly, and give DJs a better way to find what comes next.',
+    path: '/',
+    jsonLd: [
+      {
+        '@context': 'https://schema.org',
+        '@type': 'Organization',
+        name: 'BackTheVibes',
+        url: typeof window !== 'undefined' ? window.location.origin : '',
+        description: 'A platform where independent artists publish music, fans support them directly, and DJs license tracks directly from the artist.',
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        name: 'BackTheVibes',
+        url: typeof window !== 'undefined' ? window.location.origin : '',
+      },
+    ],
+  })
 
   useEffect(() => {
     void listActiveSubscriptionPlansForRole('fan').then((plans) => {
@@ -215,8 +237,8 @@ export function LandingPage() {
       <footer className="border-t border-white/10">
         <div className="mx-auto grid max-w-[1440px] gap-10 px-5 py-12 sm:grid-cols-2 sm:px-8 lg:grid-cols-[1.4fr_1fr_1fr_1fr] lg:px-12 lg:py-16">
           <div><BrandMark /><p className="mt-5 max-w-xs text-sm leading-6 text-ink-2">Independent music, direct support, and clearer connections between the people who move culture.</p></div>
-          <FooterGroup title="Platform" links={[['How it works', '/#how-it-works'], ['Pricing', '/#pricing'], ['Sign in', '/sign-in']]} />
-          <FooterGroup title="Join" links={[['For listeners', '/sign-up?role=fan'], ['For artists', '/sign-up?role=artist'], ['For DJs', '/sign-up?role=dj']]} />
+          <FooterGroup title="Platform" links={[['How it works', '/#how-it-works'], ['Pricing', '/#pricing'], ['Blog', '/blog'], ['Sign in', '/sign-in']]} />
+          <FooterGroup title="Join" links={[['For listeners', '/sign-up?role=fan'], ['For artists', '/for-artists'], ['For DJs', '/for-djs']]} />
           <FooterGroup title="Legal" links={[['Terms & conditions', '/terms'], ['Privacy policy', '/privacy']]} />
         </div>
         <div className="mx-auto flex max-w-[1440px] flex-col gap-2 border-t border-white/[0.07] px-5 py-6 text-xs text-ink-3 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-12"><p>© {new Date().getFullYear()} BackTheVibes.</p><p>Independent by design.</p></div>
