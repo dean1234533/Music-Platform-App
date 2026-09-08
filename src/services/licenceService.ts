@@ -33,26 +33,70 @@ export async function respondToLicenceRequest(requestId: string, action: 'start_
   return respondCallable({ requestId, action })
 }
 
-export function subscribeLicenceRequest(requestId: string, onChange: (req: LicenceRequestDoc | null) => void) {
-  return onSnapshot(doc(db, 'licenceRequests', requestId), (snap) => {
-    onChange(snap.exists() ? (snap.data() as LicenceRequestDoc) : null)
-  })
+export function subscribeLicenceRequest(
+  requestId: string,
+  onChange: (req: LicenceRequestDoc | null) => void,
+  onError?: (error: Error) => void,
+) {
+  return onSnapshot(
+    doc(db, 'licenceRequests', requestId),
+    (snap) => {
+      onChange(snap.exists() ? (snap.data() as LicenceRequestDoc) : null)
+    },
+    (error) => {
+      console.error('[subscribeLicenceRequest] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
-export function subscribeRequestsForDj(djId: string, onChange: (rows: LicenceRequestDoc[]) => void) {
+export function subscribeRequestsForDj(
+  djId: string,
+  onChange: (rows: LicenceRequestDoc[]) => void,
+  onError?: (error: Error) => void,
+) {
   const q = query(collection(db, 'licenceRequests'), where('djId', '==', djId), orderBy('createdAt', 'desc'))
-  return onSnapshot(q, (snap) => onChange(snap.docs.map((d) => d.data() as LicenceRequestDoc)))
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map((d) => d.data() as LicenceRequestDoc)),
+    (error) => {
+      console.error('[subscribeRequestsForDj] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
-export function subscribeRequestsForArtist(artistId: string, onChange: (rows: LicenceRequestDoc[]) => void) {
+export function subscribeRequestsForArtist(
+  artistId: string,
+  onChange: (rows: LicenceRequestDoc[]) => void,
+  onError?: (error: Error) => void,
+) {
   const q = query(collection(db, 'licenceRequests'), where('artistId', '==', artistId), orderBy('createdAt', 'desc'))
-  return onSnapshot(q, (snap) => onChange(snap.docs.map((d) => d.data() as LicenceRequestDoc)))
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map((d) => d.data() as LicenceRequestDoc)),
+    (error) => {
+      console.error('[subscribeRequestsForArtist] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
-export function subscribeAgreement(agreementId: string, onChange: (agreement: LicenceAgreementDoc | null) => void) {
-  return onSnapshot(doc(db, 'licenceAgreements', agreementId), (snap) => {
-    onChange(snap.exists() ? (snap.data() as LicenceAgreementDoc) : null)
-  })
+export function subscribeAgreement(
+  agreementId: string,
+  onChange: (agreement: LicenceAgreementDoc | null) => void,
+  onError?: (error: Error) => void,
+) {
+  return onSnapshot(
+    doc(db, 'licenceAgreements', agreementId),
+    (snap) => {
+      onChange(snap.exists() ? (snap.data() as LicenceAgreementDoc) : null)
+    },
+    (error) => {
+      console.error('[subscribeAgreement] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 export interface ProposeAgreementInput {
@@ -118,10 +162,21 @@ export async function uploadDrawnSignature(agreementId: string, uid: string, blo
   return getDownloadURL(snap.ref)
 }
 
-export function subscribeOffer(offerId: string, onChange: (offer: LicenceOfferDoc | null) => void) {
-  return onSnapshot(doc(db, 'licenceOffers', offerId), (snap) => {
-    onChange(snap.exists() ? (snap.data() as LicenceOfferDoc) : null)
-  })
+export function subscribeOffer(
+  offerId: string,
+  onChange: (offer: LicenceOfferDoc | null) => void,
+  onError?: (error: Error) => void,
+) {
+  return onSnapshot(
+    doc(db, 'licenceOffers', offerId),
+    (snap) => {
+      onChange(snap.exists() ? (snap.data() as LicenceOfferDoc) : null)
+    },
+    (error) => {
+      console.error('[subscribeOffer] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 export const createLicencePaymentSession = callable<

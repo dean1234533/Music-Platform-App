@@ -93,13 +93,28 @@ export const toggleStoryHighlight = callable<
 >('toggleStoryHighlight')
 
 /** Owner-only: every one of this artist's Stories, including expired ones, newest first. */
-export function subscribeArtistStories(artistId: string, onChange: (stories: StoryDoc[]) => void): () => void {
+export function subscribeArtistStories(
+  artistId: string,
+  onChange: (stories: StoryDoc[]) => void,
+  onError?: (error: Error) => void,
+): () => void {
   const q = query(collection(db, 'stories'), where('artistId', '==', artistId), orderBy('createdAt', 'desc'))
-  return onSnapshot(q, (snap) => onChange(snap.docs.map((d) => d.data() as StoryDoc)))
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map((d) => d.data() as StoryDoc)),
+    (error) => {
+      console.error('[subscribeArtistStories] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 /** Public Highlights row on an artist's profile — public-tier highlights only. */
-export function subscribeArtistPublicHighlights(artistId: string, onChange: (stories: StoryDoc[]) => void): () => void {
+export function subscribeArtistPublicHighlights(
+  artistId: string,
+  onChange: (stories: StoryDoc[]) => void,
+  onError?: (error: Error) => void,
+): () => void {
   const q = query(
     collection(db, 'stories'),
     where('artistId', '==', artistId),
@@ -107,7 +122,14 @@ export function subscribeArtistPublicHighlights(artistId: string, onChange: (sto
     where('isHighlight', '==', true),
     orderBy('createdAt', 'desc'),
   )
-  return onSnapshot(q, (snap) => onChange(snap.docs.map((d) => d.data() as StoryDoc)))
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map((d) => d.data() as StoryDoc)),
+    (error) => {
+      console.error('[subscribeArtistPublicHighlights] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 /**
@@ -122,6 +144,7 @@ export function subscribeActiveStoriesForArtist(
   artistId: string,
   tier: StoryVisibility,
   onChange: (stories: StoryDoc[]) => void,
+  onError?: (error: Error) => void,
 ): () => void {
   const q = query(
     collection(db, 'stories'),
@@ -130,7 +153,14 @@ export function subscribeActiveStoriesForArtist(
     where('expiresAt', '>', Timestamp.now()),
     orderBy('expiresAt', 'asc'),
   )
-  return onSnapshot(q, (snap) => onChange(snap.docs.map((d) => d.data() as StoryDoc)))
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map((d) => d.data() as StoryDoc)),
+    (error) => {
+      console.error('[subscribeActiveStoriesForArtist] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 /** Firestore's `in` operator caps at 10 values — chunk a followed/supported-artist list into batches. */
@@ -144,6 +174,7 @@ export function subscribeActiveStoriesForArtists(
   artistIds: string[],
   tier: StoryVisibility,
   onChange: (stories: StoryDoc[]) => void,
+  onError?: (error: Error) => void,
 ): () => void {
   if (artistIds.length === 0) {
     onChange([])
@@ -159,18 +190,36 @@ export function subscribeActiveStoriesForArtists(
       where('expiresAt', '>', Timestamp.now()),
       orderBy('expiresAt', 'asc'),
     )
-    return onSnapshot(q, (snap) => {
-      perBatch.set(i, snap.docs.map((d) => d.data() as StoryDoc))
-      onChange(Array.from(perBatch.values()).flat())
-    })
+    return onSnapshot(
+      q,
+      (snap) => {
+        perBatch.set(i, snap.docs.map((d) => d.data() as StoryDoc))
+        onChange(Array.from(perBatch.values()).flat())
+      },
+      (error) => {
+        console.error('[subscribeActiveStoriesForArtists] listener error:', error)
+        onError?.(error)
+      },
+    )
   })
   return () => unsubs.forEach((u) => u())
 }
 
 /** Drives the seen/unseen ring on StoryBubble/StoryRail. */
-export function subscribeMyViewedStoryIds(userId: string, onChange: (storyIds: Set<string>) => void): () => void {
+export function subscribeMyViewedStoryIds(
+  userId: string,
+  onChange: (storyIds: Set<string>) => void,
+  onError?: (error: Error) => void,
+): () => void {
   const q = query(collection(db, 'storyViews'), where('userId', '==', userId))
-  return onSnapshot(q, (snap) => onChange(new Set(snap.docs.map((d) => (d.data() as { storyId: string }).storyId))))
+  return onSnapshot(
+    q,
+    (snap) => onChange(new Set(snap.docs.map((d) => (d.data() as { storyId: string }).storyId))),
+    (error) => {
+      console.error('[subscribeMyViewedStoryIds] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 export async function recordStoryView(storyId: string, userId: string): Promise<void> {

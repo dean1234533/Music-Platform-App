@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { subscribeAgreement } from '@/services/licenceService'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { getTrack } from '@/services/trackService'
-import { EmptyState, LoadingState } from '@/components/common/StateViews'
+import { EmptyState, ErrorState, LoadingState } from '@/components/common/StateViews'
 import { Button } from '@/components/common/Button'
 import { formatCurrency } from '@/utils/format'
 import type { LicenceAgreementDoc } from '@/types/licence'
@@ -31,11 +31,12 @@ export function ContractPage() {
   const { firebaseUser } = useAuth()
   const [agreement, setAgreement] = useState<LicenceAgreementDoc | null | undefined>(undefined)
   const [track, setTrack] = useState<TrackDoc | null>(null)
+  const [loadError, setLoadError] = useState(false)
   const artist = useArtistSummary(agreement?.artistId ?? null)
 
   useEffect(() => {
     if (!agreementId) return
-    return subscribeAgreement(agreementId, setAgreement)
+    return subscribeAgreement(agreementId, setAgreement, () => setLoadError(true))
   }, [agreementId])
 
   useEffect(() => {
@@ -43,6 +44,9 @@ export function ContractPage() {
     void getTrack(agreement.trackId).then(setTrack)
   }, [agreement])
 
+  if (agreement === undefined && loadError) {
+    return <ErrorState title="Something went wrong" description="Couldn't load this page. Try refreshing." />
+  }
   if (agreement === undefined) return <LoadingState label="Loading contract…" />
   if (agreement === null || !firebaseUser) return <EmptyState title="Contract not found" />
 

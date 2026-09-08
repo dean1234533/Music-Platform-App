@@ -3,8 +3,20 @@ import { db } from '@/lib/firebase'
 import { callable } from '@/lib/callable'
 import type { SupportAllocationDoc } from '@/types/subscription'
 
-export function subscribeIsSupporting(fanId: string, artistId: string, onChange: (supporting: boolean) => void) {
-  return onSnapshot(doc(db, 'supportRelationships', `${fanId}_${artistId}`), (snap) => onChange(snap.exists()))
+export function subscribeIsSupporting(
+  fanId: string,
+  artistId: string,
+  onChange: (supporting: boolean) => void,
+  onError?: (error: Error) => void,
+) {
+  return onSnapshot(
+    doc(db, 'supportRelationships', `${fanId}_${artistId}`),
+    (snap) => onChange(snap.exists()),
+    (error) => {
+      console.error('[subscribeIsSupporting] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 export async function listSupportedArtistIds(fanId: string): Promise<string[]> {
@@ -27,8 +39,19 @@ export async function updateSupportAllocations(allocations: AllocationInput[]): 
   return { totalMinor: result.totalMinor }
 }
 
-export function subscribeSupportAllocations(fanId: string, onChange: (doc: SupportAllocationDoc | null) => void) {
-  return onSnapshot(doc(db, 'supportAllocations', fanId), (snap) => {
-    onChange(snap.exists() ? (snap.data() as SupportAllocationDoc) : null)
-  })
+export function subscribeSupportAllocations(
+  fanId: string,
+  onChange: (doc: SupportAllocationDoc | null) => void,
+  onError?: (error: Error) => void,
+) {
+  return onSnapshot(
+    doc(db, 'supportAllocations', fanId),
+    (snap) => {
+      onChange(snap.exists() ? (snap.data() as SupportAllocationDoc) : null)
+    },
+    (error) => {
+      console.error('[subscribeSupportAllocations] listener error:', error)
+      onError?.(error)
+    },
+  )
 }

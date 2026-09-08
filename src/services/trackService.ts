@@ -172,10 +172,21 @@ export async function getTrack(trackId: string): Promise<TrackDoc | null> {
   return snap.exists() ? (snap.data() as TrackDoc) : null
 }
 
-export function subscribeTrack(trackId: string, onChange: (track: TrackDoc | null) => void) {
-  return onSnapshot(trackRef(trackId), (snap) => {
-    onChange(snap.exists() ? (snap.data() as TrackDoc) : null)
-  })
+export function subscribeTrack(
+  trackId: string,
+  onChange: (track: TrackDoc | null) => void,
+  onError?: (error: Error) => void,
+) {
+  return onSnapshot(
+    trackRef(trackId),
+    (snap) => {
+      onChange(snap.exists() ? (snap.data() as TrackDoc) : null)
+    },
+    (error) => {
+      console.error('[subscribeTrack] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 export async function updateTrackDealSettings(trackId: string, settings: TrackDjDealSettings): Promise<void> {

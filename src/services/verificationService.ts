@@ -7,7 +7,18 @@ export const submitVerificationRequest = callable<{ profileType: 'artist' | 'dj'
   'submitVerificationRequest',
 )
 
-export function subscribeOwnVerificationRequests(userId: string, onChange: (rows: VerificationRequestDoc[]) => void) {
+export function subscribeOwnVerificationRequests(
+  userId: string,
+  onChange: (rows: VerificationRequestDoc[]) => void,
+  onError?: (error: Error) => void,
+) {
   const q = query(collection(db, 'verificationRequests'), where('userId', '==', userId), orderBy('createdAt', 'desc'))
-  return onSnapshot(q, (snap) => onChange(snap.docs.map((d) => d.data() as VerificationRequestDoc)))
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map((d) => d.data() as VerificationRequestDoc)),
+    (error) => {
+      console.error('[subscribeOwnVerificationRequests] listener error:', error)
+      onError?.(error)
+    },
+  )
 }

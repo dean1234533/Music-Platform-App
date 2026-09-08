@@ -20,8 +20,19 @@ export async function openConnectDashboard(): Promise<void> {
   window.location.href = url
 }
 
-export function subscribeArtistPayoutAccount(artistId: string, onChange: (account: ArtistPayoutAccountDoc | null) => void) {
-  return onSnapshot(doc(db, 'artistPayoutAccounts', artistId), (snap) => {
-    onChange(snap.exists() ? (snap.data() as ArtistPayoutAccountDoc) : null)
-  })
+export function subscribeArtistPayoutAccount(
+  artistId: string,
+  onChange: (account: ArtistPayoutAccountDoc | null) => void,
+  onError?: (error: Error) => void,
+) {
+  return onSnapshot(
+    doc(db, 'artistPayoutAccounts', artistId),
+    (snap) => {
+      onChange(snap.exists() ? (snap.data() as ArtistPayoutAccountDoc) : null)
+    },
+    (error) => {
+      console.error('[subscribeArtistPayoutAccount] listener error:', error)
+      onError?.(error)
+    },
+  )
 }

@@ -17,8 +17,20 @@ export async function unlikeTrack(fanId: string, trackId: string): Promise<void>
   await deleteDoc(likeRef(fanId, trackId))
 }
 
-export function subscribeIsLiked(fanId: string, trackId: string, onChange: (liked: boolean) => void) {
-  return onSnapshot(likeRef(fanId, trackId), (snap) => onChange(snap.exists()))
+export function subscribeIsLiked(
+  fanId: string,
+  trackId: string,
+  onChange: (liked: boolean) => void,
+  onError?: (error: Error) => void,
+) {
+  return onSnapshot(
+    likeRef(fanId, trackId),
+    (snap) => onChange(snap.exists()),
+    (error) => {
+      console.error('[subscribeIsLiked] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 export async function listLikedTrackIds(fanId: string): Promise<string[]> {
@@ -27,7 +39,18 @@ export async function listLikedTrackIds(fanId: string): Promise<string[]> {
   return snap.docs.map((d) => d.data().trackId as string)
 }
 
-export function subscribeLikedTrackIds(fanId: string, onChange: (trackIds: string[]) => void) {
+export function subscribeLikedTrackIds(
+  fanId: string,
+  onChange: (trackIds: string[]) => void,
+  onError?: (error: Error) => void,
+) {
   const q = query(collection(db, 'trackLikes'), where('fanId', '==', fanId))
-  return onSnapshot(q, (snap) => onChange(snap.docs.map((document) => document.data().trackId as string)))
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map((document) => document.data().trackId as string)),
+    (error) => {
+      console.error('[subscribeLikedTrackIds] listener error:', error)
+      onError?.(error)
+    },
+  )
 }

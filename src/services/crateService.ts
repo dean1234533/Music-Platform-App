@@ -39,9 +39,20 @@ export async function createCrate(ownerId: string, title: string): Promise<strin
   return crateId
 }
 
-export function subscribeOwnCrates(ownerId: string, onChange: (crates: CrateDoc[]) => void) {
+export function subscribeOwnCrates(
+  ownerId: string,
+  onChange: (crates: CrateDoc[]) => void,
+  onError?: (error: Error) => void,
+) {
   const q = query(collection(db, 'crates'), where('ownerId', '==', ownerId), orderBy('createdAt', 'desc'))
-  return onSnapshot(q, (snap) => onChange(snap.docs.map((d) => d.data() as CrateDoc)))
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map((d) => d.data() as CrateDoc)),
+    (error) => {
+      console.error('[subscribeOwnCrates] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 export async function getCrate(crateId: string): Promise<CrateDoc | null> {

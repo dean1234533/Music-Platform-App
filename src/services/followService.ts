@@ -29,8 +29,16 @@ export function subscribeIsFollowing(
   fanId: string,
   artistId: string,
   onChange: (following: boolean) => void,
+  onError?: (error: Error) => void,
 ): () => void {
-  return onSnapshot(followRef(fanId, artistId), (snap) => onChange(snap.exists()))
+  return onSnapshot(
+    followRef(fanId, artistId),
+    (snap) => onChange(snap.exists()),
+    (error) => {
+      console.error('[subscribeIsFollowing] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 export async function listFollowedArtistIds(fanId: string): Promise<string[]> {

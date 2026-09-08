@@ -10,7 +10,7 @@ import { TrackActions } from '@/components/music/TrackActions'
 import { RequestDjAccessModal } from '@/components/track/RequestDjAccessModal'
 import { ReportTrackModal } from '@/components/track/ReportTrackModal'
 import { DealsPanel } from '@/components/licence/DealsPanel'
-import { EmptyState, LoadingState } from '@/components/common/StateViews'
+import { EmptyState, ErrorState, LoadingState } from '@/components/common/StateViews'
 import { Button } from '@/components/common/Button'
 import { ShareButton } from '@/components/common/ShareButton'
 import { formatDuration } from '@/utils/format'
@@ -27,10 +27,11 @@ export function TrackPage() {
   const [showDjRequest, setShowDjRequest] = useState(false)
   const [requestDealId, setRequestDealId] = useState<string | null>(null)
   const [showReport, setShowReport] = useState(false)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
     if (!trackId) return
-    return subscribeTrack(trackId, setTrack)
+    return subscribeTrack(trackId, setTrack, () => setLoadError(true))
   }, [trackId])
 
   // Upgrade the flat /track/:trackId address bar to the canonical nested
@@ -43,6 +44,9 @@ export function TrackPage() {
     }
   }, [artist, trackId, navigate])
 
+  if (track === undefined && loadError) {
+    return <ErrorState title="Something went wrong" description="Couldn't load this page. Try refreshing." />
+  }
   if (track === undefined) return <LoadingState label="Loading track…" />
   if (track === null) return <EmptyState title="Track not found" />
 

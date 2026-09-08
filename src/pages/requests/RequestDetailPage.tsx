@@ -19,7 +19,7 @@ import { OfferFormModal } from '@/components/licence/OfferFormModal'
 import { OfferCard } from '@/components/licence/OfferCard'
 import { SignAgreementModal } from '@/components/licence/SignAgreementModal'
 import { Button } from '@/components/common/Button'
-import { EmptyState, LoadingState } from '@/components/common/StateViews'
+import { EmptyState, ErrorState, LoadingState } from '@/components/common/StateViews'
 import { formatCurrency } from '@/utils/format'
 import type { LicenceAgreementDoc, LicenceOfferDoc, LicenceRequestDoc } from '@/types/licence'
 import type { MessageDoc } from '@/types/conversation'
@@ -59,13 +59,14 @@ export function RequestDetailPage() {
   const [blockBusy, setBlockBusy] = useState(false)
   const [showVoidConfirm, setShowVoidConfirm] = useState(false)
   const [voidReason, setVoidReason] = useState('')
+  const [loadError, setLoadError] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const artist = useArtistSummary(request?.artistId ?? null)
 
   useEffect(() => {
     if (!requestId) return
-    return subscribeLicenceRequest(requestId, setRequest)
+    return subscribeLicenceRequest(requestId, setRequest, () => setLoadError(true))
   }, [requestId])
 
   useEffect(() => {
@@ -94,6 +95,9 @@ export function RequestDetailPage() {
     return subscribeIsBlocked(firebaseUser.uid, otherPartyId, setIsBlocked)
   }, [request, firebaseUser])
 
+  if (request === undefined && loadError) {
+    return <ErrorState title="Something went wrong" description="Couldn't load this page. Try refreshing." />
+  }
   if (request === undefined) return <LoadingState label="Loading request…" />
   if (request === null || !firebaseUser) return <EmptyState title="Request not found" />
 

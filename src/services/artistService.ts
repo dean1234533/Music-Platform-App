@@ -110,10 +110,18 @@ export async function getArtistProfile(artistId: string): Promise<ArtistProfile 
 export function subscribeArtistProfile(
   artistId: string,
   onChange: (profile: ArtistProfile | null) => void,
+  onError?: (error: Error) => void,
 ): () => void {
-  return onSnapshot(artistRef(artistId), (snap) => {
-    onChange(snap.exists() ? (snap.data() as ArtistProfile) : null)
-  })
+  return onSnapshot(
+    artistRef(artistId),
+    (snap) => {
+      onChange(snap.exists() ? (snap.data() as ArtistProfile) : null)
+    },
+    (error) => {
+      console.error('[subscribeArtistProfile] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 export async function updateArtistProfile(
@@ -127,15 +135,23 @@ export async function updateArtistProfile(
 export function subscribeArtistTracks(
   artistId: string,
   onChange: (tracks: TrackDoc[]) => void,
+  onError?: (error: Error) => void,
 ): () => void {
   const q = query(
     collection(db, 'tracks'),
     where('artistId', '==', artistId),
     orderBy('createdAt', 'desc'),
   )
-  return onSnapshot(q, (snap) => {
-    onChange(snap.docs.map((d) => d.data() as TrackDoc))
-  })
+  return onSnapshot(
+    q,
+    (snap) => {
+      onChange(snap.docs.map((d) => d.data() as TrackDoc))
+    },
+    (error) => {
+      console.error('[subscribeArtistTracks] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 /**
@@ -147,6 +163,7 @@ export function subscribeArtistTracks(
 export function subscribePublicArtistTracks(
   artistId: string,
   onChange: (tracks: TrackDoc[]) => void,
+  onError?: (error: Error) => void,
 ): () => void {
   const q = query(
     collection(db, 'tracks'),
@@ -154,7 +171,14 @@ export function subscribePublicArtistTracks(
     where('visibility', '==', 'public'),
     orderBy('createdAt', 'desc'),
   )
-  return onSnapshot(q, (snap) => {
-    onChange(snap.docs.map((d) => d.data() as TrackDoc))
-  })
+  return onSnapshot(
+    q,
+    (snap) => {
+      onChange(snap.docs.map((d) => d.data() as TrackDoc))
+    },
+    (error) => {
+      console.error('[subscribePublicArtistTracks] listener error:', error)
+      onError?.(error)
+    },
+  )
 }

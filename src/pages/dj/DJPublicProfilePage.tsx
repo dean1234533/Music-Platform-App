@@ -10,12 +10,16 @@ export function DJPublicProfilePage() {
   const { djId } = useParams<{ djId: string }>()
   const navigate = useNavigate()
   const [profile, setProfile] = useState<DJProfile | null | undefined>(undefined)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
     if (!djId) return
-    return subscribeDJProfile(djId, setProfile)
+    return subscribeDJProfile(djId, setProfile, () => setLoadError(true))
   }, [djId])
 
+  if (profile === undefined && loadError) {
+    return <ErrorState title="Something went wrong" description="Couldn't load this page. Try refreshing." />
+  }
   if (profile === undefined) return <LoadingState label="Loading DJ…" />
   if (profile === null) return <ErrorState title="DJ not found" description="This DJ profile doesn't exist." />
 

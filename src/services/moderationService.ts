@@ -45,11 +45,19 @@ export const submitCounterNotice = callable<{ claimId: string; counterNoticeText
 export function subscribeArtistCopyrightClaims(
   artistId: string,
   onChange: (claims: CopyrightClaimDoc[]) => void,
+  onError?: (error: Error) => void,
 ): () => void {
   const q = query(collection(db, 'copyrightClaims'), where('artistId', '==', artistId), orderBy('createdAt', 'desc'))
-  return onSnapshot(q, (snap) => {
-    onChange(snap.docs.map((d) => d.data() as CopyrightClaimDoc))
-  })
+  return onSnapshot(
+    q,
+    (snap) => {
+      onChange(snap.docs.map((d) => d.data() as CopyrightClaimDoc))
+    },
+    (error) => {
+      console.error('[subscribeArtistCopyrightClaims] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 export const submitReport = callable<

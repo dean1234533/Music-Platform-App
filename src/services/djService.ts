@@ -45,10 +45,21 @@ export async function getDJProfile(djId: string): Promise<DJProfile | null> {
   return snap.exists() ? (snap.data() as DJProfile) : null
 }
 
-export function subscribeDJProfile(djId: string, onChange: (profile: DJProfile | null) => void) {
-  return onSnapshot(djRef(djId), (snap) => {
-    onChange(snap.exists() ? (snap.data() as DJProfile) : null)
-  })
+export function subscribeDJProfile(
+  djId: string,
+  onChange: (profile: DJProfile | null) => void,
+  onError?: (error: Error) => void,
+) {
+  return onSnapshot(
+    djRef(djId),
+    (snap) => {
+      onChange(snap.exists() ? (snap.data() as DJProfile) : null)
+    },
+    (error) => {
+      console.error('[subscribeDJProfile] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 export async function updateDJProfile(

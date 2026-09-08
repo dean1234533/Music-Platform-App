@@ -49,10 +49,18 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 export function subscribeToUserProfile(
   uid: string,
   onChange: (profile: UserProfile | null) => void,
+  onError?: (error: Error) => void,
 ): () => void {
-  return onSnapshot(userRef(uid), (snap) => {
-    onChange(snap.exists() ? (snap.data() as UserProfile) : null)
-  })
+  return onSnapshot(
+    userRef(uid),
+    (snap) => {
+      onChange(snap.exists() ? (snap.data() as UserProfile) : null)
+    },
+    (error) => {
+      console.error('[subscribeToUserProfile] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 export async function completeOnboarding(uid: string, roles: UserRole[]): Promise<void> {

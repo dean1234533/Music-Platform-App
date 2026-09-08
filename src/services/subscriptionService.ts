@@ -28,8 +28,16 @@ export async function openBillingPortal(): Promise<void> {
 export function subscribeToOwnSubscription(
   uid: string,
   onChange: (sub: SubscriptionDoc | null) => void,
+  onError?: (error: Error) => void,
 ) {
-  return onSnapshot(doc(db, 'subscriptions', `${uid}_fan`), (snap) => {
-    onChange(snap.exists() ? (snap.data() as SubscriptionDoc) : null)
-  })
+  return onSnapshot(
+    doc(db, 'subscriptions', `${uid}_fan`),
+    (snap) => {
+      onChange(snap.exists() ? (snap.data() as SubscriptionDoc) : null)
+    },
+    (error) => {
+      console.error('[subscribeToOwnSubscription] listener error:', error)
+      onError?.(error)
+    },
+  )
 }

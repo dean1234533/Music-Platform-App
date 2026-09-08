@@ -7,7 +7,7 @@ import { submitVerificationRequest } from '@/services/verificationService'
 import { signOut } from '@/services/authService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
-import { LoadingState, EmptyState } from '@/components/common/StateViews'
+import { LoadingState, EmptyState, ErrorState } from '@/components/common/StateViews'
 import { AccountSecuritySection } from '@/components/account/AccountSecuritySection'
 import type { DJProfile } from '@/types/dj'
 
@@ -20,18 +20,24 @@ export function DJProfilePage() {
   const [saved, setSaved] = useState(false)
   const [requestingVerification, setRequestingVerification] = useState(false)
   const [verificationRequested, setVerificationRequested] = useState(false)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
     if (!firebaseUser) return
-    return subscribeDJProfile(firebaseUser.uid, (p) => {
-      setProfile(p)
-      if (p) {
-        setForm({ name: p.name, bio: p.bio, genres: p.genres.join(', '), country: p.country, city: p.city })
-      }
-    })
+    return subscribeDJProfile(
+      firebaseUser.uid,
+      (p) => {
+        setProfile(p)
+        if (p) {
+          setForm({ name: p.name, bio: p.bio, genres: p.genres.join(', '), country: p.country, city: p.city })
+        }
+      },
+      () => setLoadError(true),
+    )
   }, [firebaseUser])
 
   if (!firebaseUser) return <LoadingState />
+  if (loadError) return <ErrorState title="Something went wrong" description="Couldn't load this page. Try refreshing." />
   if (!profile) return <EmptyState title="No DJ profile found" description="Add a DJ profile from your account settings." />
 
   async function handleRequestVerification() {

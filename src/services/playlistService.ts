@@ -37,9 +37,20 @@ export async function createPlaylist(ownerId: string, title: string): Promise<st
   return playlistId
 }
 
-export function subscribeOwnPlaylists(ownerId: string, onChange: (playlists: PlaylistDoc[]) => void) {
+export function subscribeOwnPlaylists(
+  ownerId: string,
+  onChange: (playlists: PlaylistDoc[]) => void,
+  onError?: (error: Error) => void,
+) {
   const q = query(collection(db, 'playlists'), where('ownerId', '==', ownerId), orderBy('createdAt', 'desc'))
-  return onSnapshot(q, (snap) => onChange(snap.docs.map((d) => d.data() as PlaylistDoc)))
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map((d) => d.data() as PlaylistDoc)),
+    (error) => {
+      console.error('[subscribeOwnPlaylists] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 export async function getPlaylist(playlistId: string): Promise<PlaylistDoc | null> {

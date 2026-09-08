@@ -27,9 +27,20 @@ export async function deleteDjDeal(dealId: string): Promise<void> {
   await deleteDoc(doc(db, 'djDeals', dealId))
 }
 
-export function subscribeArtistDeals(artistId: string, onChange: (deals: DjDealDoc[]) => void): () => void {
+export function subscribeArtistDeals(
+  artistId: string,
+  onChange: (deals: DjDealDoc[]) => void,
+  onError?: (error: Error) => void,
+): () => void {
   const q = query(collection(db, 'djDeals'), where('artistId', '==', artistId), orderBy('createdAt', 'desc'))
-  return onSnapshot(q, (snap) => onChange(snap.docs.map((d) => d.data() as DjDealDoc)))
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map((d) => d.data() as DjDealDoc)),
+    (error) => {
+      console.error('[subscribeArtistDeals] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 /** Public — used to resolve a track's allowedDealIds for the DJ-facing deal view. Firestore has no `in` on doc IDs > 30, chunk if ever needed. */

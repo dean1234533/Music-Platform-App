@@ -44,6 +44,7 @@ export function ArtistPublicProfilePage() {
   const [fanOffers, setFanOffers] = useState<FanOfferDoc[]>([])
   const [offerClaims, setOfferClaims] = useState<FanOfferClaimDoc[]>([])
   const [pendingOfferId, setPendingOfferId] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
     if (!slug) return
@@ -53,7 +54,7 @@ export function ArtistPublicProfilePage() {
 
   useEffect(() => {
     if (!artistId) return
-    const unsubProfile = subscribeArtistProfile(artistId, setArtist)
+    const unsubProfile = subscribeArtistProfile(artistId, setArtist, () => setLoadError(true))
     const unsubTracks = subscribePublicArtistTracks(artistId, setTracks)
     return () => {
       unsubProfile()
@@ -118,6 +119,7 @@ export function ArtistPublicProfilePage() {
 
   if (artistId === undefined) return <LoadingState label="Loading artist…" />
   if (artistId === null) return <ErrorState title="Artist not found" description="This artist URL doesn't exist." />
+  if (loadError) return <ErrorState title="Something went wrong" description="Couldn't load this page. Try refreshing." />
   if (!artist) return <LoadingState label="Loading artist…" />
 
   const publicTracks = tracks

@@ -16,8 +16,16 @@ export const exportUserData = callable<void, { url: string; expiresInSeconds: nu
 export function subscribeAccountDeletionStatus(
   uid: string,
   onChange: (status: AccountDeletionDoc | null) => void,
+  onError?: (error: Error) => void,
 ): () => void {
-  return onSnapshot(doc(db, 'accountDeletions', uid), (snap) => {
-    onChange(snap.exists() ? (snap.data() as AccountDeletionDoc) : null)
-  })
+  return onSnapshot(
+    doc(db, 'accountDeletions', uid),
+    (snap) => {
+      onChange(snap.exists() ? (snap.data() as AccountDeletionDoc) : null)
+    },
+    (error) => {
+      console.error('[subscribeAccountDeletionStatus] listener error:', error)
+      onError?.(error)
+    },
+  )
 }

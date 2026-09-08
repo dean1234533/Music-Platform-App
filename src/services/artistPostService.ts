@@ -27,9 +27,20 @@ export async function deleteArtistPost(postId: string): Promise<void> {
   await deleteDoc(doc(db, 'artistPosts', postId))
 }
 
-export function subscribeArtistPosts(artistId: string, onChange: (posts: ArtistPost[]) => void) {
+export function subscribeArtistPosts(
+  artistId: string,
+  onChange: (posts: ArtistPost[]) => void,
+  onError?: (error: Error) => void,
+) {
   const q = query(collection(db, 'artistPosts'), where('artistId', '==', artistId), orderBy('createdAt', 'desc'))
-  return onSnapshot(q, (snap) => onChange(snap.docs.map((d) => d.data() as ArtistPost)))
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map((d) => d.data() as ArtistPost)),
+    (error) => {
+      console.error('[subscribeArtistPosts] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 /**
@@ -43,6 +54,7 @@ export function subscribePublicArtistPosts(
   artistId: string,
   viewer: { isFollowing: boolean; isSupporting: boolean },
   onChange: (posts: ArtistPost[]) => void,
+  onError?: (error: Error) => void,
 ): () => void {
   const tiers: Array<ArtistPost['visibility']> = ['everyone']
   if (viewer.isFollowing) tiers.push('followers')
@@ -62,10 +74,17 @@ export function subscribePublicArtistPosts(
       where('visibility', '==', tier),
       orderBy('createdAt', 'desc'),
     )
-    return onSnapshot(q, (snap) => {
-      results.set(tier, snap.docs.map((d) => d.data() as ArtistPost))
-      emit()
-    })
+    return onSnapshot(
+      q,
+      (snap) => {
+        results.set(tier, snap.docs.map((d) => d.data() as ArtistPost))
+        emit()
+      },
+      (error) => {
+        console.error('[subscribePublicArtistPosts] listener error:', error)
+        onError?.(error)
+      },
+    )
   })
 
   return () => unsubscribers.forEach((unsub) => unsub())

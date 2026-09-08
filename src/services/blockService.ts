@@ -17,6 +17,14 @@ export function subscribeIsBlocked(
   blockerId: string,
   blockedId: string,
   onChange: (blocked: boolean) => void,
+  onError?: (error: Error) => void,
 ): () => void {
-  return onSnapshot(blockRef(blockerId, blockedId), (snap) => onChange(snap.exists()))
+  return onSnapshot(
+    blockRef(blockerId, blockedId),
+    (snap) => onChange(snap.exists()),
+    (error) => {
+      console.error('[subscribeIsBlocked] listener error:', error)
+      onError?.(error)
+    },
+  )
 }

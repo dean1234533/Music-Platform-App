@@ -10,13 +10,35 @@ export const sendBulkDjOutreach = callable<{ trackId: string; message: string },
   'sendBulkDjOutreach',
 )
 
-export function subscribeConversation(conversationId: string, onChange: (conversation: ConversationDoc | null) => void) {
-  return onSnapshot(doc(db, 'conversations', conversationId), (snap) => {
-    onChange(snap.exists() ? (snap.data() as ConversationDoc) : null)
-  })
+export function subscribeConversation(
+  conversationId: string,
+  onChange: (conversation: ConversationDoc | null) => void,
+  onError?: (error: Error) => void,
+) {
+  return onSnapshot(
+    doc(db, 'conversations', conversationId),
+    (snap) => {
+      onChange(snap.exists() ? (snap.data() as ConversationDoc) : null)
+    },
+    (error) => {
+      console.error('[subscribeConversation] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
-export function subscribeMessages(conversationId: string, onChange: (rows: MessageDoc[]) => void) {
+export function subscribeMessages(
+  conversationId: string,
+  onChange: (rows: MessageDoc[]) => void,
+  onError?: (error: Error) => void,
+) {
   const q = query(collection(db, 'conversations', conversationId, 'messages'), orderBy('createdAt', 'asc'))
-  return onSnapshot(q, (snap) => onChange(snap.docs.map((d) => d.data() as MessageDoc)))
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map((d) => d.data() as MessageDoc)),
+    (error) => {
+      console.error('[subscribeMessages] listener error:', error)
+      onError?.(error)
+    },
+  )
 }

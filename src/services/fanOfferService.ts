@@ -47,15 +47,27 @@ export async function deleteFanOffer(offerId: string): Promise<void> {
   await deleteDoc(doc(db, 'fanOffers', offerId))
 }
 
-export function subscribeArtistFanOffers(artistId: string, onChange: (offers: FanOfferDoc[]) => void) {
+export function subscribeArtistFanOffers(
+  artistId: string,
+  onChange: (offers: FanOfferDoc[]) => void,
+  onError?: (error: Error) => void,
+) {
   const offersQuery = query(collection(db, 'fanOffers'), where('artistId', '==', artistId), orderBy('createdAt', 'desc'))
-  return onSnapshot(offersQuery, (snapshot) => onChange(snapshot.docs.map((item) => item.data() as FanOfferDoc)))
+  return onSnapshot(
+    offersQuery,
+    (snapshot) => onChange(snapshot.docs.map((item) => item.data() as FanOfferDoc)),
+    (error) => {
+      console.error('[subscribeArtistFanOffers] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
 
 export function subscribeVisibleFanOffers(
   artistId: string,
   viewer: { isFollowing: boolean; isSupporting: boolean },
   onChange: (offers: FanOfferDoc[]) => void,
+  onError?: (error: Error) => void,
 ): () => void {
   const audiences: FanOfferAudience[] = ['everyone']
   if (viewer.isFollowing) audiences.push('followers')
@@ -76,10 +88,17 @@ export function subscribeVisibleFanOffers(
       where('audience', '==', audience),
       orderBy('createdAt', 'desc'),
     )
-    return onSnapshot(offersQuery, (snapshot) => {
-      results.set(audience, snapshot.docs.map((item) => item.data() as FanOfferDoc))
-      emit()
-    })
+    return onSnapshot(
+      offersQuery,
+      (snapshot) => {
+        results.set(audience, snapshot.docs.map((item) => item.data() as FanOfferDoc))
+        emit()
+      },
+      (error) => {
+        console.error('[subscribeVisibleFanOffers] listener error:', error)
+        onError?.(error)
+      },
+    )
   })
   return () => unsubscribers.forEach((unsubscribe) => unsubscribe())
 }
@@ -103,7 +122,18 @@ export async function removeFanOfferClaim(fanId: string, offerId: string): Promi
   await deleteDoc(doc(db, 'fanOfferClaims', claimId(fanId, offerId)))
 }
 
-export function subscribeOwnFanOfferClaims(fanId: string, onChange: (claims: FanOfferClaimDoc[]) => void) {
+export function subscribeOwnFanOfferClaims(
+  fanId: string,
+  onChange: (claims: FanOfferClaimDoc[]) => void,
+  onError?: (error: Error) => void,
+) {
   const claimsQuery = query(collection(db, 'fanOfferClaims'), where('fanId', '==', fanId))
-  return onSnapshot(claimsQuery, (snapshot) => onChange(snapshot.docs.map((item) => item.data() as FanOfferClaimDoc)))
+  return onSnapshot(
+    claimsQuery,
+    (snapshot) => onChange(snapshot.docs.map((item) => item.data() as FanOfferClaimDoc)),
+    (error) => {
+      console.error('[subscribeOwnFanOfferClaims] listener error:', error)
+      onError?.(error)
+    },
+  )
 }
