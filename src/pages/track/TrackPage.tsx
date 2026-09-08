@@ -141,6 +141,10 @@ export function TrackPage() {
             </Link>
           )}
         </div>
+      ) : hasRole('dj') ? (
+        <div className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm text-ink-2">
+          This artist hasn't opened this track up for DJ requests.
+        </div>
       ) : null}
 
       {hasRole('dj') && track.djDealSettings?.acceptDjRequests ? (
