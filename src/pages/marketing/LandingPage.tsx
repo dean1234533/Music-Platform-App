@@ -111,7 +111,10 @@ export function LandingPage() {
               <img src="/wavelength-hero.png" alt="A curated collection of translucent vinyl and sculptural record sleeves" className="h-full w-full rounded-[1.85rem] object-cover object-[68%_center]" />
               <div className="absolute inset-x-5 bottom-5 flex items-center justify-between rounded-2xl border border-white/10 bg-black/55 px-5 py-4 backdrop-blur-xl">
                 <div><p className="text-xs uppercase tracking-[0.16em] text-ink-2">Now in rotation</p><p className="mt-1 text-sm font-medium">The independent frequency</p></div>
-                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-500 text-surface-0"><ArrowRight className="h-4 w-4 -rotate-45" /></span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-2 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-brand-400" aria-hidden="true" />
+                  Curated daily
+                </span>
               </div>
             </div>
           </div>
