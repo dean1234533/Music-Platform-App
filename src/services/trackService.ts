@@ -239,6 +239,15 @@ export interface DjTrackFilters {
 }
 
 /**
+ * A track can accept a direct DJ enquiry without an artist-created deal.
+ * Per-track deal settings override the older promotion/licence switches.
+ */
+export function isTrackAcceptingDjRequests(track: TrackDoc): boolean {
+  if (track.djDealSettings) return track.djDealSettings.acceptDjRequests
+  return track.djPromotion && track.djLicenceMode !== 'not_available'
+}
+
+/**
  * DJ discovery filtering. Only `genre` is pushed into the Firestore
  * query (the one equality field worth an index at this app's scale) — the
  * rest are applied client-side over a bounded page. Not a scalable search
@@ -255,23 +264,28 @@ export async function listDJPromotionTracksFiltered(
   opts: { includeProPlusOnly?: boolean; includeDjOnly?: boolean; count?: number } = {},
 ): Promise<TrackDoc[]> {
   const visibilities = opts.includeDjOnly ? ['public', 'dj_only'] : ['public']
-  const constraints = [where('djPromotion', '==', true), where('visibility', 'in', visibilities)]
-  if (filters.genre) constraints.push(where('genre', '==', filters.genre))
+  const constraints = [where('visibility', 'in', visibilities)]
 
-  const q = query(collection(db, 'tracks'), ...constraints, orderBy('createdAt', 'desc'), limit(opts.count ?? 100))
+  // Pull a bounded discovery window, then apply requestability and optional
+  // filters together. This includes tracks opened through the newer manual-
+  // approval setting even when the legacy djPromotion flag is false.
+  const q = query(collection(db, 'tracks'), ...constraints, orderBy('createdAt', 'desc'), limit(Math.max(opts.count ?? 100, 100)))
   const snap = await getDocs(q)
   const now = Date.now()
 
   return snap.docs
     .map((d) => d.data() as TrackDoc)
+    .filter(isTrackAcceptingDjRequests)
     .filter((t) => t.embargoUntil == null || t.embargoUntil.toMillis() <= now)
     .filter((t) => opts.includeProPlusOnly || t.djPromoTier === 'all')
+    .filter((t) => !filters.genre || t.genre === filters.genre)
     .filter((t) => !filters.mood || t.mood === filters.mood)
     .filter((t) => !filters.key || t.key === filters.key)
     .filter((t) => !filters.licenceMode || t.djLicenceMode === filters.licenceMode)
     .filter((t) => !filters.location || t.location === filters.location)
     .filter((t) => filters.bpmMin == null || (t.bpm != null && t.bpm >= filters.bpmMin))
     .filter((t) => filters.bpmMax == null || (t.bpm != null && t.bpm <= filters.bpmMax))
+    .slice(0, opts.count ?? 100)
 }
 
 /** Convenience query for DJ discovery. */

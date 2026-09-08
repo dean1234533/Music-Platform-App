@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Play, Pause, Radio, Flag, Scale, ArrowLeft } from 'lucide-react'
-import { subscribeTrack } from '@/services/trackService'
+import { isTrackAcceptingDjRequests, subscribeTrack } from '@/services/trackService'
 import { usePlayer } from '@/contexts/PlayerContext'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { useAuth } from '@/contexts/AuthContext'
@@ -51,6 +51,7 @@ export function TrackPage() {
   if (track === null) return <EmptyState title="Track not found" />
 
   const isCurrent = currentTrack?.trackId === track.trackId
+  const acceptsDjRequests = isTrackAcceptingDjRequests(track)
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-10">
@@ -85,7 +86,7 @@ export function TrackPage() {
                 text={`Listen to "${track.title}" by ${artist.name} on BackTheVibes`}
               />
             ) : null}
-            {track.djPromotion ? (
+            {acceptsDjRequests ? (
               <span className="flex items-center gap-1.5 rounded-full bg-dj-500/15 px-3 py-2 text-xs font-medium text-dj-400">
                 <Radio className="h-3.5 w-3.5" />
                 Open for DJ promotion
@@ -128,9 +129,9 @@ export function TrackPage() {
         </div>
       )}
 
-      {track.djPromotion && track.djLicenceMode !== 'not_available' ? (
+      {acceptsDjRequests ? (
         <div className="flex flex-col gap-3 rounded-xl border border-dj-500/30 bg-dj-500/5 px-4 py-3 text-sm text-ink-1 sm:flex-row sm:items-center sm:justify-between">
-          <span>This track is open for DJ requests.</span>
+          <span>This artist is accepting DJ requests for this track.</span>
           {hasRole('dj') ? (
             <Button size="sm" onClick={() => setShowDjRequest(true)}>
               Request DJ access

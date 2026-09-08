@@ -48,13 +48,13 @@ export const submitLicenceRequest = onCall(async (request) => {
   const trackSnap = await db.collection('tracks').doc(trackId).get()
   if (!trackSnap.exists) throw new HttpsError('not-found', 'Track not found.')
   const track = trackSnap.data()!
-  if (!track.djPromotion || track.djLicenceMode === 'not_available') {
-    throw new HttpsError('failed-precondition', 'This track is not open for DJ requests.')
-  }
   const dealSettings = track.djDealSettings as
     | { acceptDjRequests: boolean; allowedDealIds: string[]; verifiedDjsOnly: boolean }
     | undefined
-  if (dealSettings && !dealSettings.acceptDjRequests) {
+  const acceptsDjRequests = dealSettings
+    ? dealSettings.acceptDjRequests
+    : Boolean(track.djPromotion && track.djLicenceMode !== 'not_available')
+  if (!acceptsDjRequests) {
     throw new HttpsError('failed-precondition', 'This track is not open for DJ requests.')
   }
   if (dealId && (!dealSettings || !dealSettings.allowedDealIds.includes(dealId))) {

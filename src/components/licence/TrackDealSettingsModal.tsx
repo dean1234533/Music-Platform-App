@@ -68,6 +68,9 @@ export function TrackDealSettingsModal({ track, onClose }: { track: TrackDoc; on
 
         {settings.acceptDjRequests ? (
           <>
+            <p className="text-xs text-ink-3">
+              DJs can send a request without choosing a deal. If manual approval is enabled, you review every request before an offer can proceed.
+            </p>
             <div>
               <Label>Allowed deals</Label>
               {deals.length === 0 ? (

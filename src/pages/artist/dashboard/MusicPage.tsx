@@ -12,7 +12,7 @@ import { TrackDealSettingsModal } from '@/components/licence/TrackDealSettingsMo
 import { TrackDjAccessModal } from '@/components/licence/TrackDjAccessModal'
 import type { TrackDoc } from '@/types/track'
 import { OPEN_CLAIM_STATUSES, type CopyrightClaimDoc } from '@/types/moderation'
-import { deleteTrack } from '@/services/trackService'
+import { deleteTrack, isTrackAcceptingDjRequests } from '@/services/trackService'
 import { useToast } from '@/contexts/ToastContext'
 
 const VISIBILITY_LABEL: Record<TrackDoc['visibility'], string> = {
@@ -109,10 +109,10 @@ export function MusicPage() {
               <span className="shrink-0 rounded-full bg-surface-3 px-2.5 py-1 text-xs text-ink-1">
                 {VISIBILITY_LABEL[track.visibility]}
               </span>
-              {track.djPromotion ? (
+              {isTrackAcceptingDjRequests(track) ? (
                 <span className="shrink-0 rounded-full bg-dj-500/15 px-2.5 py-1 text-xs text-dj-400">DJ promo</span>
               ) : null}
-              {track.djPromotion ? (
+              {isTrackAcceptingDjRequests(track) ? (
                 <button
                   type="button"
                   onClick={() => setOutreachTrack(track)}

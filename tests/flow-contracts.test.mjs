@@ -121,6 +121,19 @@ test('DJ requests page exposes the request flow instead of becoming a dead end',
   assert.match(read('functions/src/messaging/bulkOutreach.ts'), /linkTo: `\/track\/\$\{trackId\}`/)
 })
 
+test('manual approval still lets DJs send a request without an artist deal', () => {
+  const trackService = read('src/services/trackService.ts')
+  const trackPage = read('src/pages/track/TrackPage.tsx')
+  const requestBackend = read('functions/src/licensing/requests.ts')
+  const settings = read('src/components/licence/TrackDealSettingsModal.tsx')
+  assert.match(trackService, /if \(track\.djDealSettings\) return track\.djDealSettings\.acceptDjRequests/)
+  assert.match(trackService, /filter\(isTrackAcceptingDjRequests\)/)
+  assert.match(trackPage, /const acceptsDjRequests = isTrackAcceptingDjRequests\(track\)/)
+  assert.match(trackPage, /Request DJ access/)
+  assert.match(requestBackend, /dealSettings\s*\? dealSettings\.acceptDjRequests/)
+  assert.match(settings, /DJs can send a request without choosing a deal/)
+})
+
 test('notifications use Firestore IDs and navigate their deep links', () => {
   assert.match(read('src/services/notificationService.ts'), /notificationId: d\.id/)
   const page = read('src/pages/fan/NotificationsPage.tsx')
