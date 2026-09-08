@@ -14,6 +14,7 @@ import { formatFileSize, MAX_AUDIO_MB, MAX_IMAGE_MB, validateAudioFile, validate
 import { PREVIEW_MAX_DURATION_SEC, PREVIEW_MIN_DURATION_SEC, SUGGESTED_PREVIEW_DURATIONS_SEC } from '@/constants/mediaConfig'
 import type { LicenceMode, TrackRightsMetadata, TrackVisibility } from '@/types/track'
 import { CAMELOT_KEYS, GENRES, MOODS } from '@/constants/musicTaxonomy'
+import { MAX_STORED_TRACKS_PER_ARTIST } from '@/constants/platformLimits'
 
 const VISIBILITY_OPTIONS: { value: TrackVisibility; label: string }[] = [
   { value: 'public', label: 'Public stream' },
@@ -58,6 +59,7 @@ export function UploadTrackPage() {
   const [mood, setMood] = useState('')
   const [trackKey, setTrackKey] = useState('')
   const [artistLocation, setArtistLocation] = useState<string | null>(null)
+  const [storedTrackCount, setStoredTrackCount] = useState<number | null>(null)
   const [description, setDescription] = useState('')
   const [explicit, setExplicit] = useState(false)
   const [songwriters, setSongwriters] = useState('')
@@ -73,7 +75,10 @@ export function UploadTrackPage() {
 
   useEffect(() => {
     if (!firebaseUser) return
-    getArtistProfile(firebaseUser.uid).then((profile) => setArtistLocation(profile?.location ?? null))
+    getArtistProfile(firebaseUser.uid).then((profile) => {
+      setArtistLocation(profile?.location ?? null)
+      setStoredTrackCount(profile?.trackCount ?? 0)
+    })
   }, [firebaseUser])
 
   const [masterFile, setMasterFile] = useState<File | null>(null)
@@ -119,6 +124,17 @@ export function UploadTrackPage() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     if (!firebaseUser) return
+    const artistProfile = await getArtistProfile(firebaseUser.uid)
+    const currentTrackCount = artistProfile?.trackCount
+    if (currentTrackCount === undefined) {
+      setError('We could not verify your track allowance. Please refresh and try again.')
+      return
+    }
+    setStoredTrackCount(currentTrackCount)
+    if (currentTrackCount >= MAX_STORED_TRACKS_PER_ARTIST) {
+      setError(`Your account can store up to ${MAX_STORED_TRACKS_PER_ARTIST} tracks. Delete an existing track before uploading another.`)
+      return
+    }
     if (!masterFile) {
       setError('A master audio file is required.')
       return
@@ -225,6 +241,16 @@ export function UploadTrackPage() {
         Upload one master file — we'll automatically create an optimised streaming version and a
         preview clip. The master stays private.
       </p>
+
+      <div className="mt-5 flex items-center justify-between rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm">
+        <span className="text-ink-1">Stored track allowance</span>
+        <span className="font-semibold text-ink-0">
+          {storedTrackCount === null ? 'Checking…' : `${storedTrackCount} of ${MAX_STORED_TRACKS_PER_ARTIST}`}
+        </span>
+      </div>
+      {storedTrackCount !== null && storedTrackCount >= MAX_STORED_TRACKS_PER_ARTIST ? (
+        <p className="mt-2 text-sm text-ink-2">Delete an existing track from Music before uploading another.</p>
+      ) : null}
 
       <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-6">
         <fieldset disabled={submitting} className="contents">
@@ -513,7 +539,7 @@ export function UploadTrackPage() {
         {mediaUpload.state.stage !== 'idle' ? <UploadProgress state={mediaUpload.state} /> : null}
         {error ? <p className="text-sm text-danger-500">{error}</p> : null}
 
-        <Button type="submit" loading={submitting} className="w-fit">
+        <Button type="submit" loading={submitting} disabled={storedTrackCount === null || storedTrackCount >= MAX_STORED_TRACKS_PER_ARTIST} className="w-fit">
           Publish track
         </Button>
         </fieldset>

@@ -342,13 +342,14 @@ export function AdminSettingsPage() {
           </div>
 
           <div>
-            <Label>Limits (use -1 for unlimited)</Label>
+            <Label>Finite plan allowances</Label>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {FAN_LIMIT_KEYS.map((key) => (
                 <div key={key}>
                   <Label>{key}</Label>
                   <Input
                     type="number"
+                    min="0"
                     value={form.limits[key] ?? ''}
                     onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, [key]: e.target.value } }))}
                   />

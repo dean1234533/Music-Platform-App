@@ -53,7 +53,13 @@ export const adminUpsertSubscriptionPlan = onCall(async (request) => {
   const cleanedLimits: Record<string, number> = {}
   if (limits && typeof limits === 'object') {
     for (const key of PLAN_LIMIT_KEYS) {
-      if (typeof limits[key] === 'number') cleanedLimits[key] = limits[key]
+      const value = limits[key]
+      if (typeof value === 'number') {
+        if (!Number.isFinite(value) || value < 0) {
+          throw new HttpsError('invalid-argument', `${key} must be a finite, non-negative allowance.`)
+        }
+        cleanedLimits[key] = value
+      }
     }
   }
 

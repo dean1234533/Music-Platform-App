@@ -115,6 +115,9 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.resource.data.artistId == request.auth.uid
         && hasRole('artist')
+        // Keep this finite storage allowance in sync with platformLimits.ts.
+        && exists(/databases/$(database)/documents/artistProfiles/$(request.auth.uid))
+        && get(/databases/$(database)/documents/artistProfiles/$(request.auth.uid)).data.get('trackCount', 0) < 10
         && request.resource.data.rightsConfirmed == true
         && request.resource.data.playCount == 0;
 

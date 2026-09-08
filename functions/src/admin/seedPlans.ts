@@ -13,8 +13,8 @@ const SEED_PLANS: SeedPlan[] = [
     features: {}, limits: { supportAllocationCapMinor: 0 }, displayOrder: 0, recommended: false,
   },
   {
-    planId: 'fan_supporter', name: 'Supporter', role: 'fan', tier: 'mid', priceMinor: 0,
-    currency: 'gbp', interval: 'month', stripePriceId: null, active: false, isDefaultFree: false,
+    planId: 'fan_supporter', name: 'Supporter', role: 'fan', tier: 'mid', priceMinor: 499,
+    currency: 'gbp', interval: 'month', stripePriceId: null, active: true, isDefaultFree: false,
     features: { supporterContent: true, earlyAccess: true, polls: true, artistDefinedPerks: true },
     limits: {}, displayOrder: 1, recommended: true,
   },
@@ -22,7 +22,7 @@ const SEED_PLANS: SeedPlan[] = [
 
 const LEGACY_PLAN_IDS = ['fan_super_supporter', 'artist_starter', 'artist_pro', 'artist_pro_plus', 'dj_free', 'dj_pro', 'dj_pro_plus']
 
-/** Seeds a disabled Supporter template without choosing its price, and retires legacy creator/DJ plans. */
+/** Seeds the launch Supporter offer and retires legacy creator/DJ plans. */
 export const adminSeedSubscriptionPlans = onCall(async (request) => {
   const adminId = await requireAdmin(request)
   const seeded: string[] = []

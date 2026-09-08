@@ -40,7 +40,7 @@ export function PricingPage() {
           <p className="eyebrow">Simple pricing</p>
           <h1 className="mt-4 text-4xl font-medium tracking-[-0.045em] sm:text-6xl">Create for free. Support by choice.</h1>
           <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-ink-2">
-            Artists and DJs get the complete platform without subscriptions or artificial limits. Listener memberships fund the artists fans choose.
+            Artists and DJs start free with clear allowances. Listener memberships fund the artists fans choose.
           </p>
         </div>
 
@@ -75,8 +75,8 @@ export function PricingPage() {
             <h2 className="mt-2 text-3xl font-medium tracking-[-0.04em]">No creator subscription. No upgrade wall.</h2>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
-            <PriceCard index={0} title="Artist" price="Free" description="Release music, grow supporters, reach opted-in DJs, and manage revenue." features={['Unlimited track uploads', 'Releases, analytics and supporter content', 'DJ outreach, licensing and payouts']} cta={firebaseUser && hasRole('artist') ? 'Open artist dashboard' : 'Create artist profile'} to={firebaseUser ? (hasRole('artist') ? '/dashboard/artist' : '/onboarding/add-role?role=artist') : '/sign-up?role=artist'} />
-            <PriceCard index={1} title="DJ" price="Free" description="Discover releases and agree track licences directly with artists." features={['Unlimited licence requests', 'Filters, crates, notes and analytics', 'Verification and secure downloads']} cta={firebaseUser && hasRole('dj') ? 'Open DJ workspace' : 'Create DJ profile'} to={firebaseUser ? (hasRole('dj') ? '/dj/discover' : '/onboarding/add-role?role=dj') : '/sign-up?role=dj'} />
+            <PriceCard index={0} title="Artist" price="Free" description="Release music, grow supporters, reach opted-in DJs, and manage revenue." features={['Up to 10 stored tracks', 'Releases, analytics and supporter content', 'DJ outreach, licensing and payouts']} cta={firebaseUser && hasRole('artist') ? 'Open artist dashboard' : 'Create artist profile'} to={firebaseUser ? (hasRole('artist') ? '/dashboard/artist' : '/onboarding/add-role?role=artist') : '/sign-up?role=artist'} />
+            <PriceCard index={1} title="DJ" price="Free" description="Discover releases and agree track licences directly with artists." features={['Direct artist-approved licence requests', 'Filters, crates, notes and analytics', 'Verification and secure downloads']} cta={firebaseUser && hasRole('dj') ? 'Open DJ workspace' : 'Create DJ profile'} to={firebaseUser ? (hasRole('dj') ? '/dj/discover' : '/onboarding/add-role?role=dj') : '/sign-up?role=dj'} />
           </div>
           <p className="mt-6 text-center text-xs leading-5 text-ink-3">DJ licence prices are agreed with each artist. The configured transaction fee and artist proceeds are shown before payment.</p>
         </section>

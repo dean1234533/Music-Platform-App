@@ -17,7 +17,24 @@ test('creator pricing remains free and role CTAs preserve their intent', () => {
   assert.match(pricing, /title="DJ" price="Free"/)
   assert.match(pricing, /add-role\?role=artist/)
   assert.match(pricing, /add-role\?role=dj/)
+  assert.match(pricing, /Up to 10 stored tracks/)
+  assert.doesNotMatch(pricing, /unlimited/i)
   assert.doesNotMatch(pricing, /Artist Pro(?:\+|\b)|DJ Pro(?:\+|\b)|upgrade artist|upgrade DJ/i)
+})
+
+test('track storage allowance is shown before upload and enforced by Firestore', () => {
+  const upload = read('src/pages/artist/dashboard/UploadTrackPage.tsx')
+  const rules = read('firestore.rules')
+  assert.match(upload, /MAX_STORED_TRACKS_PER_ARTIST/)
+  assert.match(upload, /Stored track allowance/)
+  assert.match(rules, /trackCount[\s\S]*?< 10/)
+})
+
+test('launch supporter pricing stays low-friction and legacy tiers are retired', () => {
+  const seedPlans = read('functions/src/admin/seedPlans.ts')
+  assert.match(seedPlans, /fan_supporter[\s\S]*?priceMinor: 499/)
+  assert.match(seedPlans, /fan_super_supporter/)
+  assert.doesNotMatch(read('src/pages/marketing/PricingPage.tsx'), /artificial limits/i)
 })
 
 test('email signup cannot continue before verification', () => {

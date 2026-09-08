@@ -75,7 +75,7 @@ service firebase.storage {
     // through a Cloud Function issuing short-lived signed URLs (Phase 4),
     // never through a client-readable Storage rule. Still must be a
     // compressed format — WAV/FLAC uploads are rejected here too, since
-    // "original" means the master the artist licenses, not an unlimited
+    // "original" means the master the artist licenses, not an unbounded
     // raw-file dumping ground.
     match /artists/{artistId}/originals/{fileName} {
       allow read: if isOwner(artistId);
