@@ -39,9 +39,9 @@ export function PricingPage() {
       <main className="mx-auto max-w-6xl px-5 py-16 sm:px-8 lg:px-12">
         <div className="text-center">
           <p className="eyebrow">Simple pricing</p>
-          <h1 className="mt-4 text-4xl font-medium tracking-[-0.045em] sm:text-6xl">Create for free. Support by choice.</h1>
+          <h1 className="mt-4 text-4xl font-medium tracking-[-0.045em] sm:text-6xl">Clear prices. Finite limits. Fair earnings.</h1>
           <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-ink-2">
-            Artists and DJs start free with clear allowances. Listener memberships fund the artists fans choose.
+            Listeners and DJs can start free. Artists pay one modest annual membership to publish and earn; listener memberships fund the artists fans choose.
           </p>
         </div>
 
@@ -73,14 +73,14 @@ export function PricingPage() {
         <section className="mt-20">
           <div className="mb-7 border-b border-white/10 pb-5">
             <p className="eyebrow">For music makers</p>
-            <h2 className="mt-2 text-3xl font-medium tracking-[-0.04em]">No creator subscription. No upgrade wall.</h2>
+            <h2 className="mt-2 text-3xl font-medium tracking-[-0.04em]">One affordable year of artist tools.</h2>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
-            <PriceCard index={0} title="Artist" price="Free" description="Release music, grow supporters, reach opted-in DJs, and manage revenue." features={['Up to 10 stored tracks', 'Releases, analytics and supporter content', 'DJ outreach, licensing and payouts']} cta={firebaseUser && hasRole('artist') ? 'Open artist dashboard' : 'Create artist profile'} to={firebaseUser ? (hasRole('artist') ? '/dashboard/artist' : '/onboarding/add-role?role=artist') : '/sign-up?role=artist'} />
+            <PriceCard index={0} featured title="Artist Membership" price="£29.99" suffix="/year" description="About £2.50 a month, billed once yearly. Publish music, build direct fan support, and manage your earnings." features={['Up to 10 stored tracks', 'Releases, analytics and supporter offers', 'DJ outreach, licensing and earnings tools']} cta={firebaseUser && hasRole('artist') ? 'Open artist dashboard' : 'Create artist profile'} to={firebaseUser ? (hasRole('artist') ? '/dashboard/artist' : '/onboarding/add-role?role=artist') : '/sign-up?role=artist'} />
             <PriceCard index={1} title="DJ" price="Free" description="Discover releases and agree track licences directly with artists." features={['Direct artist-approved licence requests', 'Filters, crates, notes and analytics', 'Verification and secure downloads']} cta={firebaseUser && hasRole('dj') ? 'Open DJ workspace' : 'Create DJ profile'} to={firebaseUser ? (hasRole('dj') ? '/dj/discover' : '/onboarding/add-role?role=dj') : '/sign-up?role=dj'} />
           </div>
           <p className="mt-6 text-center text-xs leading-5 text-ink-3">DJ licence prices are agreed with each artist. Wavelength takes 15% of net transaction revenue; the artist receives 85%.</p>
-          <p className="mt-2 text-center text-xs leading-5 text-ink-3">Artist earnings clear after 7 days and can be withdrawn once the available balance reaches £25.</p>
+          <p className="mt-2 text-center text-xs leading-5 text-ink-3">Artist earnings clear after 7 days. Artists can request a payout whenever their available balance reaches £25.</p>
         </section>
 
         <p className="mx-auto mt-12 max-w-3xl text-center text-xs leading-5 text-ink-3">

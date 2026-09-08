@@ -11,9 +11,10 @@ test('public, fan, artist, DJ, agreement, and admin routes are registered', () =
   }
 })
 
-test('creator pricing remains free and role CTAs preserve their intent', () => {
+test('artist annual pricing and role CTAs preserve their intent', () => {
   const pricing = read('src/pages/marketing/PricingPage.tsx')
-  assert.match(pricing, /title="Artist" price="Free"/)
+  assert.match(pricing, /title="Artist Membership" price="£29\.99" suffix="\/year"/)
+  assert.match(pricing, /About £2\.50 a month, billed once yearly/)
   assert.match(pricing, /title="DJ" price="Free"/)
   assert.match(pricing, /add-role\?role=artist/)
   assert.match(pricing, /add-role\?role=dj/)

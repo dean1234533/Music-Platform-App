@@ -171,9 +171,9 @@ export function LandingPage() {
                 <div><p className="eyebrow">Platform membership</p><h3 className="mt-3 text-3xl font-medium tracking-[-0.04em]">Join free</h3></div>
                 <p className="text-3xl font-medium tracking-[-0.04em] text-ink-0">£0</p>
               </div>
-              <p className="mt-5 max-w-xl text-sm leading-6 text-ink-2">One account gives you the complete foundation. Listen as a fan, publish as an artist, work as a DJ—or add more than one role.</p>
+              <p className="mt-5 max-w-xl text-sm leading-6 text-ink-2">One account gives you the complete foundation. Listen as a fan, create an artist profile, work as a DJ—or add more than one role.</p>
               <div className="mt-7 grid gap-3 sm:grid-cols-3">
-                {[['Listen', 'Discover, follow and build playlists.'], ['Create', 'Release music and grow support.'], ['DJ', 'Discover, negotiate and license.']].map(([title, copy]) => (
+                {[['Listen', 'Discover, follow and build playlists.'], ['Create', 'Build a profile; artist publishing is £29.99/year.'], ['DJ', 'Discover, negotiate and license.']].map(([title, copy]) => (
                   <div key={title} className="border-t border-white/10 pt-3"><p className="text-sm font-semibold text-ink-0">{title}</p><p className="mt-1 text-xs leading-5 text-ink-3">{copy}</p></div>
                 ))}
               </div>
@@ -190,7 +190,7 @@ export function LandingPage() {
               <Link to="/sign-up?role=fan" className="mt-8 inline-flex items-center gap-2 rounded-full bg-brand-500 px-5 py-3 text-sm font-semibold text-surface-0 transition hover:bg-brand-400">Become a supporter <ArrowRight className="h-4 w-4" /></Link>
             </div>
           </div>
-          <p className="mx-auto mt-6 max-w-2xl text-center text-xs leading-5 text-ink-3">Licensing fees are agreed directly between artists and DJs. Applicable platform fees are shown before payment or payout.</p>
+          <p className="mx-auto mt-6 max-w-2xl text-center text-xs leading-5 text-ink-3">Artist membership is £29.99 per year. Licensing fees are agreed directly between artists and DJs. Applicable platform fees are shown before payment or payout.</p>
           <p className="mt-4 text-center">
             <Link to="/pricing" className="text-sm font-medium text-brand-400 transition hover:text-brand-300">See all pricing →</Link>
           </p>
