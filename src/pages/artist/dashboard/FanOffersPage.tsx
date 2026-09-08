@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Gift, Sparkles } from 'lucide-react'
+import { Gift } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { createFanOffer, deleteFanOffer, subscribeArtistFanOffers } from '@/services/fanOfferService'
@@ -60,7 +60,7 @@ export function FanOffersPage() {
 
       <section className="rounded-[1.5rem] border border-white/[0.09] bg-white/[0.025] p-5 sm:p-6">
         <div className="mb-5 flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-500/10 text-brand-400"><Sparkles size={19} /></span>
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-500/10 text-brand-400"><Gift size={19} strokeWidth={1.8} /></span>
           <div><h2 className="font-semibold text-ink-0">Create an offer</h2><p className="text-xs text-ink-3">Fans see the redemption details only after claiming.</p></div>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
