@@ -82,11 +82,18 @@ export const deleteTrack = onCall(async (request) => {
     throw new HttpsError('failed-precondition', 'This track has an active licence. Unpublish it instead so the signed entitlement remains available.')
   }
 
+  // Prefix-delete rather than deleting the exact stored path — the stored
+  // originalAudioPath/previewAudioPath/streamAudioPath fields only need to
+  // have been right at upload time to have played correctly since; if any
+  // ever drifted from the real Storage path (a legacy doc, a stale field),
+  // an exact bucket.file(path).delete() silently no-ops via ignoreNotFound
+  // instead of actually removing the file. The trackId segment of the path
+  // is always reliable since it's the Firestore doc id itself.
   const bucket = getStorage().bucket()
   await Promise.all([
-    track.originalAudioPath ? bucket.file(track.originalAudioPath).delete({ ignoreNotFound: true }) : Promise.resolve(),
-    track.previewAudioPath ? bucket.file(track.previewAudioPath).delete({ ignoreNotFound: true }) : Promise.resolve(),
-    track.streamAudioPath ? bucket.file(track.streamAudioPath).delete({ ignoreNotFound: true }) : Promise.resolve(),
+    bucket.deleteFiles({ prefix: `artists/${track.artistId}/originals/${trackId}.` }),
+    bucket.deleteFiles({ prefix: `artists/${track.artistId}/streaming/${trackId}.` }),
+    bucket.deleteFiles({ prefix: `artists/${track.artistId}/previews/${trackId}.` }),
     bucket.deleteFiles({ prefix: `artists/${track.artistId}/artwork/${trackId}.` }),
   ])
 
