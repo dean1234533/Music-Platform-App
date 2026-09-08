@@ -59,6 +59,7 @@ const ArtistSettingsPage = lazy(() => import('@/pages/artist/dashboard/ArtistSet
 
 const DJDashboardLayout = lazy(() => import('@/pages/dj/DJDashboardLayout').then((m) => ({ default: m.DJDashboardLayout })))
 const DJDiscoverPage = lazy(() => import('@/pages/dj/DJDiscoverPage').then((m) => ({ default: m.DJDiscoverPage })))
+const DJArtistsPage = lazy(() => import('@/pages/dj/DJArtistsPage').then((m) => ({ default: m.DJArtistsPage })))
 const DJRequestsPage = lazy(() => import('@/pages/dj/DJRequestsPage').then((m) => ({ default: m.DJRequestsPage })))
 const DJProfilePage = lazy(() => import('@/pages/dj/DJProfilePage').then((m) => ({ default: m.DJProfilePage })))
 const DJPublicProfilePage = lazy(() => import('@/pages/dj/DJPublicProfilePage').then((m) => ({ default: m.DJPublicProfilePage })))
@@ -227,6 +228,7 @@ function App() {
               }
             >
               <Route path="discover" element={<DJDiscoverPage />} />
+              <Route path="artists" element={<DJArtistsPage />} />
               <Route path="requests" element={<DJRequestsPage />} />
               <Route path="crates" element={<DJCratesPage />} />
               <Route path="analytics" element={<DJAnalyticsPage />} />
