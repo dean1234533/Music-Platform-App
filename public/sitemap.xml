@@ -1,62 +1,62 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://music-platform-app.dbsworkouts.workers.dev/</loc>
+    <loc>https://backthevibes.com/</loc>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://music-platform-app.dbsworkouts.workers.dev/pricing</loc>
+    <loc>https://backthevibes.com/pricing</loc>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://music-platform-app.dbsworkouts.workers.dev/for-djs</loc>
+    <loc>https://backthevibes.com/for-djs</loc>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://music-platform-app.dbsworkouts.workers.dev/for-artists</loc>
+    <loc>https://backthevibes.com/for-artists</loc>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://music-platform-app.dbsworkouts.workers.dev/blog</loc>
+    <loc>https://backthevibes.com/blog</loc>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://music-platform-app.dbsworkouts.workers.dev/terms</loc>
+    <loc>https://backthevibes.com/terms</loc>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://music-platform-app.dbsworkouts.workers.dev/privacy</loc>
+    <loc>https://backthevibes.com/privacy</loc>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://music-platform-app.dbsworkouts.workers.dev/copyright</loc>
+    <loc>https://backthevibes.com/copyright</loc>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://music-platform-app.dbsworkouts.workers.dev/sign-in</loc>
+    <loc>https://backthevibes.com/sign-in</loc>
     <priority>0.2</priority>
   </url>
   <url>
-    <loc>https://music-platform-app.dbsworkouts.workers.dev/sign-up</loc>
+    <loc>https://backthevibes.com/sign-up</loc>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://music-platform-app.dbsworkouts.workers.dev/blog/how-djs-license-tracks-legally</loc>
+    <loc>https://backthevibes.com/blog/how-djs-license-tracks-legally</loc>
     <lastmod>2026-08-01</lastmod>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://music-platform-app.dbsworkouts.workers.dev/blog/how-independent-artists-get-paid</loc>
+    <loc>https://backthevibes.com/blog/how-independent-artists-get-paid</loc>
     <lastmod>2026-08-08</lastmod>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://music-platform-app.dbsworkouts.workers.dev/blog/building-an-ethical-dj-crate</loc>
+    <loc>https://backthevibes.com/blog/building-an-ethical-dj-crate</loc>
     <lastmod>2026-08-15</lastmod>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://music-platform-app.dbsworkouts.workers.dev/blog/why-independent-music-discovery-feels-broken</loc>
+    <loc>https://backthevibes.com/blog/why-independent-music-discovery-feels-broken</loc>
     <lastmod>2026-08-22</lastmod>
     <priority>0.6</priority>
   </url>

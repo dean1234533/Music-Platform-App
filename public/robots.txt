@@ -10,4 +10,4 @@ Disallow: /forgot-password
 Disallow: /agreements/
 Disallow: /requests/
 
-Sitemap: https://music-platform-app.dbsworkouts.workers.dev/sitemap.xml
+Sitemap: https://backthevibes.com/sitemap.xml

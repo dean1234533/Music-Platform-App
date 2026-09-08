@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { BLOG_POSTS } from '../src/content/blog.ts'
 
-const SITE_URL = 'https://music-platform-app.dbsworkouts.workers.dev'
+const SITE_URL = 'https://backthevibes.com'
 
 const STATIC_ROUTES = [
   { path: '/', priority: '1.0' },
