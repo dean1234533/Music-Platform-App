@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { PlayerProvider } from '@/contexts/PlayerContext'
@@ -5,70 +6,75 @@ import { ToastProvider } from '@/contexts/ToastContext'
 import { ProtectedRoute, RequireOnboarding } from '@/components/auth/ProtectedRoute'
 import { RoleRoute } from '@/components/auth/RoleRoute'
 import { InstallBanner } from '@/components/pwa/InstallBanner'
+import { LoadingState } from '@/components/common/StateViews'
 
-import { LandingPage } from '@/pages/marketing/LandingPage'
-import { PricingPage } from '@/pages/marketing/PricingPage'
-import { LegalPage } from '@/pages/marketing/LegalPage'
-import { CopyrightPolicyPage } from '@/pages/legal/CopyrightPolicyPage'
-import { CopyrightClaimPage } from '@/pages/legal/CopyrightClaimPage'
-import { SignInPage } from '@/pages/auth/SignInPage'
-import { SignUpPage } from '@/pages/auth/SignUpPage'
-import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
-import { VerifyEmailPage } from '@/pages/auth/VerifyEmailPage'
-import { OnboardingPage } from '@/pages/onboarding/OnboardingPage'
-import { AddRolePage } from '@/pages/onboarding/AddRolePage'
+// Every page is route-level code-split: each becomes its own chunk, fetched
+// only when actually navigated to, instead of one ~1.2MB bundle everyone
+// downloads up front regardless of which of these ~50 pages (many
+// role-gated, most people never touching most of them) they'll ever visit.
+const LandingPage = lazy(() => import('@/pages/marketing/LandingPage').then((m) => ({ default: m.LandingPage })))
+const PricingPage = lazy(() => import('@/pages/marketing/PricingPage').then((m) => ({ default: m.PricingPage })))
+const LegalPage = lazy(() => import('@/pages/marketing/LegalPage').then((m) => ({ default: m.LegalPage })))
+const CopyrightPolicyPage = lazy(() => import('@/pages/legal/CopyrightPolicyPage').then((m) => ({ default: m.CopyrightPolicyPage })))
+const CopyrightClaimPage = lazy(() => import('@/pages/legal/CopyrightClaimPage').then((m) => ({ default: m.CopyrightClaimPage })))
+const SignInPage = lazy(() => import('@/pages/auth/SignInPage').then((m) => ({ default: m.SignInPage })))
+const SignUpPage = lazy(() => import('@/pages/auth/SignUpPage').then((m) => ({ default: m.SignUpPage })))
+const ForgotPasswordPage = lazy(() => import('@/pages/auth/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage })))
+const VerifyEmailPage = lazy(() => import('@/pages/auth/VerifyEmailPage').then((m) => ({ default: m.VerifyEmailPage })))
+const OnboardingPage = lazy(() => import('@/pages/onboarding/OnboardingPage').then((m) => ({ default: m.OnboardingPage })))
+const AddRolePage = lazy(() => import('@/pages/onboarding/AddRolePage').then((m) => ({ default: m.AddRolePage })))
 
-import { FanDashboardLayout } from '@/pages/fan/FanDashboardLayout'
-import { HomePage } from '@/pages/fan/HomePage'
-import { DiscoverPage } from '@/pages/fan/DiscoverPage'
-import { SearchPage } from '@/pages/fan/SearchPage'
-import { FollowingPage } from '@/pages/fan/FollowingPage'
-import { SupportedPage } from '@/pages/fan/SupportedPage'
-import { FanOffersPage as ListenerOffersPage } from '@/pages/fan/FanOffersPage'
-import { LibraryPage } from '@/pages/fan/LibraryPage'
-import { PlaylistsPage } from '@/pages/fan/PlaylistsPage'
-import { PlaylistDetailPage } from '@/pages/fan/PlaylistDetailPage'
-import { NotificationsPage } from '@/pages/fan/NotificationsPage'
-import { SubscriptionPage } from '@/pages/fan/SubscriptionPage'
-import { ProfilePage } from '@/pages/fan/ProfilePage'
-import { SettingsPage } from '@/pages/fan/SettingsPage'
+const FanDashboardLayout = lazy(() => import('@/pages/fan/FanDashboardLayout').then((m) => ({ default: m.FanDashboardLayout })))
+const HomePage = lazy(() => import('@/pages/fan/HomePage').then((m) => ({ default: m.HomePage })))
+const DiscoverPage = lazy(() => import('@/pages/fan/DiscoverPage').then((m) => ({ default: m.DiscoverPage })))
+const SearchPage = lazy(() => import('@/pages/fan/SearchPage').then((m) => ({ default: m.SearchPage })))
+const FollowingPage = lazy(() => import('@/pages/fan/FollowingPage').then((m) => ({ default: m.FollowingPage })))
+const SupportedPage = lazy(() => import('@/pages/fan/SupportedPage').then((m) => ({ default: m.SupportedPage })))
+const ListenerOffersPage = lazy(() => import('@/pages/fan/FanOffersPage').then((m) => ({ default: m.FanOffersPage })))
+const LibraryPage = lazy(() => import('@/pages/fan/LibraryPage').then((m) => ({ default: m.LibraryPage })))
+const PlaylistsPage = lazy(() => import('@/pages/fan/PlaylistsPage').then((m) => ({ default: m.PlaylistsPage })))
+const PlaylistDetailPage = lazy(() => import('@/pages/fan/PlaylistDetailPage').then((m) => ({ default: m.PlaylistDetailPage })))
+const NotificationsPage = lazy(() => import('@/pages/fan/NotificationsPage').then((m) => ({ default: m.NotificationsPage })))
+const SubscriptionPage = lazy(() => import('@/pages/fan/SubscriptionPage').then((m) => ({ default: m.SubscriptionPage })))
+const ProfilePage = lazy(() => import('@/pages/fan/ProfilePage').then((m) => ({ default: m.ProfilePage })))
+const SettingsPage = lazy(() => import('@/pages/fan/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 
-import { ArtistPublicProfilePage } from '@/pages/artist/ArtistPublicProfilePage'
-import { ArtistDashboardLayout } from '@/pages/artist/dashboard/ArtistDashboardLayout'
-import { OverviewPage } from '@/pages/artist/dashboard/OverviewPage'
-import { MusicPage } from '@/pages/artist/dashboard/MusicPage'
-import { UploadTrackPage } from '@/pages/artist/dashboard/UploadTrackPage'
-import { StoriesPage } from '@/pages/artist/dashboard/StoriesPage'
-import { DjDealsPage } from '@/pages/artist/dashboard/DjDealsPage'
-import { StoryAnalyticsPage } from '@/pages/artist/dashboard/StoryAnalyticsPage'
-import { CommunityPage } from '@/pages/artist/dashboard/CommunityPage'
-import { FanOffersPage as ArtistFanOffersPage } from '@/pages/artist/dashboard/FanOffersPage'
-import { DJRequestsPage as ArtistDJRequestsPage } from '@/pages/artist/dashboard/DJRequestsPage'
-import { RevenuePage } from '@/pages/artist/dashboard/RevenuePage'
-import { ArtistSettingsPage } from '@/pages/artist/dashboard/ArtistSettingsPage'
+const ArtistPublicProfilePage = lazy(() => import('@/pages/artist/ArtistPublicProfilePage').then((m) => ({ default: m.ArtistPublicProfilePage })))
+const ArtistDashboardLayout = lazy(() => import('@/pages/artist/dashboard/ArtistDashboardLayout').then((m) => ({ default: m.ArtistDashboardLayout })))
+const OverviewPage = lazy(() => import('@/pages/artist/dashboard/OverviewPage').then((m) => ({ default: m.OverviewPage })))
+const MusicPage = lazy(() => import('@/pages/artist/dashboard/MusicPage').then((m) => ({ default: m.MusicPage })))
+const UploadTrackPage = lazy(() => import('@/pages/artist/dashboard/UploadTrackPage').then((m) => ({ default: m.UploadTrackPage })))
+const StoriesPage = lazy(() => import('@/pages/artist/dashboard/StoriesPage').then((m) => ({ default: m.StoriesPage })))
+const DjDealsPage = lazy(() => import('@/pages/artist/dashboard/DjDealsPage').then((m) => ({ default: m.DjDealsPage })))
+const StoryAnalyticsPage = lazy(() => import('@/pages/artist/dashboard/StoryAnalyticsPage').then((m) => ({ default: m.StoryAnalyticsPage })))
+const CommunityPage = lazy(() => import('@/pages/artist/dashboard/CommunityPage').then((m) => ({ default: m.CommunityPage })))
+const ArtistFanOffersPage = lazy(() => import('@/pages/artist/dashboard/FanOffersPage').then((m) => ({ default: m.FanOffersPage })))
+const ArtistDJRequestsPage = lazy(() => import('@/pages/artist/dashboard/DJRequestsPage').then((m) => ({ default: m.DJRequestsPage })))
+const RevenuePage = lazy(() => import('@/pages/artist/dashboard/RevenuePage').then((m) => ({ default: m.RevenuePage })))
+const ArtistSettingsPage = lazy(() => import('@/pages/artist/dashboard/ArtistSettingsPage').then((m) => ({ default: m.ArtistSettingsPage })))
 
-import { DJDashboardLayout } from '@/pages/dj/DJDashboardLayout'
-import { DJDiscoverPage } from '@/pages/dj/DJDiscoverPage'
-import { DJRequestsPage } from '@/pages/dj/DJRequestsPage'
-import { DJProfilePage } from '@/pages/dj/DJProfilePage'
-import { DJPublicProfilePage } from '@/pages/dj/DJPublicProfilePage'
-import { DJCratesPage } from '@/pages/dj/DJCratesPage'
-import { DJAnalyticsPage } from '@/pages/dj/DJAnalyticsPage'
+const DJDashboardLayout = lazy(() => import('@/pages/dj/DJDashboardLayout').then((m) => ({ default: m.DJDashboardLayout })))
+const DJDiscoverPage = lazy(() => import('@/pages/dj/DJDiscoverPage').then((m) => ({ default: m.DJDiscoverPage })))
+const DJRequestsPage = lazy(() => import('@/pages/dj/DJRequestsPage').then((m) => ({ default: m.DJRequestsPage })))
+const DJProfilePage = lazy(() => import('@/pages/dj/DJProfilePage').then((m) => ({ default: m.DJProfilePage })))
+const DJPublicProfilePage = lazy(() => import('@/pages/dj/DJPublicProfilePage').then((m) => ({ default: m.DJPublicProfilePage })))
+const DJCratesPage = lazy(() => import('@/pages/dj/DJCratesPage').then((m) => ({ default: m.DJCratesPage })))
+const DJAnalyticsPage = lazy(() => import('@/pages/dj/DJAnalyticsPage').then((m) => ({ default: m.DJAnalyticsPage })))
 
-import { TrackPage } from '@/pages/track/TrackPage'
-import { RequestDetailPage } from '@/pages/requests/RequestDetailPage'
-import { MyAgreementsPage } from '@/pages/agreements/MyAgreementsPage'
-import { ContractPage } from '@/pages/agreements/ContractPage'
+const TrackPage = lazy(() => import('@/pages/track/TrackPage').then((m) => ({ default: m.TrackPage })))
+const RequestDetailPage = lazy(() => import('@/pages/requests/RequestDetailPage').then((m) => ({ default: m.RequestDetailPage })))
+const MyAgreementsPage = lazy(() => import('@/pages/agreements/MyAgreementsPage').then((m) => ({ default: m.MyAgreementsPage })))
+const ContractPage = lazy(() => import('@/pages/agreements/ContractPage').then((m) => ({ default: m.ContractPage })))
 
-import { AdminDashboardLayout } from '@/pages/admin/AdminDashboardLayout'
-import { AdminUsersPage } from '@/pages/admin/AdminUsersPage'
-import { AdminVerificationPage } from '@/pages/admin/AdminVerificationPage'
-import { AdminReportsPage } from '@/pages/admin/AdminReportsPage'
-import { AdminSettingsPage } from '@/pages/admin/AdminSettingsPage'
-import { AdminAuditLogPage } from '@/pages/admin/AdminAuditLogPage'
-import { AdminSecurityIncidentsPage } from '@/pages/admin/AdminSecurityIncidentsPage'
+const AdminDashboardLayout = lazy(() => import('@/pages/admin/AdminDashboardLayout').then((m) => ({ default: m.AdminDashboardLayout })))
+const AdminUsersPage = lazy(() => import('@/pages/admin/AdminUsersPage').then((m) => ({ default: m.AdminUsersPage })))
+const AdminVerificationPage = lazy(() => import('@/pages/admin/AdminVerificationPage').then((m) => ({ default: m.AdminVerificationPage })))
+const AdminReportsPage = lazy(() => import('@/pages/admin/AdminReportsPage').then((m) => ({ default: m.AdminReportsPage })))
+const AdminSettingsPage = lazy(() => import('@/pages/admin/AdminSettingsPage').then((m) => ({ default: m.AdminSettingsPage })))
+const AdminAuditLogPage = lazy(() => import('@/pages/admin/AdminAuditLogPage').then((m) => ({ default: m.AdminAuditLogPage })))
+const AdminSecurityIncidentsPage = lazy(() => import('@/pages/admin/AdminSecurityIncidentsPage').then((m) => ({ default: m.AdminSecurityIncidentsPage })))
 
-import { NotFoundPage } from '@/pages/NotFoundPage'
+const NotFoundPage = lazy(() => import('@/pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })))
 
 function App() {
   return (
@@ -77,6 +83,7 @@ function App() {
         <ToastProvider>
           <PlayerProvider>
             <InstallBanner />
+            <Suspense fallback={<LoadingState label="Loading…" />}>
             <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/pricing" element={<PricingPage />} />
@@ -239,6 +246,7 @@ function App() {
 
             <Route path="*" element={<NotFoundPage />} />
             </Routes>
+            </Suspense>
           </PlayerProvider>
         </ToastProvider>
       </AuthProvider>
