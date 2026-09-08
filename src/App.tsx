@@ -230,7 +230,7 @@ function App() {
               <Route path="discover" element={<DJDiscoverPage />} />
               <Route path="artists" element={<DJArtistsPage />} />
               <Route path="requests" element={<DJRequestsPage />} />
-              <Route path="crates" element={<DJCratesPage />} />
+              <Route path="sets" element={<DJCratesPage />} />
               <Route path="analytics" element={<DJAnalyticsPage />} />
               <Route path="profile" element={<DJProfilePage />} />
               <Route path="plan" element={<Navigate replace to="/dj/profile" />} />

@@ -43,13 +43,13 @@ export function DJCratesPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold text-ink-0">Crates</h1>
+        <h1 className="text-2xl font-semibold text-ink-0">Sets</h1>
         <p className="mt-1 text-sm text-ink-2">Organize tracks you're considering or cleared to play into named sets.</p>
       </div>
 
       <div className="flex max-w-md gap-2">
         <Input
-          placeholder="New crate name"
+          placeholder="New set name"
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
@@ -63,7 +63,7 @@ export function DJCratesPage() {
       {crates === null ? (
         <LoadingState />
       ) : crates.length === 0 ? (
-        <EmptyState icon={<Layers className="h-8 w-8 text-ink-3" />} title="No crates yet" description="Create your first crate above." />
+        <EmptyState icon={<Layers className="h-8 w-8 text-ink-3" />} title="No sets yet" description="Create your first set above." />
       ) : (
         <div className="flex flex-col gap-4">
           {crates.map((crate) => (
@@ -100,7 +100,7 @@ function CrateCard({ crate }: { crate: CrateDoc }) {
           onClick={() => deleteCrate(crate.crateId)}
           className="text-xs text-ink-3 transition hover:text-danger-500"
         >
-          Delete crate
+          Delete set
         </button>
       </div>
 
@@ -116,7 +116,7 @@ function CrateCard({ crate }: { crate: CrateDoc }) {
                   {track?.artworkURL ? <img src={track.artworkURL} alt="" className="h-full w-full object-cover" /> : null}
                 </div>
                 <span className="min-w-0 flex-1 truncate">{track ? track.title : track === null ? 'Track no longer available' : 'Loading…'}</span>
-                <button type="button" onClick={() => removeTrackFromCrate(crate.crateId, trackId)} aria-label="Remove from crate">
+                <button type="button" onClick={() => removeTrackFromCrate(crate.crateId, trackId)} aria-label="Remove from set">
                   <X className="h-3.5 w-3.5 text-ink-3 hover:text-danger-500" />
                 </button>
               </li>
