@@ -154,6 +154,21 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    // blockedUsers/{blockerId_blockedId} — who I've blocked. Read is
+    // blocker-only (the blocked party never gets to see they're blocked
+    // through this doc); enforcement (e.g. sendMessage refusing to deliver
+    // between two users where either has blocked the other) happens
+    // server-side via the Admin SDK, which isn't limited by this read rule.
+    match /blockedUsers/{blockId} {
+      allow read: if isSignedIn() && (resource == null || resource.data.blockerId == request.auth.uid);
+      allow create: if isSignedIn()
+        && request.resource.data.blockerId == request.auth.uid
+        && request.resource.data.blockedId != request.auth.uid
+        && blockId == request.resource.data.blockerId + '_' + request.resource.data.blockedId;
+      allow delete: if isSignedIn() && resource.data.blockerId == request.auth.uid;
+      allow update: if false;
+    }
+
     match /trackLikes/{likeId} {
       // resource == null short-circuits for the common "not liked" case —
       // subscribeIsLiked reads a doc that usually doesn't exist.

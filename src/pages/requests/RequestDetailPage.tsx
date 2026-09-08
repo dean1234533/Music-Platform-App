@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Download, Send, ArrowLeft } from 'lucide-react'
+import { Download, Send, ArrowLeft, ShieldOff, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { blockUser, subscribeIsBlocked, unblockUser } from '@/services/blockService'
 import {
   createLicencePaymentSession,
   getSecureDownloadUrl,
@@ -53,6 +54,8 @@ export function RequestDetailPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null)
+  const [isBlocked, setIsBlocked] = useState(false)
+  const [blockBusy, setBlockBusy] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const artist = useArtistSummary(request?.artistId ?? null)
@@ -82,12 +85,30 @@ export function RequestDetailPage() {
 
   useEffect(() => { void getPlatformSettings().then(setPlatformSettings) }, [])
 
+  useEffect(() => {
+    if (!request || !firebaseUser) return
+    const otherPartyId = request.artistId === firebaseUser.uid ? request.djId : request.artistId
+    return subscribeIsBlocked(firebaseUser.uid, otherPartyId, setIsBlocked)
+  }, [request, firebaseUser])
+
   if (request === undefined) return <LoadingState label="Loading request…" />
   if (request === null || !firebaseUser) return <EmptyState title="Request not found" />
 
   const isArtist = request.artistId === firebaseUser.uid
   const isDj = request.djId === firebaseUser.uid
   if (!isArtist && !isDj) return <EmptyState title="You don't have access to this request" />
+
+  const otherPartyId = isArtist ? request.djId : request.artistId
+
+  async function handleToggleBlock() {
+    setBlockBusy(true)
+    try {
+      if (isBlocked) await unblockUser(firebaseUser!.uid, otherPartyId)
+      else await blockUser(firebaseUser!.uid, otherPartyId)
+    } finally {
+      setBlockBusy(false)
+    }
+  }
 
   async function runAction(fn: () => Promise<unknown>) {
     setBusy(true)
@@ -144,17 +165,34 @@ export function RequestDetailPage() {
       <button onClick={() => navigate(-1)} className="flex w-fit items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0">
         <ArrowLeft className="h-4 w-4" /> Back
       </button>
-      <div>
-        <span className="rounded-full bg-surface-3 px-3 py-1 text-xs font-medium text-ink-1">
-          {STATUS_LABEL[request.status] ?? request.status}
-        </span>
-        <h1 className="mt-2 text-2xl font-semibold text-ink-0">{track?.title ?? 'Track'}</h1>
-        {artist ? (
-          <Link to={`/artist/${artist.slug}`} className="text-sm text-ink-2 hover:underline">
-            {artist.name}
-          </Link>
-        ) : null}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <span className="rounded-full bg-surface-3 px-3 py-1 text-xs font-medium text-ink-1">
+            {STATUS_LABEL[request.status] ?? request.status}
+          </span>
+          <h1 className="mt-2 text-2xl font-semibold text-ink-0">{track?.title ?? 'Track'}</h1>
+          {artist ? (
+            <Link to={`/artist/${artist.slug}`} className="text-sm text-ink-2 hover:underline">
+              {artist.name}
+            </Link>
+          ) : null}
+        </div>
+        <button
+          onClick={handleToggleBlock}
+          disabled={blockBusy}
+          className="flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium text-ink-3 hover:bg-surface-2 hover:text-ink-1"
+          title={isBlocked ? 'Unblock this user' : 'Block this user'}
+        >
+          {isBlocked ? <ShieldCheck className="h-3.5 w-3.5" /> : <ShieldOff className="h-3.5 w-3.5" />}
+          {isBlocked ? 'Unblock' : 'Block'}
+        </button>
       </div>
+      {isBlocked ? (
+        <p className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-2">
+          You've blocked this user — they can't message you and you can't send them new requests. Messages already
+          sent are still visible below.
+        </p>
+      ) : null}
 
       {error ? <p className="text-sm text-danger-500">{error}</p> : null}
 

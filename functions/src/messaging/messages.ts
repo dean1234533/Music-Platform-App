@@ -77,6 +77,17 @@ export const sendMessage = onCall(async (request) => {
     throw new HttpsError('permission-denied', 'You are not part of this conversation.')
   }
 
+  const otherPartyId = participantIds.find((id) => id !== uid)
+  if (otherPartyId) {
+    const [blockedByMe, blockedByThem] = await Promise.all([
+      db.collection('blockedUsers').doc(`${uid}_${otherPartyId}`).get(),
+      db.collection('blockedUsers').doc(`${otherPartyId}_${uid}`).get(),
+    ])
+    if (blockedByMe.exists || blockedByThem.exists) {
+      throw new HttpsError('permission-denied', 'You can’t message this user.')
+    }
+  }
+
   await enforceRateLimit(`sendMessage_${uid}`, 30, 60)
 
   const messageRef = conversationRef.collection('messages').doc()

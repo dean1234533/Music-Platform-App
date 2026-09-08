@@ -65,7 +65,14 @@ export const submitLicenceRequest = onCall(async (request) => {
     throw new HttpsError('failed-precondition', 'This release is under embargo and not yet available for requests.')
   }
   const artistId = track.artistId as string
-  const artistSnap = await db.collection('artistProfiles').doc(artistId).get()
+  const [artistSnap, blockedByArtist, blockedByDj] = await Promise.all([
+    db.collection('artistProfiles').doc(artistId).get(),
+    db.collection('blockedUsers').doc(`${artistId}_${djId}`).get(),
+    db.collection('blockedUsers').doc(`${djId}_${artistId}`).get(),
+  ])
+  if (blockedByArtist.exists || blockedByDj.exists) {
+    throw new HttpsError('permission-denied', 'You can’t request tracks from this artist.')
+  }
   const policy = (artistSnap.data()?.djAllowRequests as string) ?? 'disabled'
   if (policy === 'disabled') {
     throw new HttpsError('failed-precondition', 'This artist is not accepting DJ requests right now.')
