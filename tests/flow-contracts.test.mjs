@@ -104,12 +104,21 @@ test('fan offers include platform-wide offers and preserve relationship access',
 test('DJ requests page exposes the request flow instead of becoming a dead end', () => {
   const page = read('src/pages/dj/DJRequestsPage.tsx')
   assert.match(page, /My requests/)
-  assert.match(page, /listArtistsSeekingDJExposure\(6, \{\}, true, true\)/)
+  assert.match(page, /listArtistsSeekingDJExposure\(30, \{\}, true, true\)/)
   assert.match(page, /Tracks accepting requests/)
+  assert.match(page, /DJ promos & deals/)
+  assert.match(page, /getDealsByIds\(dealIds\)/)
+  assert.match(read('src/services/dealService.ts'), /Math\.ceil\(uniqueIds\.length \/ 30\)/)
+  assert.match(page, /Artist promo messages are turned off/)
+  assert.match(page, /bulkOutreachOptIn: true/)
   assert.match(page, /Request DJ access/)
   assert.match(page, /to="\/dj\/discover"/)
   assert.match(page, /Requests could not be loaded/)
   assert.match(page, /getTrack\(request\.trackId\)/)
+  const nav = read('src/components/layout/navConfig.ts')
+  assert.match(nav, /Promos & requests/)
+  assert.match(nav, /to: '\/dj\/notifications'/)
+  assert.match(read('functions/src/messaging/bulkOutreach.ts'), /linkTo: `\/track\/\$\{trackId\}`/)
 })
 
 test('notifications use Firestore IDs and navigate their deep links', () => {

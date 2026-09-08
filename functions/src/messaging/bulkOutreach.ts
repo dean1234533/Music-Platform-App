@@ -42,7 +42,7 @@ export const sendBulkDjOutreach = onCall(async (request) => {
         type: 'artist_promo',
         title: `New promo: "${trackTitle}"`,
         body: message.trim().slice(0, 140),
-        linkTo: '/dj/discover',
+        linkTo: `/track/${trackId}`,
         read: false,
         createdAt: FieldValue.serverTimestamp(),
       })

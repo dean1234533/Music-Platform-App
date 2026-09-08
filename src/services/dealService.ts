@@ -43,10 +43,13 @@ export function subscribeArtistDeals(
   )
 }
 
-/** Public — used to resolve a track's allowedDealIds for the DJ-facing deal view. Firestore has no `in` on doc IDs > 30, chunk if ever needed. */
+/** Public — resolves track-linked deals for DJ-facing views in Firestore-safe chunks. */
 export async function getDealsByIds(dealIds: string[]): Promise<DjDealDoc[]> {
   if (dealIds.length === 0) return []
-  const q = query(collection(db, 'djDeals'), where('dealId', 'in', dealIds.slice(0, 30)))
-  const snap = await getDocs(q)
-  return snap.docs.map((d) => d.data() as DjDealDoc)
+  const uniqueIds = [...new Set(dealIds)]
+  const chunks = Array.from({ length: Math.ceil(uniqueIds.length / 30) }, (_, index) => uniqueIds.slice(index * 30, index * 30 + 30))
+  const snapshots = await Promise.all(
+    chunks.map((ids) => getDocs(query(collection(db, 'djDeals'), where('dealId', 'in', ids)))),
+  )
+  return snapshots.flatMap((snap) => snap.docs.map((d) => d.data() as DjDealDoc))
 }

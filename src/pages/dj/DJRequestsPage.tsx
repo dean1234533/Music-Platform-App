@@ -1,15 +1,25 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, MessageSquare, Radar } from 'lucide-react'
+import { ArrowRight, Handshake, MessageSquare, Radar } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeRequestsForDj } from '@/services/licenceService'
 import { listArtistsSeekingDJExposure } from '@/services/discoveryService'
 import { getTrack } from '@/services/trackService'
+import { getDealsByIds } from '@/services/dealService'
+import { subscribeDJProfile, updateDJProfile } from '@/services/djService'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { TrackCard } from '@/components/music/TrackCard'
+import { Button } from '@/components/common/Button'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/StateViews'
 import type { LicenceRequestDoc } from '@/types/licence'
 import type { TrackDoc } from '@/types/track'
+import type { DjDealDoc } from '@/types/deal'
+import { formatCurrency } from '@/utils/format'
+
+interface DealOpportunity {
+  deal: DjDealDoc
+  track: TrackDoc
+}
 
 const STATUS_LABEL: Record<string, string> = {
   submitted: 'New',
@@ -31,6 +41,9 @@ export function DJRequestsPage() {
   const [requests, setRequests] = useState<LicenceRequestDoc[] | null>(null)
   const [requestError, setRequestError] = useState(false)
   const [openTracks, setOpenTracks] = useState<TrackDoc[] | null>(null)
+  const [dealOpportunities, setDealOpportunities] = useState<DealOpportunity[] | null>(null)
+  const [promoOptIn, setPromoOptIn] = useState<boolean | null>(null)
+  const [enablingPromos, setEnablingPromos] = useState(false)
 
   useEffect(() => {
     if (!firebaseUser) return
@@ -42,9 +55,41 @@ export function DJRequestsPage() {
   }, [firebaseUser])
 
   useEffect(() => {
-    void listArtistsSeekingDJExposure(6, {}, true, true)
-      .then(setOpenTracks)
-      .catch(() => setOpenTracks([]))
+    if (!firebaseUser) return
+    return subscribeDJProfile(firebaseUser.uid, (profile) => setPromoOptIn(profile?.bulkOutreachOptIn ?? false))
+  }, [firebaseUser])
+
+  async function enableArtistPromos() {
+    if (!firebaseUser) return
+    setEnablingPromos(true)
+    try {
+      await updateDJProfile(firebaseUser.uid, { bulkOutreachOptIn: true })
+      setPromoOptIn(true)
+    } finally {
+      setEnablingPromos(false)
+    }
+  }
+
+  useEffect(() => {
+    void listArtistsSeekingDJExposure(30, {}, true, true)
+      .then(async (tracks) => {
+        setOpenTracks(tracks.slice(0, 6))
+        const dealIds = [...new Set(tracks.flatMap((track) => track.djDealSettings?.allowedDealIds ?? []))]
+        const deals = await getDealsByIds(dealIds)
+        const dealById = new Map(deals.filter((deal) => deal.active).map((deal) => [deal.dealId, deal]))
+        setDealOpportunities(
+          tracks.flatMap((track) =>
+            (track.djDealSettings?.allowedDealIds ?? [])
+              .map((dealId) => dealById.get(dealId))
+              .filter((deal): deal is DjDealDoc => Boolean(deal))
+              .map((deal) => ({ deal, track })),
+          ),
+        )
+      })
+      .catch(() => {
+        setOpenTracks([])
+        setDealOpportunities([])
+      })
   }, [])
 
   return (
@@ -87,6 +132,46 @@ export function DJRequestsPage() {
       </section>
 
       <section className="flex flex-col gap-5">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-dj-400">From artists</p>
+          <h2 className="mt-1 text-xl font-semibold text-ink-0">DJ promos & deals</h2>
+          <p className="mt-1 text-sm text-ink-2">Licence packages artists have attached to tracks for DJs.</p>
+        </div>
+
+        {promoOptIn === false ? (
+          <div className="flex flex-col gap-4 rounded-2xl border border-dj-500/30 bg-dj-500/[0.07] p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-ink-0">Artist promo messages are turned off</p>
+              <p className="mt-1 text-sm text-ink-2">Turn them on to receive new-track promos directly from artists in Notifications.</p>
+            </div>
+            <Button size="sm" onClick={() => void enableArtistPromos()} loading={enablingPromos} className="shrink-0">
+              Turn on artist promos
+            </Button>
+          </div>
+        ) : null}
+
+        {dealOpportunities === null ? (
+          <LoadingState label="Loading artist deals…" />
+        ) : dealOpportunities.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-surface-border bg-surface-1/40 px-5 py-6">
+            <div className="flex items-start gap-3">
+              <Handshake className="mt-0.5 h-5 w-5 shrink-0 text-dj-400" />
+              <div>
+                <p className="text-sm font-semibold text-ink-0">No artist deal packages are live yet</p>
+                <p className="mt-1 text-sm text-ink-2">When an artist assigns an active DJ deal to a track, it will appear here automatically.</p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {dealOpportunities.map(({ deal, track }) => (
+              <DealOpportunityCard key={`${track.trackId}-${deal.dealId}`} deal={deal} track={track} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-5">
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-dj-400">Open for DJs</p>
@@ -115,6 +200,38 @@ export function DJRequestsPage() {
         )}
       </section>
     </div>
+  )
+}
+
+function dealPriceLabel(deal: DjDealDoc): string {
+  if (deal.priceType === 'free') return 'Free'
+  if (deal.priceType === 'fixed') return formatCurrency(deal.priceMinor ?? 0, deal.currency)
+  if (deal.priceType === 'starting_from') return `From ${formatCurrency(deal.priceMinor ?? 0, deal.currency)}`
+  if (deal.priceType === 'negotiable') return 'Negotiable'
+  return 'Custom quote'
+}
+
+function DealOpportunityCard({ deal, track }: { deal: DjDealDoc; track: TrackDoc }) {
+  const artist = useArtistSummary(track.artistId)
+
+  return (
+    <Link
+      to={`/track/${track.trackId}`}
+      className="group flex min-w-0 items-center gap-4 rounded-2xl border border-surface-border bg-surface-1 p-4 transition hover:border-dj-500/40 hover:bg-surface-2"
+    >
+      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface-3">
+        {track.artworkURL ? <img src={track.artworkURL} alt="" className="h-full w-full object-cover" /> : null}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <p className="truncate text-sm font-semibold text-ink-0">{deal.name}</p>
+          <span className="shrink-0 text-xs font-semibold text-dj-400">{dealPriceLabel(deal)}</span>
+        </div>
+        <p className="mt-1 truncate text-xs text-ink-1">{track.title} · {artist?.name ?? 'Artist'}</p>
+        <p className="mt-1 line-clamp-1 text-xs text-ink-3">{deal.description || deal.permittedUse}</p>
+      </div>
+      <ArrowRight className="h-4 w-4 shrink-0 text-ink-3 transition group-hover:translate-x-0.5 group-hover:text-dj-400" />
+    </Link>
   )
 }
 

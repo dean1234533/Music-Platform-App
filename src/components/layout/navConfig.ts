@@ -77,7 +77,8 @@ export const artistDashboardNavItems: NavItem[] = [
 export const djNavItems: NavItem[] = [
   { label: 'Discover', to: '/dj/discover', icon: Radar, end: true },
   { label: 'Artists', to: '/dj/artists', icon: Users },
-  { label: 'Requests', to: '/dj/requests', icon: MessageSquare },
+  { label: 'Promos & requests', to: '/dj/requests', icon: MessageSquare },
+  { label: 'Notifications', to: '/dj/notifications', icon: Bell },
   { label: 'Sets', to: '/dj/sets', icon: Layers },
   { label: 'Analytics', to: '/dj/analytics', icon: LineChart },
   { label: 'Agreements', to: '/agreements', icon: FileText },
