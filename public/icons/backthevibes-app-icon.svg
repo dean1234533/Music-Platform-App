@@ -8,11 +8,51 @@
       <stop stop-color="#10140E"/>
       <stop offset="1" stop-color="#050607"/>
     </linearGradient>
+    <radialGradient id="blueDisc" cx="0" cy="0" r="1" gradientTransform="translate(130 174) rotate(55) scale(148)">
+      <stop stop-color="#6F8BFF"/>
+      <stop offset=".45" stop-color="#244BFF"/>
+      <stop offset="1" stop-color="#061343"/>
+    </radialGradient>
+    <radialGradient id="silverDisc" cx="0" cy="0" r="1" gradientTransform="translate(220 154) rotate(52) scale(166)">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset=".42" stop-color="#AEB3AF"/>
+      <stop offset="1" stop-color="#282C2A"/>
+    </radialGradient>
+    <radialGradient id="limeDisc" cx="0" cy="0" r="1" gradientTransform="translate(336 168) rotate(54) scale(150)">
+      <stop stop-color="#E8FF83"/>
+      <stop offset=".44" stop-color="#A8CD24"/>
+      <stop offset="1" stop-color="#263600"/>
+    </radialGradient>
+    <linearGradient id="blueSleeve" x1="76" y1="226" x2="226" y2="416" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#101B39"/>
+      <stop offset="1" stop-color="#060A12"/>
+    </linearGradient>
+    <linearGradient id="centreSleeve" x1="181" y1="218" x2="331" y2="424" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1A1C1C"/>
+      <stop offset="1" stop-color="#070808"/>
+    </linearGradient>
+    <linearGradient id="limeSleeve" x1="286" y1="226" x2="436" y2="416" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1D260B"/>
+      <stop offset="1" stop-color="#080B05"/>
+    </linearGradient>
   </defs>
   <rect width="512" height="512" fill="url(#surface)"/>
   <rect width="512" height="512" fill="url(#signal)"/>
   <rect x="30" y="30" width="452" height="452" rx="80" stroke="#C8F33F" stroke-opacity=".18" stroke-width="4"/>
-  <circle cx="256" cy="256" r="132" stroke="#F6F7F4" stroke-width="26"/>
-  <path d="M76 256C126 256 128 206 166 206C204 206 204 306 240 306C276 306 276 172 308 172C344 172 344 276 374 276C404 276 410 256 436 256" stroke="#050607" stroke-width="42" stroke-linecap="round"/>
-  <path d="M76 256C126 256 128 206 166 206C204 206 204 306 240 306C276 306 276 172 308 172C344 172 344 276 374 276C404 276 410 256 436 256" stroke="#C8F33F" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="154" cy="214" r="86" fill="url(#blueDisc)"/>
+  <circle cx="358" cy="214" r="86" fill="url(#limeDisc)"/>
+  <circle cx="256" cy="196" r="98" fill="url(#silverDisc)"/>
+  <g fill="none" stroke="#F6F7F4" stroke-opacity=".14">
+    <circle cx="154" cy="214" r="68"/><circle cx="154" cy="214" r="51"/>
+    <circle cx="256" cy="196" r="78"/><circle cx="256" cy="196" r="58"/>
+    <circle cx="358" cy="214" r="68"/><circle cx="358" cy="214" r="51"/>
+  </g>
+  <circle cx="154" cy="214" r="13" fill="#050607"/>
+  <circle cx="256" cy="196" r="15" fill="#050607"/>
+  <circle cx="358" cy="214" r="13" fill="#050607"/>
+  <rect x="76" y="226" width="150" height="190" rx="20" fill="url(#blueSleeve)" stroke="#244BFF" stroke-opacity=".48" stroke-width="3"/>
+  <rect x="286" y="226" width="150" height="190" rx="20" fill="url(#limeSleeve)" stroke="#C8F33F" stroke-opacity=".48" stroke-width="3"/>
+  <rect x="181" y="216" width="150" height="208" rx="20" fill="url(#centreSleeve)" stroke="#F6F7F4" stroke-opacity=".24" stroke-width="3"/>
+  <circle cx="256" cy="320" r="46" fill="none" stroke="#F6F7F4" stroke-opacity=".2" stroke-width="3"/>
+  <circle cx="256" cy="320" r="7" fill="#C8F33F"/>
 </svg>
