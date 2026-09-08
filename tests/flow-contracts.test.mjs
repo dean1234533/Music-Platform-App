@@ -113,7 +113,9 @@ test('DJ requests page exposes the request flow instead of becoming a dead end',
   assert.match(page, /bulkOutreachOptIn: true/)
   assert.match(page, /Accept deal/)
   assert.match(page, /submitLicenceRequest/)
-  assert.match(page, /Deal accepted\. The artist has been notified\./)
+  assert.match(page, /Deal accepted\. Your contract is ready to review and sign\./)
+  assert.match(page, /Review & sign contract/)
+  assert.match(page, /OfferCard/)
   assert.match(page, /Request access/)
   assert.match(page, /RequestDjAccessModal/)
   assert.doesNotMatch(page, /to=\{`\/track\/\$\{track\.trackId\}`\}/)
@@ -137,6 +139,8 @@ test('manual approval still lets DJs send a request without an artist deal', () 
   assert.match(trackPage, /Request DJ access/)
   assert.match(requestBackend, /dealSettings\s*\? dealSettings\.acceptDjRequests/)
   assert.match(settings, /DJs can send a request without choosing a deal/)
+  assert.match(read('src/pages/artist/dashboard/DJRequestsPage.tsx'), /Approve & set contract terms/)
+  assert.match(read('src/components/licence/OfferCard.tsx'), /Accept terms & create contract/)
 })
 
 test('notifications use Firestore IDs and navigate their deep links', () => {
@@ -147,14 +151,19 @@ test('notifications use Firestore IDs and navigate their deep links', () => {
   assert.doesNotMatch(read('functions/src/messaging/messages.ts'), /\/messages\/\$\{conversationId\}/)
 })
 
-test('licence conversations use a full-size, high-contrast chat surface', () => {
-  const page = read('src/pages/requests/RequestDetailPage.tsx')
-  assert.match(page, /min-h-\[32rem\]/)
-  assert.match(page, /flex min-h-0 flex-1 flex-col/)
-  assert.match(page, /bg-brand-500\/\[0\.10\] text-ink-0/)
-  assert.match(page, /bg-surface-2[\s\S]*?caret-brand-400/)
-  assert.doesNotMatch(page, /max-h-96/)
-  assert.doesNotMatch(page, /bg-brand-500 text-white/)
+test('DJ licensing has no chat page and ends in a signed downloadable contract', () => {
+  const app = read('src/App.tsx')
+  const requestBackend = read('functions/src/licensing/requests.ts')
+  const contract = read('src/pages/agreements/ContractPage.tsx')
+  assert.doesNotMatch(app, /RequestDetailPage/)
+  assert.match(app, /path="\/requests\/:requestId" element=\{<Navigate to="\/agreements" replace \/>\}/)
+  assert.doesNotMatch(requestBackend, /tx\.set\(conversationRef/)
+  assert.match(requestBackend, /status: agreementRef \? 'agreement_ready' : 'submitted'/)
+  assert.match(requestBackend, /contentHash: computeContentHash\(agreementTerms\)/)
+  assert.match(contract, /Sign agreement/)
+  assert.match(contract, /createLicencePaymentSession/)
+  assert.match(contract, /Download track/)
+  assert.match(contract, /getSecureDownloadUrl/)
 })
 
 test('account deletion cancels billing and removes supporter state', () => {

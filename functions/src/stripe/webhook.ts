@@ -317,9 +317,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
     const requestRef = db.collection('licenceRequests').doc(agreement.licenceRequestId)
     const requestSnap = await tx.get(requestRef)
-    const conversationRef = requestSnap.exists
-      ? db.collection('conversations').doc(requestSnap.data()!.conversationId as string)
-      : null
+    const conversationId = requestSnap.data()?.conversationId as string | undefined
+    const conversationRef = conversationId ? db.collection('conversations').doc(conversationId) : null
 
     const grossMinor = settlement.netRevenueMinor
     const txId = `licence_${agreementId}`
@@ -378,7 +377,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       type: 'download_unlocked',
       title: 'Payment received — download unlocked',
       body: 'Your licence payment was received. The full-quality track is now available.',
-      linkTo: '/dj/requests',
+      linkTo: `/agreements/${agreementId}`,
       read: false,
       createdAt: FieldValue.serverTimestamp(),
     })

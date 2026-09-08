@@ -18,7 +18,7 @@ export interface SubmitLicenceRequestInput {
   streamingIntention?: boolean
 }
 
-const submitRequestCallable = callable<SubmitLicenceRequestInput, { requestId: string; conversationId: string }>(
+const submitRequestCallable = callable<SubmitLicenceRequestInput, { requestId: string; agreementId: string | null }>(
   'submitLicenceRequest',
 )
 const respondCallable = callable<{ requestId: string; action: 'start_negotiation' | 'reject' | 'cancel' }, { status: string }>(

@@ -2,8 +2,8 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
 import { requireActiveUser, userHasRole } from '../roles.js'
-import { writeSystemMessage } from '../messaging/messages.js'
 import { enforceRateLimit } from '../rateLimit.js'
+import { computeContentHash, type AgreementTerms } from './agreements.js'
 
 const INTENDED_USES = [
   'live_club_performance',
@@ -17,8 +17,9 @@ const INTENDED_USES = [
 
 /**
  * Kicks off the DJ loop: DJ requests access to a DJ-promoted track. Creates
- * both the licenceRequest (source of truth for status) and a conversation
- * scoped to it, so messaging never floats free of a specific request.
+ * the licenceRequest (source of truth for status). A selected fixed/free
+ * artist deal is also frozen into an agreement immediately; a custom access
+ * request waits for the artist to set the final contract terms.
  */
 export const submitLicenceRequest = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
@@ -82,7 +83,44 @@ export const submitLicenceRequest = onCall(async (request) => {
   const djUserSnap = await db.collection('users').doc(djId).get()
   const djName = (djUserSnap.data()?.displayName as string) || 'A DJ'
   const requestRef = db.collection('licenceRequests').doc()
-  const conversationRef = db.collection('conversations').doc()
+  let deal: FirebaseFirestore.DocumentData | null = null
+  if (dealId) {
+    const dealSnap = await db.collection('djDeals').doc(dealId).get()
+    if (!dealSnap.exists) throw new HttpsError('not-found', 'Deal not found.')
+    deal = dealSnap.data()!
+    if (!deal.active || deal.artistId !== artistId) {
+      throw new HttpsError('failed-precondition', 'This deal is no longer available.')
+    }
+  }
+
+  const isPresetDeal = Boolean(deal && ['free', 'fixed'].includes(deal.priceType))
+  const agreementRef = isPresetDeal ? db.collection('licenceAgreements').doc() : null
+  const nowDate = new Date().toISOString().slice(0, 10)
+  const startDate = requestedStartDate || nowDate
+  const expiryDate = deal?.durationDays
+    ? new Date(new Date(`${startDate}T00:00:00.000Z`).getTime() + deal.durationDays * 86_400_000).toISOString().slice(0, 10)
+    : requestedEndDate || null
+
+  const agreementTerms: AgreementTerms | null = deal && isPresetDeal
+    ? {
+        permittedUse: deal.permittedUse,
+        territory: deal.territory,
+        startDate,
+        expiryDate,
+        licenceFeeMinor: deal.priceType === 'fixed' ? deal.priceMinor ?? 0 : 0,
+        currency: deal.currency ?? 'gbp',
+        attributionRequirements: deal.attributionRequirements ?? '',
+        recordingPermission: Boolean(deal.recordingPermission),
+        streamingPermission: Boolean(deal.streamingPermission),
+        promotionalMixPermission: Boolean(deal.promotionalMixPermission),
+        commercialUse: true,
+        redistributionAllowed: Boolean(deal.redistributionAllowed),
+        resaleAllowed: Boolean(deal.resaleAllowed),
+        remixAllowed: Boolean(deal.remixAllowed),
+        additionalTerms: deal.additionalTerms ?? '',
+        rightsHolderDeclaration: true,
+      }
+    : null
 
   await db.runTransaction(async (tx) => {
     const djSnap = await tx.get(djProfileRef)
@@ -115,33 +153,51 @@ export const submitLicenceRequest = onCall(async (request) => {
       requestedEndDate: requestedEndDate ?? null,
       recordingIntention: Boolean(recordingIntention),
       streamingIntention: Boolean(streamingIntention),
-      status: 'submitted',
-      conversationId: conversationRef.id,
+      status: agreementRef ? 'agreement_ready' : 'submitted',
+      currentAgreementId: agreementRef?.id ?? null,
       legalHold: false,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     })
-    tx.set(conversationRef, {
-      conversationId: conversationRef.id,
-      participantIds: [djId, artistId],
-      trackId,
-      licenceRequestId: requestRef.id,
-      lastMessageAt: FieldValue.serverTimestamp(),
-      createdAt: FieldValue.serverTimestamp(),
-    })
-    writeSystemMessage(tx, conversationRef, djId, 'system', `${djName} requested access to "${track.title}".`)
+    if (agreementRef && agreementTerms) {
+      tx.set(agreementRef, {
+        agreementId: agreementRef.id,
+        licenceRequestId: requestRef.id,
+        artistId,
+        djId,
+        trackId,
+        trackVersion: 1,
+        ...agreementTerms,
+        contentHash: computeContentHash(agreementTerms),
+        agreementVersion: 1,
+        status: 'pending',
+        artistAcceptedAt: null,
+        djAcceptedAt: null,
+        artistLegalName: null,
+        djLegalName: null,
+        paidAt: null,
+        downloadRevoked: false,
+        downloadCount: 0,
+        legalHold: false,
+        sourceDealId: dealId,
+        createdAt: FieldValue.serverTimestamp(),
+        finalisedAt: null,
+      })
+    }
     tx.set(db.collection('notifications').doc(), {
       userId: artistId,
-      type: 'dj_request',
-      title: 'New DJ request',
-      body: `A DJ requested access to "${track.title}".`,
+      type: agreementRef ? 'agreement_ready' : 'dj_request',
+      title: agreementRef ? 'Deal accepted' : 'New DJ request',
+      body: agreementRef
+        ? `${djName} accepted your deal for "${track.title}". The contract is ready for both parties to sign.`
+        : `${djName} requested access to "${track.title}". Review the request and set the contract terms.`,
       linkTo: `/dashboard/artist/dj-requests`,
       read: false,
       createdAt: FieldValue.serverTimestamp(),
     })
   })
 
-  return { requestId: requestRef.id, conversationId: conversationRef.id }
+  return { requestId: requestRef.id, agreementId: agreementRef?.id ?? null }
 })
 
 const ARTIST_ACTIONS = ['start_negotiation', 'reject'] as const

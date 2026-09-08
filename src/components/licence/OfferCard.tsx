@@ -48,7 +48,7 @@ export function OfferCard({
   }
 
   return (
-    <div className="max-w-[90%] self-start rounded-xl border border-brand-400/30 bg-surface-1 p-3 text-sm">
+    <div className="w-full rounded-xl border border-brand-400/30 bg-surface-2/70 p-4 text-sm">
       <div className="flex items-center justify-between">
         <p className="font-semibold text-ink-0">
           {offer.priceMinor > 0 ? formatCurrency(offer.priceMinor, offer.currency) : 'Free'} · v{offer.version}
@@ -63,7 +63,7 @@ export function OfferCard({
       {canAct ? (
         <div className="mt-2 flex gap-2">
           <Button size="sm" loading={busy} onClick={handleAccept}>
-            Accept
+            Accept terms & create contract
           </Button>
           <Button size="sm" variant="secondary" onClick={() => onCounter(offer)}>
             Counter

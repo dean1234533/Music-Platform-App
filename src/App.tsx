@@ -67,7 +67,6 @@ const DJCratesPage = lazy(() => import('@/pages/dj/DJCratesPage').then((m) => ({
 const DJAnalyticsPage = lazy(() => import('@/pages/dj/DJAnalyticsPage').then((m) => ({ default: m.DJAnalyticsPage })))
 
 const TrackPage = lazy(() => import('@/pages/track/TrackPage').then((m) => ({ default: m.TrackPage })))
-const RequestDetailPage = lazy(() => import('@/pages/requests/RequestDetailPage').then((m) => ({ default: m.RequestDetailPage })))
 const MyAgreementsPage = lazy(() => import('@/pages/agreements/MyAgreementsPage').then((m) => ({ default: m.MyAgreementsPage })))
 const ContractPage = lazy(() => import('@/pages/agreements/ContractPage').then((m) => ({ default: m.ContractPage })))
 
@@ -139,14 +138,7 @@ function App() {
             <Route path="/djs/:djId" element={<DJPublicProfilePage />} />
             <Route path="/artist/:slug/track/:trackId" element={<TrackPage />} />
             <Route path="/track/:trackId" element={<TrackPage />} />
-            <Route
-              path="/requests/:requestId"
-              element={
-                <ProtectedRoute>
-                  <RequestDetailPage />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/requests/:requestId" element={<Navigate to="/agreements" replace />} />
             <Route
               path="/agreements"
               element={

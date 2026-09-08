@@ -49,8 +49,9 @@ async function loadNegotiableRequest(requestId: string, uid: string) {
 /**
  * Enforces the per-track djDealSettings that were previously stored but
  * never checked: a price floor (minimumPriceMinor) on any offer terms, and
- * customApprovalRequired blocking the artist's opening offer until they've
- * explicitly moved the request past 'submitted' via respondToLicenceRequest.
+ * A track price floor is always enforced. Opening the contract-terms form is
+ * itself the artist's explicit approval of a manual-review request, so no
+ * separate status-changing step is required first.
  */
 async function enforceTrackDealSettings(
   trackId: string,
@@ -64,12 +65,8 @@ async function enforceTrackDealSettings(
     | undefined
   if (!dealSettings) return
 
-  if (isOpeningOffer && dealSettings.customApprovalRequired && requestStatus === 'submitted') {
-    throw new HttpsError(
-      'failed-precondition',
-      'This track requires you to explicitly approve the request before sending an offer.',
-    )
-  }
+  void isOpeningOffer
+  void requestStatus
   if (typeof dealSettings.minimumPriceMinor === 'number' && priceMinor < dealSettings.minimumPriceMinor) {
     throw new HttpsError('invalid-argument', 'This offer is below the minimum price set for this track.')
   }
@@ -91,12 +88,14 @@ export const sendOffer = onCall(async (request) => {
   await enforceTrackDealSettings(licenceRequest.trackId, terms.priceMinor, true, licenceRequest.status)
 
   const offerRef = db.collection('licenceOffers').doc()
-  const conversationRef = db.collection('conversations').doc(licenceRequest.conversationId)
+  const conversationRef = licenceRequest.conversationId
+    ? db.collection('conversations').doc(licenceRequest.conversationId)
+    : null
   const batch = db.batch()
 
   batch.set(offerRef, buildOfferDoc(offerRef.id, requestId, licenceRequest, uid, 'artist', terms, 1, null))
   batch.update(requestRef, { status: 'offer_sent', currentOfferId: offerRef.id, updatedAt: FieldValue.serverTimestamp() })
-  writeSystemMessage(batch, conversationRef, uid, 'offer_card', 'Artist sent an offer.', { offerId: offerRef.id })
+  if (conversationRef) writeSystemMessage(batch, conversationRef, uid, 'offer_card', 'Artist sent an offer.', { offerId: offerRef.id })
   batch.set(db.collection('notifications').doc(), {
     userId: licenceRequest.djId,
     type: 'offer_sent',
@@ -131,7 +130,9 @@ export const counterOffer = onCall(async (request) => {
   await enforceTrackDealSettings(licenceRequest.trackId, terms.priceMinor, false, licenceRequest.status)
 
   const offerRef = db.collection('licenceOffers').doc()
-  const conversationRef = db.collection('conversations').doc(licenceRequest.conversationId)
+  const conversationRef = licenceRequest.conversationId
+    ? db.collection('conversations').doc(licenceRequest.conversationId)
+    : null
   const batch = db.batch()
 
   batch.update(previousRef, { status: 'countered', supersededByOfferId: offerRef.id })
@@ -140,16 +141,19 @@ export const counterOffer = onCall(async (request) => {
     buildOfferDoc(offerRef.id, requestId, licenceRequest, uid, isArtist ? 'artist' : 'dj', terms, previous.version + 1, null),
   )
   batch.update(requestRef, { status: 'counter_offer', currentOfferId: offerRef.id, updatedAt: FieldValue.serverTimestamp() })
-  writeSystemMessage(batch, conversationRef, uid, 'offer_card', `${isArtist ? 'Artist' : 'DJ'} sent a counter-offer.`, {
-    offerId: offerRef.id,
-  })
+  if (conversationRef) {
+    writeSystemMessage(batch, conversationRef, uid, 'offer_card', `${isArtist ? 'Artist' : 'DJ'} sent a counter-offer.`, {
+      offerId: offerRef.id,
+    })
+  }
   const notifyId = isArtist ? licenceRequest.djId : licenceRequest.artistId
+  const notifyLink = isArtist ? '/dj/requests' : '/dashboard/artist/dj-requests'
   batch.set(db.collection('notifications').doc(), {
     userId: notifyId,
     type: 'offer_sent',
     title: 'Counter-offer received',
     body: 'The other party sent a counter-offer.',
-    linkTo: '/dj/requests',
+    linkTo: notifyLink,
     read: false,
     createdAt: FieldValue.serverTimestamp(),
   })
@@ -194,22 +198,26 @@ export const acceptOffer = onCall(async (request) => {
     rightsHolderDeclaration: true,
   }
 
-  const conversationRef = db.collection('conversations').doc(licenceRequest.conversationId)
+  const conversationRef = licenceRequest.conversationId
+    ? db.collection('conversations').doc(licenceRequest.conversationId)
+    : null
   const batch = db.batch()
   batch.update(offerRef, { status: 'accepted' })
   const { agreementRef } = await writeAgreementVersion(batch, requestRef, licenceRequest, terms)
 
-  writeSystemMessage(batch, conversationRef, uid, 'offer_card', 'Offer accepted.', { offerId: offerRef.id })
-  writeSystemMessage(batch, conversationRef, uid, 'contract_status', 'Contract generated — both parties can now sign.', {
-    agreementId: agreementRef.id,
-  })
+  if (conversationRef) {
+    writeSystemMessage(batch, conversationRef, uid, 'offer_card', 'Offer accepted.', { offerId: offerRef.id })
+    writeSystemMessage(batch, conversationRef, uid, 'contract_status', 'Contract generated — both parties can now sign.', {
+      agreementId: agreementRef.id,
+    })
+  }
   const notifyId = isArtist ? licenceRequest.djId : licenceRequest.artistId
   batch.set(db.collection('notifications').doc(), {
     userId: notifyId,
     type: 'agreement_ready',
     title: 'Offer accepted',
     body: 'Your offer was accepted — the contract is ready to sign.',
-    linkTo: '/dj/requests',
+    linkTo: `/agreements/${agreementRef.id}`,
     read: false,
     createdAt: FieldValue.serverTimestamp(),
   })
@@ -235,11 +243,13 @@ export const withdrawOffer = onCall(async (request) => {
   if (offer.status !== 'pending') throw new HttpsError('failed-precondition', 'This offer is no longer pending.')
   if (offer.createdBy !== uid) throw new HttpsError('permission-denied', 'You can only withdraw your own offer.')
 
-  const conversationRef = db.collection('conversations').doc(licenceRequest.conversationId)
+  const conversationRef = licenceRequest.conversationId
+    ? db.collection('conversations').doc(licenceRequest.conversationId)
+    : null
   const batch = db.batch()
   batch.update(offerRef, { status: 'withdrawn' })
   batch.update(requestRef, { status: 'negotiating', currentOfferId: FieldValue.delete(), updatedAt: FieldValue.serverTimestamp() })
-  writeSystemMessage(batch, conversationRef, uid, 'system', 'The offer was withdrawn.', { offerId: offerRef.id })
+  if (conversationRef) writeSystemMessage(batch, conversationRef, uid, 'system', 'The offer was withdrawn.', { offerId: offerRef.id })
 
   await batch.commit()
   return { ok: true }

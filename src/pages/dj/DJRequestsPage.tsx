@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Handshake, MessageSquare, Radar } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { submitLicenceRequest, subscribeRequestsForDj } from '@/services/licenceService'
+import { respondToLicenceRequest, submitLicenceRequest, subscribeRequestsForDj } from '@/services/licenceService'
 import { listArtistsSeekingDJExposure } from '@/services/discoveryService'
 import { getTrack } from '@/services/trackService'
 import { getDealsByIds } from '@/services/dealService'
@@ -12,8 +12,10 @@ import { useToast } from '@/contexts/ToastContext'
 import { TrackCard } from '@/components/music/TrackCard'
 import { RequestDjAccessModal } from '@/components/track/RequestDjAccessModal'
 import { Button } from '@/components/common/Button'
+import { OfferCard } from '@/components/licence/OfferCard'
+import { OfferFormModal } from '@/components/licence/OfferFormModal'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/StateViews'
-import type { LicenceRequestDoc } from '@/types/licence'
+import type { LicenceOfferDoc, LicenceRequestDoc } from '@/types/licence'
 import type { TrackDoc } from '@/types/track'
 import type { DjDealDoc } from '@/types/deal'
 import { formatCurrency } from '@/utils/format'
@@ -25,6 +27,7 @@ interface DealOpportunity {
 
 interface RequestTarget {
   trackId: string
+  dealId?: string
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -53,6 +56,7 @@ export function DJRequestsPage() {
   const [enablingPromos, setEnablingPromos] = useState(false)
   const [requestTarget, setRequestTarget] = useState<RequestTarget | null>(null)
   const [acceptingDealId, setAcceptingDealId] = useState<string | null>(null)
+  const [offerModal, setOfferModal] = useState<{ requestId: string; previousOffer: LicenceOfferDoc } | null>(null)
 
   useEffect(() => {
     if (!firebaseUser) return
@@ -91,7 +95,7 @@ export function DJRequestsPage() {
         venue: '',
         message: `Accepted “${deal.name}”.`,
       })
-      notify('Deal accepted. The artist has been notified.', 'success')
+      notify('Deal accepted. Your contract is ready to review and sign.', 'success')
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Could not accept this deal.', 'error')
     } finally {
@@ -154,7 +158,13 @@ export function DJRequestsPage() {
         ) : (
           <div className="flex flex-col divide-y divide-surface-border overflow-hidden rounded-2xl border border-surface-border bg-surface-1">
             {requests.map((req) => (
-              <RequestRow key={req.requestId} request={req} />
+              <RequestRow
+                key={req.requestId}
+                request={req}
+                uid={firebaseUser!.uid}
+                onCounter={(offer) => setOfferModal({ requestId: req.requestId, previousOffer: offer })}
+                onError={(message) => notify(message, 'error')}
+              />
             ))}
           </div>
         )}
@@ -201,6 +211,7 @@ export function DJRequestsPage() {
                 accepted={Boolean(requests?.some((request) => request.dealId === deal.dealId && request.trackId === track.trackId))}
                 accepting={acceptingDealId === deal.dealId}
                 onAccept={() => void acceptArtistDeal(deal, track)}
+                onRequestTerms={() => setRequestTarget({ trackId: track.trackId, dealId: deal.dealId })}
               />
             ))}
           </div>
@@ -244,7 +255,16 @@ export function DJRequestsPage() {
       {requestTarget ? (
         <RequestDjAccessModal
           trackId={requestTarget.trackId}
+          dealId={requestTarget.dealId}
           onClose={() => setRequestTarget(null)}
+        />
+      ) : null}
+      {offerModal ? (
+        <OfferFormModal
+          requestId={offerModal.requestId}
+          mode="counter"
+          previousOffer={offerModal.previousOffer}
+          onClose={() => setOfferModal(null)}
         />
       ) : null}
     </div>
@@ -265,14 +285,17 @@ function DealOpportunityCard({
   accepted,
   accepting,
   onAccept,
+  onRequestTerms,
 }: {
   deal: DjDealDoc
   track: TrackDoc
   accepted: boolean
   accepting: boolean
   onAccept: () => void
+  onRequestTerms: () => void
 }) {
   const artist = useArtistSummary(track.artistId)
+  const canAcceptImmediately = deal.priceType === 'free' || deal.priceType === 'fixed'
 
   return (
     <div className="flex min-w-0 flex-col gap-4 rounded-2xl border border-surface-border bg-surface-1 p-4 transition hover:border-dj-500/40">
@@ -289,16 +312,33 @@ function DealOpportunityCard({
           <p className="mt-1 line-clamp-1 text-xs text-ink-3">{deal.description || deal.permittedUse}</p>
         </div>
       </div>
-      <Button size="sm" onClick={onAccept} loading={accepting} disabled={accepted} className="w-full">
-        {accepted ? 'Deal accepted' : 'Accept deal'}
+      <Button
+        size="sm"
+        onClick={canAcceptImmediately ? onAccept : onRequestTerms}
+        loading={accepting}
+        disabled={accepted}
+        className="w-full"
+      >
+        {accepted ? (canAcceptImmediately ? 'Contract ready' : 'Terms requested') : (canAcceptImmediately ? 'Accept deal' : 'Request final terms')}
       </Button>
     </div>
   )
 }
 
-function RequestRow({ request }: { request: LicenceRequestDoc }) {
+function RequestRow({
+  request,
+  uid,
+  onCounter,
+  onError,
+}: {
+  request: LicenceRequestDoc
+  uid: string
+  onCounter: (offer: LicenceOfferDoc) => void
+  onError: (message: string) => void
+}) {
   const artist = useArtistSummary(request.artistId)
   const [trackTitle, setTrackTitle] = useState('Track request')
+  const [cancelling, setCancelling] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -312,13 +352,43 @@ function RequestRow({ request }: { request: LicenceRequestDoc }) {
     }
   }, [request.trackId])
 
+  async function cancelRequest() {
+    setCancelling(true)
+    try {
+      await respondToLicenceRequest(request.requestId, 'cancel')
+    } catch (error) {
+      onError(error instanceof Error ? error.message : 'Could not cancel this request.')
+    } finally {
+      setCancelling(false)
+    }
+  }
+
   return (
-    <Link to={`/requests/${request.requestId}`} className="flex items-center justify-between gap-4 px-4 py-4 hover:bg-surface-2">
-      <span className="min-w-0">
-        <span className="block truncate text-sm font-medium text-ink-0">{trackTitle}</span>
-        <span className="mt-0.5 block truncate text-xs text-ink-2">{artist?.name ?? 'Artist'}</span>
-      </span>
-      <span className="rounded-full bg-surface-3 px-2.5 py-1 text-xs text-ink-1">{STATUS_LABEL[request.status] ?? request.status}</span>
-    </Link>
+    <div className="flex flex-col gap-3 px-4 py-4">
+      <div className="flex items-center justify-between gap-4">
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-medium text-ink-0">{trackTitle}</span>
+          <span className="mt-0.5 block truncate text-xs text-ink-2">{artist?.name ?? 'Artist'}</span>
+        </span>
+        <span className="rounded-full bg-surface-3 px-2.5 py-1 text-xs text-ink-1">{STATUS_LABEL[request.status] ?? request.status}</span>
+      </div>
+      {request.currentAgreementId ? (
+        <Link
+          to={`/agreements/${request.currentAgreementId}`}
+          className="inline-flex w-fit items-center rounded-full bg-dj-400 px-4 py-2 text-sm font-semibold text-surface-0 hover:bg-dj-300"
+        >
+          Review & sign contract
+        </Link>
+      ) : request.currentOfferId ? (
+        <OfferCard offerId={request.currentOfferId} requestId={request.requestId} uid={uid} onCounter={onCounter} />
+      ) : ['submitted', 'artist_review', 'negotiating'].includes(request.status) ? (
+        <div>
+          <p className="text-xs text-ink-2">Waiting for the artist to approve your request and set the contract terms.</p>
+          <Button size="sm" variant="secondary" loading={cancelling} onClick={() => void cancelRequest()} className="mt-2">
+            Cancel request
+          </Button>
+        </div>
+      ) : null}
+    </div>
   )
 }

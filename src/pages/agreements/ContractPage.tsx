@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Printer } from 'lucide-react'
+import { ArrowLeft, CreditCard, Download, PenLine, Printer } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { subscribeAgreement } from '@/services/licenceService'
+import { createLicencePaymentSession, getSecureDownloadUrl, subscribeAgreement } from '@/services/licenceService'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { getTrack } from '@/services/trackService'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/StateViews'
 import { Button } from '@/components/common/Button'
+import { SignAgreementModal } from '@/components/licence/SignAgreementModal'
 import { formatCurrency } from '@/utils/format'
 import type { LicenceAgreementDoc } from '@/types/licence'
 import type { TrackDoc } from '@/types/track'
@@ -32,6 +33,9 @@ export function ContractPage() {
   const [agreement, setAgreement] = useState<LicenceAgreementDoc | null | undefined>(undefined)
   const [track, setTrack] = useState<TrackDoc | null>(null)
   const [loadError, setLoadError] = useState(false)
+  const [showSignModal, setShowSignModal] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
   const artist = useArtistSummary(agreement?.artistId ?? null)
 
   useEffect(() => {
@@ -52,6 +56,38 @@ export function ContractPage() {
 
   const isParty = agreement.artistId === firebaseUser.uid || agreement.djId === firebaseUser.uid
   if (!isParty) return <EmptyState title="You don't have access to this contract" />
+  const isDj = agreement.djId === firebaseUser.uid
+  const hasSigned = isDj ? Boolean(agreement.djAcceptedAt) : Boolean(agreement.artistAcceptedAt)
+
+  async function handlePay() {
+    setBusy(true)
+    setActionError(null)
+    try {
+      const origin = window.location.origin
+      const { url } = await createLicencePaymentSession({
+        agreementId: agreement!.agreementId,
+        successUrl: `${origin}/agreements/${agreement!.agreementId}?payment=success`,
+        cancelUrl: `${origin}/agreements/${agreement!.agreementId}?payment=cancelled`,
+      })
+      window.location.href = url
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not start payment.')
+      setBusy(false)
+    }
+  }
+
+  async function handleDownload() {
+    setBusy(true)
+    setActionError(null)
+    try {
+      const { url } = await getSecureDownloadUrl({ agreementId: agreement!.agreementId })
+      window.location.href = url
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not prepare the download.')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 print:px-0 print:py-0">
@@ -75,6 +111,47 @@ export function ContractPage() {
         <p className="mt-1 text-xs text-ink-3">
           Status: <span className="font-medium text-ink-1">{STATUS_LABEL[agreement.status] ?? agreement.status}</span>
         </p>
+
+        <div className="mt-5 rounded-xl border border-brand-400/20 bg-brand-500/[0.06] p-4 no-print">
+          {agreement.status === 'pending' && !hasSigned ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-ink-0">Review and sign this contract</p>
+                <p className="mt-1 text-xs text-ink-2">Track access stays locked until both parties agree to these terms.</p>
+              </div>
+              <Button size="sm" onClick={() => setShowSignModal(true)} className="shrink-0">
+                <PenLine className="h-4 w-4" /> Sign agreement
+              </Button>
+            </div>
+          ) : agreement.status === 'pending' ? (
+            <p className="text-sm text-ink-1">You have signed. Waiting for the other party to sign.</p>
+          ) : agreement.status === 'awaiting_payment' && isDj ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-ink-0">Contract signed — payment is next</p>
+                <p className="mt-1 text-xs text-ink-2">Pay securely to unlock the full-quality track download.</p>
+              </div>
+              <Button size="sm" onClick={handlePay} loading={busy} className="shrink-0">
+                <CreditCard className="h-4 w-4" /> Pay {formatCurrency(agreement.licenceFeeMinor, agreement.currency)}
+              </Button>
+            </div>
+          ) : agreement.status === 'awaiting_payment' ? (
+            <p className="text-sm text-ink-1">Both parties signed. Waiting for the DJ to complete payment.</p>
+          ) : agreement.status === 'active' && isDj ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-ink-0">Licensed track ready</p>
+                <p className="mt-1 text-xs text-ink-2">Your signed licence is active. Download the full-quality audio file.</p>
+              </div>
+              <Button size="sm" onClick={handleDownload} loading={busy} className="shrink-0">
+                <Download className="h-4 w-4" /> Download track
+              </Button>
+            </div>
+          ) : agreement.status === 'active' ? (
+            <p className="text-sm text-ink-1">The licence is active and the DJ can download the track.</p>
+          ) : null}
+          {actionError ? <p className="mt-3 text-sm text-danger-500">{actionError}</p> : null}
+        </div>
 
         <div className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
           <Party
@@ -133,6 +210,14 @@ export function ContractPage() {
           not a substitute for independent legal advice.
         </p>
       </div>
+      {showSignModal ? (
+        <SignAgreementModal
+          agreementId={agreement.agreementId}
+          uid={firebaseUser.uid}
+          onClose={() => setShowSignModal(false)}
+          onSigned={() => setShowSignModal(false)}
+        />
+      ) : null}
     </div>
   )
 }

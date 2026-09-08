@@ -42,7 +42,8 @@ export interface LicenceRequestDoc {
   recordingIntention?: boolean
   streamingIntention?: boolean
   status: LicenceRequestStatus
-  conversationId: string
+  /** Present only on legacy requests created before licensing chat was removed. */
+  conversationId?: string
   currentAgreementId?: string
   currentOfferId?: string
   /** Admin/backend-only: blocks automatic retention cleanup from touching this request. */

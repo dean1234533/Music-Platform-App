@@ -42,7 +42,7 @@ export function RequestDjAccessModal({
     setSubmitting(true)
     setError(null)
     try {
-      const { requestId } = await submitLicenceRequest({
+      await submitLicenceRequest({
         trackId,
         intendedUse,
         territory,
@@ -55,7 +55,7 @@ export function RequestDjAccessModal({
         recordingIntention,
         streamingIntention,
       })
-      navigate(`/requests/${requestId}`)
+      navigate('/dj/requests')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not submit your request.')
     } finally {
@@ -64,7 +64,7 @@ export function RequestDjAccessModal({
   }
 
   return (
-    <Modal title={dealId ? 'Request this deal' : 'Request DJ access'} onClose={onClose}>
+    <Modal title={dealId ? 'Request final deal terms' : 'Request DJ access'} onClose={onClose}>
       <div className="flex flex-col gap-4">
         <div>
           <Label>Intended use</Label>
@@ -115,12 +115,12 @@ export function RequestDjAccessModal({
           </label>
         </div>
         <div>
-          <Label>Message to the artist</Label>
+          <Label>Additional request details</Label>
           <TextArea rows={3} value={message} onChange={(e) => setMessage(e.target.value)} />
         </div>
         {error ? <p className="text-sm text-danger-500">{error}</p> : null}
         <Button onClick={handleSubmit} loading={submitting}>
-          Send request
+          Send for artist approval
         </Button>
       </div>
     </Modal>

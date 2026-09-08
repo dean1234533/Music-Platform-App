@@ -7,7 +7,7 @@ import { requireActiveUser } from '../roles.js'
 import { writeSystemMessage } from '../messaging/messages.js'
 
 /** Deterministic fingerprint of the agreed terms — a signature records the exact contentHash it was given for, so any (impossible, since writes are server-only) tampering after signing would be independently detectable. */
-function computeContentHash(terms: AgreementTerms): string {
+export function computeContentHash(terms: AgreementTerms): string {
   const canonical = Object.keys(terms)
     .sort()
     .reduce<Record<string, unknown>>((acc, key) => {
@@ -263,9 +263,8 @@ export const signAgreement = onCall(async (request) => {
 
   const requestRef = db.collection('licenceRequests').doc(agreement.licenceRequestId)
   const requestSnap = await requestRef.get()
-  const conversationRef = requestSnap.exists
-    ? db.collection('conversations').doc(requestSnap.data()!.conversationId as string)
-    : null
+  const conversationId = requestSnap.data()?.conversationId as string | undefined
+  const conversationRef = conversationId ? db.collection('conversations').doc(conversationId) : null
 
   const now = FieldValue.serverTimestamp()
   const acceptanceLogRef = db.collection('licenceAgreementAcceptances').doc()
@@ -325,7 +324,7 @@ export const signAgreement = onCall(async (request) => {
       body: requiresPayment
         ? 'Both parties signed. Complete payment to unlock the download.'
         : 'Both parties signed. The full-quality track is now available to download.',
-      linkTo: '/dj/requests',
+      linkTo: `/agreements/${agreementId}`,
       read: false,
       createdAt: now,
     })
@@ -339,6 +338,17 @@ export const signAgreement = onCall(async (request) => {
         { agreementId },
       )
     }
+  } else {
+    const notifyId = isArtist ? agreement.djId : agreement.artistId
+    batch.set(db.collection('notifications').doc(), {
+      userId: notifyId,
+      type: 'agreement_ready',
+      title: `${isArtist ? 'Artist' : 'DJ'} signed the contract`,
+      body: 'Review the final terms and add your signature to continue.',
+      linkTo: `/agreements/${agreementId}`,
+      read: false,
+      createdAt: now,
+    })
   }
 
   await batch.commit()
@@ -377,9 +387,8 @@ export const voidAgreement = onCall(async (request) => {
 
   const requestRef = db.collection('licenceRequests').doc(agreement.licenceRequestId)
   const requestSnap = await requestRef.get()
-  const conversationRef = requestSnap.exists
-    ? db.collection('conversations').doc(requestSnap.data()!.conversationId as string)
-    : null
+  const conversationId = requestSnap.data()?.conversationId as string | undefined
+  const conversationRef = conversationId ? db.collection('conversations').doc(conversationId) : null
 
   const now = FieldValue.serverTimestamp()
   const batch = db.batch()
