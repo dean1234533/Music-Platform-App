@@ -108,8 +108,11 @@ function PlaylistRow({ track, onPlay, onRemove }: { track: TrackDoc; onPlay: () 
   const artist = useArtistSummary(track.artistId)
   return (
     <div className="flex items-center gap-3 px-4 py-3">
-      <button onClick={onPlay} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-2 hover:bg-surface-3">
-        <Play className="h-4 w-4 text-ink-1" />
+      <button onClick={onPlay} className="group relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-surface-2 hover:bg-surface-3">
+        {track.artworkURL ? <img src={track.artworkURL} alt="" className="h-full w-full object-cover" /> : null}
+        <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/40">
+          <Play className={`h-4 w-4 text-white transition ${track.artworkURL ? 'opacity-0 group-hover:opacity-100' : 'text-ink-1'}`} />
+        </span>
       </button>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-ink-0">{track.title}</p>
