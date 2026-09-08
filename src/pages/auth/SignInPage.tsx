@@ -5,12 +5,22 @@ import { Input, Label } from '@/components/common/Input'
 import { Button } from '@/components/common/Button'
 import { signInWithEmail, signInWithGoogle } from '@/services/authService'
 import { friendlyAuthError } from '@/utils/authErrors'
+import { getUserProfile } from '@/services/userService'
+
+async function dashboardAfterSignIn(uid: string): Promise<string> {
+  const profile = await getUserProfile(uid)
+  if (!profile?.onboardingComplete) return '/onboarding'
+  if (profile.roles.includes('admin')) return '/admin/users'
+  if (profile.roles.includes('artist')) return '/dashboard/artist'
+  if (profile.roles.includes('dj')) return '/dj/discover'
+  return '/app/home'
+}
 
 export function SignInPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const from = (location.state as { from?: { pathname: string; search: string } } | null)?.from
-  const redirectTo = from ? `${from.pathname}${from.search}` : '/app/home'
+  const redirectTo = from ? `${from.pathname}${from.search}` : null
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -23,8 +33,8 @@ export function SignInPage() {
     setError(null)
     setLoading(true)
     try {
-      await signInWithEmail(email, password)
-      navigate(redirectTo)
+      const credential = await signInWithEmail(email, password)
+      navigate(redirectTo ?? (await dashboardAfterSignIn(credential.user.uid)))
     } catch (err) {
       setError(friendlyAuthError(err))
     } finally {
@@ -36,8 +46,8 @@ export function SignInPage() {
     setError(null)
     setGoogleLoading(true)
     try {
-      await signInWithGoogle()
-      navigate(redirectTo)
+      const credential = await signInWithGoogle()
+      navigate(redirectTo ?? (await dashboardAfterSignIn(credential.user.uid)))
     } catch (err) {
       setError(friendlyAuthError(err))
     } finally {

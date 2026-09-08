@@ -14,6 +14,7 @@ import { Input, Label } from '@/components/common/Input'
 import { formatCurrency } from '@/utils/format'
 import { DEFAULT_DATA_RETENTION, type DataRetentionSettings, type SubscriptionPlan } from '@/types/platformSettings'
 import { PLAN_TIERS, type PlanFeatureKey, type PlanLimitKey, type PlanTier } from '@/types/entitlements'
+import { AccountSecuritySection } from '@/components/account/AccountSecuritySection'
 
 const RETENTION_FIELDS: { key: keyof DataRetentionSettings; label: string }[] = [
   { key: 'notificationsDays', label: 'Notifications (days)' },
@@ -474,6 +475,8 @@ export function AdminSettingsPage() {
           </div>
         </div>
       </section>
+
+      <AccountSecuritySection />
     </div>
   )
 }

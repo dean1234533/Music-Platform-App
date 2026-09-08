@@ -26,7 +26,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setInitializing(false)
         return
       }
-      await ensureUserDocument(user)
+      try {
+        await ensureUserDocument(user)
+      } catch (error) {
+        console.error('Could not initialise the user profile.', error)
+        setProfile(null)
+        setInitializing(false)
+      }
     })
     return unsubscribeAuth
   }, [])

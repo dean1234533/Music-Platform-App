@@ -10,6 +10,8 @@ import {
 } from 'react'
 import { getPreviewPlaybackURL, recordPreviewPlay } from '@/services/trackService'
 import type { TrackDoc } from '@/types/track'
+import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
 
 interface PlayerContextValue {
   currentTrack: TrackDoc | null
@@ -30,7 +32,10 @@ interface PlayerContextValue {
 const PlayerContext = createContext<PlayerContextValue | undefined>(undefined)
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
+  const { firebaseUser } = useAuth()
+  const { notify } = useToast()
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const previousUserIdRef = useRef<string | null>(null)
   const queueRef = useRef<TrackDoc[]>([])
   const currentTrackRef = useRef<TrackDoc | null>(null)
   const [currentTrack, setCurrentTrack] = useState<TrackDoc | null>(null)
@@ -82,6 +87,26 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     currentTrackRef.current = currentTrack
   }, [currentTrack])
 
+  useEffect(() => {
+    const previousUserId = previousUserIdRef.current
+    const nextUserId = firebaseUser?.uid ?? null
+    if (previousUserId && previousUserId !== nextUserId) {
+      const audio = audioRef.current
+      if (audio) {
+        audio.pause()
+        audio.removeAttribute('src')
+        audio.load()
+      }
+      setCurrentTrack(null)
+      setQueue([])
+      setIsPlaying(false)
+      setIsLoading(false)
+      setProgressSec(0)
+      setDurationSec(0)
+    }
+    previousUserIdRef.current = nextUserId
+  }, [firebaseUser?.uid])
+
   const loadAndPlay = useCallback(async (track: TrackDoc) => {
     const audio = audioRef.current
     if (!audio) return
@@ -95,10 +120,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       void recordPreviewPlay(track.trackId).catch(() => {
         // Best-effort analytics — playback should not fail if this errors.
       })
+    } catch (error) {
+      setIsPlaying(false)
+      notify(error instanceof Error ? error.message : 'This track is not available to play.', 'error')
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [notify])
 
   const playTrack = useCallback(
     (track: TrackDoc, nextQueue?: TrackDoc[]) => {

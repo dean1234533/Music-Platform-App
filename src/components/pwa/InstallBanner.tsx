@@ -29,9 +29,8 @@ function dismiss(): void {
  * Shown to every authenticated role — fan, artist, DJ, and admin alike, per
  * spec: installability is not a fan-only perk. Suppressed entirely once the
  * app is already running standalone, and for DISMISS_DAYS after "Not Now".
- * Manually reachable at any time from Settings → Install App (fan settings
- * today; extending to the artist/DJ/admin settings pages is a reasonable
- * follow-up, not done here to avoid duplicating the same block four times).
+ * Manually reachable at any time from the account controls shared by fan,
+ * artist, DJ, and admin settings.
  */
 export function InstallBanner() {
   const { firebaseUser } = useAuth()

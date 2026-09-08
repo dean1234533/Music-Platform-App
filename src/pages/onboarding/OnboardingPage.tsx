@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Disc3, Headphones, Radio } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { completeOnboarding } from '@/services/userService'
@@ -20,7 +20,11 @@ type Step = 'roles' | 'artist' | 'dj' | 'saving'
 export function OnboardingPage() {
   const { firebaseUser, profile } = useAuth()
   const navigate = useNavigate()
-  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null)
+  const [searchParams] = useSearchParams()
+  const initialRole = ['fan', 'artist', 'dj'].includes(searchParams.get('role') ?? '')
+    ? (searchParams.get('role') as UserRole)
+    : null
+  const [selectedRole, setSelectedRole] = useState<UserRole | null>(initialRole)
   const [step, setStep] = useState<Step>('roles')
   const [error, setError] = useState<string | null>(null)
 

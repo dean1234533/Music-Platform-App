@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Handshake, Megaphone, Plus } from 'lucide-react'
+import { Handshake, Megaphone, Plus, Trash2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeArtistTracks } from '@/services/artistService'
 import { subscribeArtistCopyrightClaims } from '@/services/moderationService'
@@ -11,6 +11,8 @@ import { CopyrightClaimBanner } from '@/components/track/CopyrightClaimBanner'
 import { TrackDealSettingsModal } from '@/components/licence/TrackDealSettingsModal'
 import type { TrackDoc } from '@/types/track'
 import { OPEN_CLAIM_STATUSES, type CopyrightClaimDoc } from '@/types/moderation'
+import { deleteTrack } from '@/services/trackService'
+import { useToast } from '@/contexts/ToastContext'
 
 const VISIBILITY_LABEL: Record<TrackDoc['visibility'], string> = {
   public: 'Public',
@@ -23,10 +25,25 @@ const VISIBILITY_LABEL: Record<TrackDoc['visibility'], string> = {
 
 export function MusicPage() {
   const { firebaseUser } = useAuth()
+  const { notify } = useToast()
   const [tracks, setTracks] = useState<TrackDoc[] | null>(null)
   const [claims, setClaims] = useState<CopyrightClaimDoc[]>([])
   const [outreachTrack, setOutreachTrack] = useState<TrackDoc | null>(null)
   const [dealsTrack, setDealsTrack] = useState<TrackDoc | null>(null)
+  const [deletingTrackId, setDeletingTrackId] = useState<string | null>(null)
+
+  async function handleDelete(track: TrackDoc) {
+    if (!window.confirm(`Delete “${track.title}” and its audio files? This cannot be undone.`)) return
+    setDeletingTrackId(track.trackId)
+    try {
+      await deleteTrack(track.trackId)
+      notify('Track and unused media deleted.')
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Could not delete the track.', 'error')
+    } finally {
+      setDeletingTrackId(null)
+    }
+  }
 
   useEffect(() => {
     if (!firebaseUser) return
@@ -110,6 +127,16 @@ export function MusicPage() {
                 title="DJ deals"
               >
                 <Handshake className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDelete(track)}
+                disabled={deletingTrackId === track.trackId}
+                className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-danger-500/10 hover:text-danger-500 disabled:opacity-50"
+                title="Delete track"
+                aria-label={`Delete ${track.title}`}
+              >
+                <Trash2 className="h-4 w-4" />
               </button>
             </div>
           ))}

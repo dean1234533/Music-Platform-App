@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { createArtistPost, subscribeArtistPosts } from '@/services/artistPostService'
+import { createArtistPost, deleteArtistPost, subscribeArtistPosts } from '@/services/artistPostService'
 import { Button } from '@/components/common/Button'
 import { Input, TextArea } from '@/components/common/Input'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import type { ArtistPost } from '@/types/artist'
+import { Trash2 } from 'lucide-react'
+import { useToast } from '@/contexts/ToastContext'
 
 export function CommunityPage() {
   const { firebaseUser } = useAuth()
+  const { notify } = useToast()
   const [posts, setPosts] = useState<ArtistPost[] | null>(null)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -26,8 +29,21 @@ export function CommunityPage() {
       await createArtistPost(firebaseUser.uid, { title, body, visibility })
       setTitle('')
       setBody('')
+      notify('Post published.')
+    } catch {
+      notify('Could not publish the post.', 'error')
     } finally {
       setPosting(false)
+    }
+  }
+
+  async function handleDelete(post: ArtistPost) {
+    if (!window.confirm(`Delete “${post.title}”? This cannot be undone.`)) return
+    try {
+      await deleteArtistPost(post.postId)
+      notify('Post deleted.')
+    } catch {
+      notify('Could not delete the post.', 'error')
     }
   }
 
@@ -69,9 +85,14 @@ export function CommunityPage() {
             <div key={post.postId} className="rounded-xl border border-surface-border bg-surface-1 p-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-medium text-ink-0">{post.title}</h3>
-                <span className="rounded-full bg-surface-3 px-2 py-0.5 text-xs text-ink-2">
-                  {post.visibility === 'everyone' ? 'Everyone' : post.visibility === 'followers' ? 'Followers' : 'Supporters'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-surface-3 px-2 py-0.5 text-xs text-ink-2">
+                    {post.visibility === 'everyone' ? 'Everyone' : post.visibility === 'followers' ? 'Followers' : 'Supporters'}
+                  </span>
+                  <button type="button" onClick={() => void handleDelete(post)} className="rounded-full p-1.5 text-ink-3 hover:bg-danger-500/10 hover:text-danger-500" aria-label={`Delete ${post.title}`}>
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
               {post.body ? <p className="mt-2 text-sm text-ink-1">{post.body}</p> : null}
             </div>

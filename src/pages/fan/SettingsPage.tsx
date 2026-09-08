@@ -4,14 +4,12 @@ import { useAuth } from '@/contexts/AuthContext'
 import { updateBasicProfile } from '@/services/userService'
 import { signOut } from '@/services/authService'
 import { currentPushPermission, disablePushNotifications, enablePushNotifications } from '@/services/pushNotificationService'
-import { useInstallPrompt } from '@/hooks/useInstallPrompt'
 import { Button } from '@/components/common/Button'
 import { AccountSecuritySection } from '@/components/account/AccountSecuritySection'
 
 export function SettingsPage() {
   const { firebaseUser, profile } = useAuth()
   const navigate = useNavigate()
-  const { canInstall, isStandalone, isIOS, install } = useInstallPrompt()
   const [pushPermission, setPushPermission] = useState<NotificationPermission | 'unsupported'>('default')
   const [pushBusy, setPushBusy] = useState(false)
   const [pushError, setPushError] = useState<string | null>(null)
@@ -152,23 +150,6 @@ export function SettingsPage() {
           Sign out
         </Button>
       </section>
-
-      {!isStandalone ? (
-        <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Install App</h2>
-          {canInstall ? (
-            <Button size="sm" variant="secondary" onClick={() => void install()}>
-              Install Wavelength
-            </Button>
-          ) : isIOS ? (
-            <p className="text-sm text-ink-2">
-              Tap Share, then "Add to Home Screen" to install Wavelength on this device.
-            </p>
-          ) : (
-            <p className="text-sm text-ink-2">Installation isn't available in this browser yet.</p>
-          )}
-        </section>
-      ) : null}
 
     </div>
   )

@@ -24,13 +24,13 @@ export async function signUpWithEmail(
   await sendEmailVerification(credential.user)
 }
 
-export async function signInWithEmail(email: string, password: string): Promise<void> {
-  await signInWithEmailAndPassword(auth, email, password)
+export async function signInWithEmail(email: string, password: string) {
+  return signInWithEmailAndPassword(auth, email, password)
 }
 
-export async function signInWithGoogle(): Promise<void> {
+export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider()
-  await signInWithPopup(auth, provider)
+  return signInWithPopup(auth, provider)
 }
 
 export async function resendVerificationEmail(): Promise<void> {

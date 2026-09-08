@@ -183,12 +183,19 @@ export async function updateTrackDealSettings(trackId: string, settings: TrackDj
 }
 
 export async function getPreviewPlaybackURL(track: TrackDoc): Promise<string> {
-  return getDownloadURL(ref(storage, track.previewAudioPath))
+  const fn = httpsCallable<{ trackId: string; kind: 'preview' }, { url: string }>(functions, 'getTrackPlaybackUrl')
+  return (await fn({ trackId: track.trackId, kind: 'preview' })).data.url
 }
 
 /** Full-length optimised playback for entitled listeners — visibility-gated the same as the track itself. */
 export async function getStreamPlaybackURL(track: TrackDoc): Promise<string> {
-  return getDownloadURL(ref(storage, track.streamAudioPath))
+  const fn = httpsCallable<{ trackId: string; kind: 'stream' }, { url: string }>(functions, 'getTrackPlaybackUrl')
+  return (await fn({ trackId: track.trackId, kind: 'stream' })).data.url
+}
+
+export async function deleteTrack(trackId: string): Promise<void> {
+  const fn = httpsCallable(functions, 'deleteTrack')
+  await fn({ trackId })
 }
 
 export async function listNewReleases(count = 20): Promise<TrackDoc[]> {

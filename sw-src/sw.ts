@@ -84,7 +84,10 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window' }).then((clientList) => {
       for (const client of clientList) {
-        if ('focus' in client) return (client as WindowClient).focus()
+        if ('focus' in client) {
+          const windowClient = client as WindowClient
+          return windowClient.navigate(linkTo).then(() => windowClient.focus())
+        }
       }
       return self.clients.openWindow(linkTo)
     }),

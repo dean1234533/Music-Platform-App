@@ -46,58 +46,19 @@ service firebase.storage {
       return request.resource.size < 100 * 1024 * 1024;
     }
 
-    // Files are named {trackId}.{ext} — strip the extension to look the
-    // track doc up in Firestore for a visibility-aware read check. Mirrors
-    // the same existence-check pattern already proven by supporter-content
-    // below, extended to the track's full visibility tier set.
-    function trackIdFromFileName(fileName) {
-      return fileName.split('.')[0];
-    }
-
-    // Field-existence checked with the `in` operator rather than
-    // map.get(key, default) — a cross-service firestore.get(...).data map
-    // didn't reliably honour the 2-arg get() default here in practice
-    // (tracks written before these fields existed were incorrectly denied
-    // even though takenDown/restrictedCapabilities were simply absent).
-    function isNotTakenDown(track) {
-      return !('takenDown' in track) || track.takenDown == false;
-    }
-    function isNotStreamingRestricted(track) {
-      return !('restrictedCapabilities' in track) || !('streaming' in track.restrictedCapabilities);
-    }
-
-    function canReadTrackAsset(artistId, fileName) {
-      let trackId = trackIdFromFileName(fileName);
-      let track = firestore.get(/databases/(default)/documents/tracks/$(trackId)).data;
-      let visibilityAllows = track.visibility == 'public'
-        || (track.visibility == 'followers' && isSignedIn() &&
-            firestore.exists(/databases/(default)/documents/follows/$(request.auth.uid + '_' + artistId)))
-        || (track.visibility == 'supporters' && isSignedIn() &&
-            firestore.exists(/databases/(default)/documents/supportRelationships/$(request.auth.uid + '_' + artistId)));
-      return visibilityAllows && isNotTakenDown(track) && isNotStreamingRestricted(track);
-    }
-
     // Public artwork — anyone can view, only the owning artist can upload.
     match /artists/{artistId}/artwork/{fileName} {
       allow read: if true;
       allow write: if isOwner(artistId) && underImageUploadLimit() && isImage();
     }
 
-    // Preview clips — public read. The takedown/restrictedCapabilities gate
-    // this comment used to describe relied on cross-service firestore.get()/
-    // exists() calls, which do not work in this project: Cloud Storage
-    // security rules require the Firestore database and Storage bucket to
-    // be in the exact same location, and this project's Firestore is in the
-    // nam5 multi-region — every such cross-service call here silently fails
-    // closed (confirmed empirically: even a trivial firestore.exists() call
-    // 403s on a document that demonstrably exists). Firestore's location is
-    // immutable short of recreating the database from scratch, so a taken-
-    // down/restricted track's preview must instead be enforced by actually
-    // deleting or moving its Storage object when takenDown/
-    // restrictedCapabilities changes (not yet wired up — tracked as a
-    // follow-up) rather than by a read-time rule check.
+    // Preview clips are private at Storage. getTrackPlaybackUrl validates
+    // live Firestore visibility and moderation state, then returns a
+    // short-lived signed URL for entitled playback.
     match /artists/{artistId}/previews/{fileName} {
-      allow read: if true;
+      // Playback is issued through getTrackPlaybackUrl after checking the
+      // current Firestore entitlement/takedown state.
+      allow read: if isOwner(artistId);
       allow write: if isOwner(artistId) && underAudioUploadLimit() && isCompressedAudio();
     }
 
@@ -105,7 +66,7 @@ service firebase.storage {
     // like the track doc itself (public/followers/supporters), not just
     // publicly readable like previews.
     match /artists/{artistId}/streaming/{fileName} {
-      allow read: if isOwner(artistId) || canReadTrackAsset(artistId, fileName);
+      allow read: if isOwner(artistId);
       allow write: if isOwner(artistId) && underAudioUploadLimit() && isCompressedAudio();
     }
 

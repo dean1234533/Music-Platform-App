@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AuthLayout } from './AuthLayout'
 import { Input, Label, FieldError } from '@/components/common/Input'
 import { Button } from '@/components/common/Button'
@@ -10,6 +10,11 @@ import { checkPassword, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '@/utils
 
 export function SignUpPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const requestedRole = ['fan', 'artist', 'dj'].includes(searchParams.get('role') ?? '')
+    ? searchParams.get('role')
+    : null
+  const roleQuery = requestedRole ? `?role=${requestedRole}` : ''
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -28,7 +33,7 @@ export function SignUpPage() {
     setLoading(true)
     try {
       await signUpWithEmail(displayName, email, password)
-      navigate('/verify-email')
+      navigate(`/verify-email${roleQuery}`)
     } catch (err) {
       setError(friendlyAuthError(err))
     } finally {
@@ -41,7 +46,7 @@ export function SignUpPage() {
     setGoogleLoading(true)
     try {
       await signInWithGoogle()
-      navigate('/onboarding')
+      navigate(`/onboarding${roleQuery}`)
     } catch (err) {
       setError(friendlyAuthError(err))
     } finally {

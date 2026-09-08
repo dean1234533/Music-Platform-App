@@ -4,6 +4,7 @@ import type { Query } from 'firebase-admin/firestore'
 import { getAuth } from 'firebase-admin/auth'
 import { getStorage } from 'firebase-admin/storage'
 import { db } from '../admin.js'
+import { getStripe, stripeSecretKey } from '../stripe/client.js'
 
 const RECENT_AUTH_WINDOW_SEC = 5 * 60
 
@@ -93,7 +94,7 @@ async function offboardArtistStories(artistId: string): Promise<void> {
  * retention schedule, not this flow. Idempotent: every step is safe to
  * re-run if a previous attempt partially failed.
  */
-export const deleteAccount = onCall(async (request) => {
+export const deleteAccount = onCall({ secrets: [stripeSecretKey] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   const uid = request.auth.uid
 
@@ -112,10 +113,24 @@ export const deleteAccount = onCall(async (request) => {
     const userSnap = await db.collection('users').doc(uid).get()
     const roles = (userSnap.data()?.roles ?? []) as string[]
 
+    const subscriptionRef = db.collection('subscriptions').doc(`${uid}_fan`)
+    const subscriptionSnap = await subscriptionRef.get()
+    const stripeSubscriptionId = subscriptionSnap.data()?.stripeSubscriptionId as string | undefined
+    if (stripeSubscriptionId) {
+      try {
+        await getStripe().subscriptions.cancel(stripeSubscriptionId)
+      } catch (error) {
+        if ((error as { code?: string }).code !== 'resource_missing') throw error
+      }
+    }
+
     if (roles.includes('artist')) {
       await offboardArtistTracks(uid)
       await offboardArtistStories(uid)
       await deleteQueryBatched(db.collection('djDeals').where('artistId', '==', uid))
+      await deleteQueryBatched(db.collection('artistPosts').where('artistId', '==', uid))
+      await deleteQueryBatched(db.collection('fanOffers').where('artistId', '==', uid))
+      await deleteQueryBatched(db.collection('fanOfferClaims').where('artistId', '==', uid))
       await deleteStorageFolder(`artists/${uid}/artwork/`)
       await db.collection('artistProfiles').doc(uid).delete()
     }
@@ -129,7 +144,12 @@ export const deleteAccount = onCall(async (request) => {
     await deleteQueryBatched(db.collection('follows').where('fanId', '==', uid))
     await deleteQueryBatched(db.collection('follows').where('artistId', '==', uid))
     await deleteQueryBatched(db.collection('trackLikes').where('fanId', '==', uid))
+    await deleteQueryBatched(db.collection('fanOfferClaims').where('fanId', '==', uid))
+    await deleteQueryBatched(db.collection('supportRelationships').where('fanId', '==', uid))
+    await deleteQueryBatched(db.collection('supportRelationships').where('artistId', '==', uid))
     await deleteQueryBatched(db.collection('notifications').where('userId', '==', uid))
+    await db.collection('supportAllocations').doc(uid).delete()
+    await subscriptionRef.delete()
 
     await db.collection('users').doc(uid).delete()
 

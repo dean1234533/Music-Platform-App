@@ -6,6 +6,7 @@ import { Input, Label } from '@/components/common/Input'
 import { PasswordStrengthMeter } from '@/components/auth/PasswordStrengthMeter'
 import { checkPassword, MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 import { DeleteAccountModal } from './DeleteAccountModal'
+import { PwaInstallSection } from './PwaInstallSection'
 
 /**
  * Change password / download-my-data / delete-account — shared across every
@@ -66,6 +67,8 @@ export function AccountSecuritySection() {
 
   return (
     <>
+      <PwaInstallSection />
+
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Password</h2>
         {hasPasswordProvider() ? (

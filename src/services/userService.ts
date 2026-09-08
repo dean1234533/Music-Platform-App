@@ -41,6 +41,11 @@ export async function ensureUserDocument(user: User): Promise<void> {
   })
 }
 
+export async function getUserProfile(uid: string): Promise<UserProfile | null> {
+  const snap = await getDoc(userRef(uid))
+  return snap.exists() ? (snap.data() as UserProfile) : null
+}
+
 export function subscribeToUserProfile(
   uid: string,
   onChange: (profile: UserProfile | null) => void,

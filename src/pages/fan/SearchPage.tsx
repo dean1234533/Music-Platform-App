@@ -48,7 +48,7 @@ export function SearchPage() {
       </div>
 
       {!term.trim() ? (
-        <EmptyState title="Search for artists and tracks" description="Genre, album, and DJ search expand in later phases." />
+        <EmptyState title="Search for artists and tracks" description="Use Discover to browse the live catalogue by genre and DJ availability." />
       ) : loading ? (
         <LoadingState label="Searching…" />
       ) : results && (results.artists.length > 0 || results.tracks.length > 0) ? (

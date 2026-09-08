@@ -131,7 +131,8 @@ service cloud.firestore {
         && request.resource.data.get('restrictedCapabilities', []) == resource.data.get('restrictedCapabilities', [])
         && request.resource.data.get('legalHold', false) == resource.data.get('legalHold', false);
 
-      allow delete: if isSignedIn() && resource.data.artistId == request.auth.uid;
+      // Server callable performs licence/legal-hold checks and media cleanup.
+      allow delete: if false;
     }
 
     match /albums/{albumId} {

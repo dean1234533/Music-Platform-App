@@ -1,4 +1,4 @@
-import { collection, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
+import { collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import type { ArtistPost } from '@/types/artist'
 
@@ -21,6 +21,10 @@ export async function createArtistPost(
     mediaURL: null,
     createdAt: serverTimestamp(),
   })
+}
+
+export async function deleteArtistPost(postId: string): Promise<void> {
+  await deleteDoc(doc(db, 'artistPosts', postId))
 }
 
 export function subscribeArtistPosts(artistId: string, onChange: (posts: ArtistPost[]) => void) {

@@ -5,15 +5,28 @@ import { markNotificationRead, subscribeNotifications } from '@/services/notific
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import type { NotificationDoc } from '@/types/notification'
 import { clsx } from 'clsx'
+import { useNavigate } from 'react-router-dom'
+import { useToast } from '@/contexts/ToastContext'
 
 export function NotificationsPage() {
   const { firebaseUser } = useAuth()
+  const navigate = useNavigate()
+  const { notify } = useToast()
   const [notifications, setNotifications] = useState<NotificationDoc[] | null>(null)
 
   useEffect(() => {
     if (!firebaseUser) return
     return subscribeNotifications(firebaseUser.uid, setNotifications)
   }, [firebaseUser])
+
+  async function openNotification(notification: NotificationDoc) {
+    try {
+      if (!notification.read) await markNotificationRead(notification.notificationId)
+      if (notification.linkTo) navigate(notification.linkTo)
+    } catch {
+      notify('Could not open that notification. Please try again.', 'error')
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -31,7 +44,7 @@ export function NotificationsPage() {
           {notifications.map((n) => (
             <button
               key={n.notificationId}
-              onClick={() => !n.read && markNotificationRead(n.notificationId)}
+              onClick={() => void openNotification(n)}
               className={clsx('flex flex-col gap-1 px-4 py-3 text-left hover:bg-surface-2', !n.read && 'bg-surface-1')}
             >
               <div className="flex items-center gap-2">

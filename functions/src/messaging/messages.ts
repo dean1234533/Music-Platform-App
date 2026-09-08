@@ -97,6 +97,7 @@ export const sendMessage = onCall(async (request) => {
   })
 
   const recipients = participantIds.filter((id) => id !== uid)
+  const licenceRequestId = conversationSnap.data()?.licenceRequestId
   await Promise.all(
     recipients.map((recipientId) =>
       db.collection('notifications').add({
@@ -104,7 +105,7 @@ export const sendMessage = onCall(async (request) => {
         type: 'new_message',
         title: 'New message',
         body: text.trim().slice(0, 140),
-        linkTo: `/messages/${conversationId}`,
+        linkTo: typeof licenceRequestId === 'string' ? `/requests/${licenceRequestId}` : '/agreements',
         read: false,
         createdAt: FieldValue.serverTimestamp(),
       }),

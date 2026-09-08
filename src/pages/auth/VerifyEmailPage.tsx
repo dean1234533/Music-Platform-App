@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { MailCheck } from 'lucide-react'
 import { AuthLayout } from './AuthLayout'
 import { Button } from '@/components/common/Button'
@@ -10,6 +10,7 @@ import { auth } from '@/lib/firebase'
 export function VerifyEmailPage() {
   const { firebaseUser } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [sent, setSent] = useState(false)
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -28,7 +29,12 @@ export function VerifyEmailPage() {
     setChecking(true)
     try {
       await auth.currentUser?.reload()
-      navigate('/onboarding')
+      if (!auth.currentUser?.emailVerified) {
+        setError('Your email is not verified yet. Open the link in your inbox, then try again.')
+        return
+      }
+      const role = searchParams.get('role')
+      navigate(`/onboarding${['fan', 'artist', 'dj'].includes(role ?? '') ? `?role=${role}` : ''}`)
     } finally {
       setChecking(false)
     }
@@ -40,8 +46,8 @@ export function VerifyEmailPage() {
         <MailCheck className="h-10 w-10 text-brand-400" />
         <p className="text-sm text-ink-1">
           We sent a verification link to{' '}
-          <span className="font-medium text-ink-0">{firebaseUser?.email}</span>. You can continue
-          setting up your account now and verify whenever the email arrives.
+          <span className="font-medium text-ink-0">{firebaseUser?.email}</span>. Open that link, then
+          return here to continue setting up your account.
         </p>
         {error ? <p className="text-sm text-danger-500">{error}</p> : null}
         {sent ? <p className="text-sm text-support-400">Verification email sent.</p> : null}
