@@ -72,11 +72,14 @@ test('install banner only shows once signed in, and first-time profiles are awai
   assert.match(users, /permission-denied[\s\S]*?unavailable/)
 })
 
-test('browser tab uses the detailed BackTheVibes app mark', () => {
+test('browser tab uses the high-contrast BackTheVibes favicon', () => {
   const html = read('index.html')
-  assert.match(html, /rel="icon"[^>]+backthevibes-app-icon\.svg\?v=2/)
-  assert.match(html, /rel="shortcut icon"[^>]+backthevibes-app-icon\.svg\?v=2/)
+  const favicon = read('public/icons/backthevibes-favicon.svg')
+  assert.match(html, /rel="icon"[^>]+backthevibes-favicon\.svg\?v=3/)
+  assert.match(html, /rel="shortcut icon"[^>]+backthevibes-favicon\.svg\?v=3/)
   assert.doesNotMatch(html, /href="\/backthevibes-mark\.svg"/)
+  assert.match(favicon, /#C8F33F/)
+  assert.match(favicon, /stroke-linecap="round"/)
 })
 
 test('notifications use Firestore IDs and navigate their deep links', () => {
