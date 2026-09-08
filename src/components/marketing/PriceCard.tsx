@@ -39,8 +39,10 @@ export function PriceCard({ index, title, price, suffix, description, features, 
 
   return (
     <div ref={cardRef} className={`price-card-reveal price-card-delay-${index} ${visible ? 'is-visible' : ''} relative flex min-h-[28rem] flex-col rounded-[1.5rem] p-7 ${featured ? 'border border-brand-400/25 bg-[radial-gradient(circle_at_82%_0%,rgba(200,243,63,.16),transparent_18rem),linear-gradient(145deg,#182016,#0b0f0a)] text-ink-0 shadow-[0_30px_90px_rgba(200,243,63,.08)]' : 'premium-panel'}`}>
-      {featured ? <span className="absolute right-5 top-5 rounded-full border border-brand-400/15 bg-brand-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-brand-400">Most meaningful</span> : null}
-      <p className={`text-xs font-bold uppercase tracking-[0.16em] ${featured ? 'text-brand-400/80' : 'text-ink-3'}`}>{title}</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className={`text-xs font-bold uppercase tracking-[0.16em] ${featured ? 'text-brand-400/80' : 'text-ink-3'}`}>{title}</p>
+        {featured ? <span className="shrink-0 rounded-full border border-brand-400/15 bg-brand-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-brand-400">Most meaningful</span> : null}
+      </div>
       <p className="mt-6 text-5xl font-medium tracking-[-0.055em]">{price}<span className="ml-1 text-sm font-medium tracking-normal text-ink-2">{suffix}</span></p>
       <p className="mt-4 text-sm leading-6 text-ink-2">{description}</p>
       <ul className="mt-8 space-y-3">{features.map((feature) => <li key={feature} className="flex items-center gap-3 text-sm"><Check className="h-4 w-4 shrink-0" />{feature}</li>)}</ul>
