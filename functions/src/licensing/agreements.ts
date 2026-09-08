@@ -344,3 +344,75 @@ export const signAgreement = onCall(async (request) => {
   await batch.commit()
   return { ok: true, bothAccepted: bothWillBeAccepted }
 })
+
+/**
+ * Either party can end a signed agreement — unilateral, not bilateral
+ * consent, since requiring both parties to agree would leave no way out of
+ * a dispute short of an admin. This is a platform-recorded cancellation for
+ * the DJ↔artist relationship (revokes download access, freezes the
+ * contract), not a substitute for whatever real-world legal/financial
+ * remedy a voided licence might require between the parties — same
+ * "pending qualified solicitor review" caveat as the rest of this system's
+ * legal wording.
+ */
+export const voidAgreement = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
+  const uid = request.auth.uid
+  const { agreementId, reason } = request.data ?? {}
+  if (!agreementId || typeof agreementId !== 'string') throw new HttpsError('invalid-argument', 'agreementId is required.')
+
+  const agreementRef = db.collection('licenceAgreements').doc(agreementId)
+  const snap = await agreementRef.get()
+  if (!snap.exists) throw new HttpsError('not-found', 'Agreement not found.')
+  const agreement = snap.data()!
+
+  const isArtist = agreement.artistId === uid
+  const isDj = agreement.djId === uid
+  if (!isArtist && !isDj) throw new HttpsError('permission-denied', 'Not a party to this agreement.')
+  if (agreement.legalHold) throw new HttpsError('failed-precondition', 'This agreement is under legal hold.')
+  if (!['active', 'awaiting_payment'].includes(agreement.status)) {
+    throw new HttpsError('failed-precondition', 'Only an active or awaiting-payment agreement can be voided.')
+  }
+
+  const requestRef = db.collection('licenceRequests').doc(agreement.licenceRequestId)
+  const requestSnap = await requestRef.get()
+  const conversationRef = requestSnap.exists
+    ? db.collection('conversations').doc(requestSnap.data()!.conversationId as string)
+    : null
+
+  const now = FieldValue.serverTimestamp()
+  const batch = db.batch()
+  batch.update(agreementRef, {
+    status: 'void',
+    downloadRevoked: true,
+    voidedBy: uid,
+    voidedAt: now,
+    voidReason: typeof reason === 'string' ? reason.slice(0, 500) : null,
+  })
+  batch.update(requestRef, { status: 'cancelled', updatedAt: now })
+
+  const notifyId = isArtist ? agreement.djId : agreement.artistId
+  batch.set(db.collection('notifications').doc(), {
+    userId: notifyId,
+    type: 'agreement_voided',
+    title: 'Licence agreement voided',
+    body: `${isArtist ? 'The artist' : 'The DJ'} voided this licence agreement. Any download access has been revoked.`,
+    linkTo: '/dj/requests',
+    read: false,
+    createdAt: now,
+  })
+  if (conversationRef) {
+    writeSystemMessage(
+      batch,
+      conversationRef,
+      uid,
+      'contract_status',
+      `${isArtist ? 'Artist' : 'DJ'} voided the agreement${typeof reason === 'string' && reason ? `: ${reason.slice(0, 200)}` : '.'}`,
+      { agreementId },
+    )
+  }
+
+  await batch.commit()
+  return { ok: true }
+})

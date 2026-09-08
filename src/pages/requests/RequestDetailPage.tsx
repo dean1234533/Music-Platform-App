@@ -9,6 +9,7 @@ import {
   respondToLicenceRequest,
   subscribeAgreement,
   subscribeLicenceRequest,
+  voidAgreement,
 } from '@/services/licenceService'
 import { sendMessage, subscribeMessages } from '@/services/messagingService'
 import { getTrack } from '@/services/trackService'
@@ -56,6 +57,8 @@ export function RequestDetailPage() {
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null)
   const [isBlocked, setIsBlocked] = useState(false)
   const [blockBusy, setBlockBusy] = useState(false)
+  const [showVoidConfirm, setShowVoidConfirm] = useState(false)
+  const [voidReason, setVoidReason] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const artist = useArtistSummary(request?.artistId ?? null)
@@ -147,6 +150,15 @@ export function RequestDetailPage() {
     await runAction(async () => {
       const { url } = await getSecureDownloadUrl({ agreementId: agreement.agreementId })
       window.open(url, '_blank', 'noopener,noreferrer')
+    })
+  }
+
+  async function handleVoidAgreement() {
+    if (!agreement) return
+    await runAction(async () => {
+      await voidAgreement({ agreementId: agreement.agreementId, reason: voidReason.trim() || undefined })
+      setShowVoidConfirm(false)
+      setVoidReason('')
     })
   }
 
@@ -269,10 +281,39 @@ export function RequestDetailPage() {
               </Button>
             ) : null}
 
+            {['active', 'awaiting_payment'].includes(agreement.status) ? (
+              <Button size="sm" variant="danger" loading={busy} onClick={() => setShowVoidConfirm(true)}>
+                Void agreement
+              </Button>
+            ) : null}
+
             <Link to={`/agreements/${agreement.agreementId}`} className="text-xs font-medium text-brand-400 hover:underline">
               View full contract →
             </Link>
           </div>
+
+          {showVoidConfirm ? (
+            <div className="mt-4 flex flex-col gap-2 rounded-xl border border-danger-500/30 bg-danger-500/5 p-4">
+              <p className="text-sm text-ink-1">
+                Voiding this agreement immediately revokes download access and ends the licence. This can't be
+                undone from here — it's recorded, not deleted.
+              </p>
+              <input
+                value={voidReason}
+                onChange={(e) => setVoidReason(e.target.value)}
+                placeholder="Reason (optional)"
+                className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 outline-none focus:border-brand-500"
+              />
+              <div className="flex gap-2">
+                <Button size="sm" variant="danger" loading={busy} onClick={handleVoidAgreement}>
+                  Confirm void
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => setShowVoidConfirm(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

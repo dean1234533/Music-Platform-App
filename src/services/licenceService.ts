@@ -87,6 +87,8 @@ export interface SignAgreementInput {
 
 export const signAgreement = callable<SignAgreementInput, { ok: boolean; bothAccepted: boolean }>('signAgreement')
 
+export const voidAgreement = callable<{ agreementId: string; reason?: string }, { ok: boolean }>('voidAgreement')
+
 export interface OfferTermsInput {
   priceMinor: number
   currency: string
