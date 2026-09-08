@@ -316,18 +316,42 @@ export const signAgreement = onCall(async (request) => {
       status: requiresPayment ? 'awaiting_payment' : 'approved',
       updatedAt: now,
     })
-    const notifyId = isArtist ? agreement.djId : agreement.artistId
-    batch.set(db.collection('notifications').doc(), {
-      userId: notifyId,
-      type: requiresPayment ? 'payment_required' : 'download_unlocked',
-      title: requiresPayment ? 'Agreement signed — payment required' : 'Agreement signed — download unlocked',
-      body: requiresPayment
-        ? 'Both parties signed. Complete payment to unlock the download.'
-        : 'Both parties signed. The full-quality track is now available to download.',
-      linkTo: `/agreements/${agreementId}`,
-      read: false,
-      createdAt: now,
-    })
+    if (requiresPayment) {
+      // Payment is always the DJ's action, regardless of which party's signature just completed
+      // the pair — the DJ needs this notification either way, not "whoever didn't just sign".
+      batch.set(db.collection('notifications').doc(), {
+        userId: agreement.djId,
+        type: 'payment_required',
+        title: 'Agreement signed — payment required',
+        body: 'Both parties signed. Complete payment to unlock the download.',
+        linkTo: `/agreements/${agreementId}`,
+        read: false,
+        createdAt: now,
+      })
+      // If the DJ was the one who just signed (finalising the pair), the artist hasn't been told yet.
+      if (!isArtist) {
+        batch.set(db.collection('notifications').doc(), {
+          userId: agreement.artistId,
+          type: 'dj_signed',
+          title: 'DJ signed — awaiting payment',
+          body: 'Both parties have now signed. The licence activates once the DJ completes payment.',
+          linkTo: `/agreements/${agreementId}`,
+          read: false,
+          createdAt: now,
+        })
+      }
+    } else {
+      const notifyId = isArtist ? agreement.djId : agreement.artistId
+      batch.set(db.collection('notifications').doc(), {
+        userId: notifyId,
+        type: 'download_unlocked',
+        title: 'Agreement signed — download unlocked',
+        body: 'Both parties signed. The full-quality track is now available to download.',
+        linkTo: `/agreements/${agreementId}`,
+        read: false,
+        createdAt: now,
+      })
+    }
     if (conversationRef) {
       writeSystemMessage(
         batch,
@@ -407,7 +431,7 @@ export const voidAgreement = onCall(async (request) => {
     type: 'agreement_voided',
     title: 'Licence agreement voided',
     body: `${isArtist ? 'The artist' : 'The DJ'} voided this licence agreement. Any download access has been revoked.`,
-    linkTo: '/dj/requests',
+    linkTo: `/agreements/${agreementId}`,
     read: false,
     createdAt: now,
   })

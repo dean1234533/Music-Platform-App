@@ -238,12 +238,15 @@ export const respondToLicenceRequest = onCall(async (request) => {
   await ref.update({ status: nextStatus, updatedAt: FieldValue.serverTimestamp() })
 
   const notifyUserId = isArtist ? data.djId : data.artistId
+  // linkTo must match whichever role is being notified — the artist's request list lives at a
+  // different path than the DJ's, and this notification can go to either depending on who acted.
+  const notifyIsArtist = notifyUserId === data.artistId
   await db.collection('notifications').add({
     userId: notifyUserId,
-    type: nextStatus === 'rejected' ? 'request_rejected' : 'new_message',
-    title: nextStatus === 'rejected' ? 'Request declined' : 'Request update',
+    type: nextStatus === 'rejected' ? 'request_rejected' : 'request_cancelled',
+    title: nextStatus === 'rejected' ? 'Request declined' : 'Request cancelled',
     body: `Your DJ request status changed to "${nextStatus}".`,
-    linkTo: '/dj/requests',
+    linkTo: notifyIsArtist ? '/dashboard/artist/dj-requests' : '/dj/requests',
     read: false,
     createdAt: FieldValue.serverTimestamp(),
   })
