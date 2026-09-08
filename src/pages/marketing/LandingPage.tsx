@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Headphones, Menu, Mic2, Radio, X } from 'lucide-react'
 import { BrandMark } from '@/components/common/BrandMark'
-import { PriceCard } from '@/components/marketing/PriceCard'
 import { MusicGlyph } from '@/components/common/MusicGlyph'
 import { listActiveSubscriptionPlansForRole } from '@/services/platformSettingsService'
 import { formatCurrency } from '@/utils/format'
@@ -166,10 +165,30 @@ export function LandingPage() {
             <h2 className="mt-4 text-4xl font-medium tracking-[-0.045em] sm:text-5xl">Join free. Support when it matters.</h2>
             <p className="mx-auto mt-5 max-w-xl text-base leading-7 text-ink-2">Explore the platform without a membership. Subscribe when you’re ready to direct meaningful monthly support to artists.</p>
           </div>
-          <div className="price-grid mx-auto mt-12 grid max-w-5xl gap-3 md:grid-cols-3">
-            <PriceCard index={0} title="Listener" price="Free" description="Discover, follow, save, and build playlists." features={['Full discovery catalogue', 'Personal library and playlists', 'Follow independent artists']} cta="Create free account" to="/sign-up?role=fan" />
-            <PriceCard index={1} featured title={supporterPlan?.name ?? 'Supporter'} price={supporterPlan ? formatCurrency(supporterPlan.priceMinor, supporterPlan.currency) : 'Flexible'} suffix={supporterPlan ? `/${supporterPlan.interval}` : undefined} description="Turn listening into direct artist support." features={['Everything in Listener', 'Allocate support each month', 'Access supporter-only posts']} cta="Become a supporter" to="/sign-up?role=fan" />
-            <PriceCard index={2} title="Artist & DJ" price="Free" description="Publish, connect, and agree opportunities directly." features={['Artist profiles and releases', 'DJ discovery and requests', 'Documented licensing flow']} cta="Join the platform" to="/sign-up" />
+          <div className="mx-auto mt-12 grid max-w-5xl overflow-hidden rounded-[1.75rem] border border-white/10 bg-white/[0.025] md:grid-cols-[1.15fr_0.85fr]">
+            <div className="p-7 sm:p-9 lg:p-11">
+              <div className="flex flex-wrap items-start justify-between gap-5">
+                <div><p className="eyebrow">Platform membership</p><h3 className="mt-3 text-3xl font-medium tracking-[-0.04em]">Join free</h3></div>
+                <p className="text-3xl font-medium tracking-[-0.04em] text-ink-0">£0</p>
+              </div>
+              <p className="mt-5 max-w-xl text-sm leading-6 text-ink-2">One account gives you the complete foundation. Listen as a fan, publish as an artist, work as a DJ—or add more than one role.</p>
+              <div className="mt-7 grid gap-3 sm:grid-cols-3">
+                {[['Listen', 'Discover, follow and build playlists.'], ['Create', 'Release music and grow support.'], ['DJ', 'Discover, negotiate and license.']].map(([title, copy]) => (
+                  <div key={title} className="border-t border-white/10 pt-3"><p className="text-sm font-semibold text-ink-0">{title}</p><p className="mt-1 text-xs leading-5 text-ink-3">{copy}</p></div>
+                ))}
+              </div>
+              <Link to="/sign-up" className="mt-8 inline-flex items-center gap-2 rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-ink-0 transition hover:border-white/30 hover:bg-white/[0.05]">Create free account <ArrowRight className="h-4 w-4" /></Link>
+            </div>
+            <div className="border-t border-brand-400/25 bg-brand-500/[0.09] p-7 sm:p-9 md:border-l md:border-t-0 lg:p-11">
+              <p className="eyebrow">Optional upgrade</p>
+              <h3 className="mt-3 text-3xl font-medium tracking-[-0.04em]">{supporterPlan?.name ?? 'Supporter'}</h3>
+              <div className="mt-5 flex items-end gap-1">
+                <span className="text-4xl font-medium tracking-[-0.05em] text-brand-400">{supporterPlan ? formatCurrency(supporterPlan.priceMinor, supporterPlan.currency) : 'Flexible'}</span>
+                {supporterPlan ? <span className="pb-1 text-sm text-ink-2">/{supporterPlan.interval}</span> : null}
+              </div>
+              <p className="mt-5 text-sm leading-6 text-ink-1">Direct your monthly membership towards the independent artists you choose and unlock their supporter-only releases and rewards.</p>
+              <Link to="/sign-up?role=fan" className="mt-8 inline-flex items-center gap-2 rounded-full bg-brand-500 px-5 py-3 text-sm font-semibold text-surface-0 transition hover:bg-brand-400">Become a supporter <ArrowRight className="h-4 w-4" /></Link>
+            </div>
           </div>
           <p className="mx-auto mt-6 max-w-2xl text-center text-xs leading-5 text-ink-3">Licensing fees are agreed directly between artists and DJs. Applicable platform fees are shown before payment or payout.</p>
           <p className="mt-4 text-center">
