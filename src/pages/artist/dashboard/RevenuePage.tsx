@@ -9,6 +9,7 @@ import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import { formatCurrency } from '@/utils/format'
 import type { ArtistBalanceDoc, ArtistPayoutAccountDoc, PayoutDoc, TransactionDoc } from '@/types/finance'
 import type { DownloadLogDoc } from '@/types/licence'
+import { MINIMUM_ARTIST_PAYOUT_MINOR } from '@/constants/platformLimits'
 
 const TYPE_LABEL: Record<TransactionDoc['type'], string> = {
   subscription_income: 'Subscription income',
@@ -87,13 +88,16 @@ export function RevenuePage() {
             </Button>
           </>
         ) : (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={handlePayout} loading={payingOut} disabled={(balance?.availableMinor ?? 0) <= 0}>
-              Request payout
-            </Button>
-            <Button size="sm" variant="secondary" onClick={openConnectDashboard}>
-              Stripe dashboard
-            </Button>
+          <div>
+            <p className="mb-3 text-sm text-ink-2">Payouts are available once the cleared balance reaches {formatCurrency(MINIMUM_ARTIST_PAYOUT_MINOR, currency)}.</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" onClick={handlePayout} loading={payingOut} disabled={(balance?.availableMinor ?? 0) < MINIMUM_ARTIST_PAYOUT_MINOR}>
+                Request payout
+              </Button>
+              <Button size="sm" variant="secondary" onClick={openConnectDashboard}>
+                Stripe dashboard
+              </Button>
+            </div>
           </div>
         )}
         {error ? <p className="mt-2 text-sm text-danger-500">{error}</p> : null}

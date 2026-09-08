@@ -26,16 +26,19 @@ export const promotePendingBalances = onSchedule('every 24 hours', async () => {
   for (const doc of snap.docs) {
     const data = doc.data()
     if (!['subscription_income', 'dj_licence_income'].includes(data.type)) continue
+    const promotableMinor = Math.max(0, data.netMinor - (data.refundedMinor ?? 0))
     batch.update(doc.ref, { promotedAt: FieldValue.serverTimestamp() })
-    batch.set(
-      db.collection('artistBalances').doc(data.artistId),
-      {
-        pendingMinor: FieldValue.increment(-data.netMinor),
-        availableMinor: FieldValue.increment(data.netMinor),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    )
+    if (promotableMinor > 0) {
+      batch.set(
+        db.collection('artistBalances').doc(data.artistId),
+        {
+          pendingMinor: FieldValue.increment(-promotableMinor),
+          availableMinor: FieldValue.increment(promotableMinor),
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      )
+    }
   }
   await batch.commit()
 })

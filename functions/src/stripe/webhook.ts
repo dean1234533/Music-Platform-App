@@ -20,6 +20,68 @@ async function findUidByCustomerId(customerId: string): Promise<string | null> {
   return snap.docs[0]!.id
 }
 
+interface NetRevenue {
+  customerPaidMinor: number
+  taxMinor: number
+  processingFeeMinor: number
+  netRevenueMinor: number
+}
+
+function calculateNetRevenue(customerPaidMinor: number, taxMinor: number, processingFeeMinor: number): NetRevenue {
+  const paid = Math.max(0, Math.round(customerPaidMinor))
+  const tax = Math.min(paid, Math.max(0, Math.round(taxMinor)))
+  const processingFee = Math.min(paid - tax, Math.max(0, Math.round(processingFeeMinor)))
+  return {
+    customerPaidMinor: paid,
+    taxMinor: tax,
+    processingFeeMinor: processingFee,
+    netRevenueMinor: paid - tax - processingFee,
+  }
+}
+
+async function processingFeeForPaymentIntent(paymentIntent: string | Stripe.PaymentIntent): Promise<number> {
+  const stripe = getStripe()
+  const intent = typeof paymentIntent === 'string'
+    ? await stripe.paymentIntents.retrieve(paymentIntent, { expand: ['latest_charge.balance_transaction'] })
+    : paymentIntent
+  const latestCharge = intent.latest_charge
+  if (!latestCharge) return 0
+  const charge = typeof latestCharge === 'string'
+    ? await stripe.charges.retrieve(latestCharge, { expand: ['balance_transaction'] })
+    : latestCharge
+  const balanceTransaction = charge.balance_transaction
+  if (!balanceTransaction) return 0
+  const resolved = typeof balanceTransaction === 'string'
+    ? await stripe.balanceTransactions.retrieve(balanceTransaction)
+    : balanceTransaction
+  return resolved.fee
+}
+
+async function paymentDetailsForInvoice(invoiceId: string): Promise<{ processingFeeMinor: number; paymentIntentIds: string[] }> {
+  const payments = await getStripe().invoicePayments.list({ invoice: invoiceId, status: 'paid', limit: 20 })
+  let total = 0
+  const paymentIntentIds: string[] = []
+  for (const invoicePayment of payments.data) {
+    if (invoicePayment.payment.payment_intent) {
+      const paymentIntent = invoicePayment.payment.payment_intent
+      paymentIntentIds.push(typeof paymentIntent === 'string' ? paymentIntent : paymentIntent.id)
+      total += await processingFeeForPaymentIntent(paymentIntent)
+    } else if (invoicePayment.payment.charge) {
+      const charge = typeof invoicePayment.payment.charge === 'string'
+        ? await getStripe().charges.retrieve(invoicePayment.payment.charge, { expand: ['balance_transaction'] })
+        : invoicePayment.payment.charge
+      const balanceTransaction = charge.balance_transaction
+      if (balanceTransaction) {
+        const resolved = typeof balanceTransaction === 'string'
+          ? await getStripe().balanceTransactions.retrieve(balanceTransaction)
+          : balanceTransaction
+        total += resolved.fee
+      }
+    }
+  }
+  return { processingFeeMinor: total, paymentIntentIds }
+}
+
 async function upsertSubscriptionRecord(subscription: Stripe.Subscription) {
   if (!isFanSubscription(subscription)) {
     logger.info('Ignoring retired creator subscription', { subscriptionId: subscription.id, role: subscription.metadata?.role })
@@ -82,28 +144,35 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   if (entries.length === 0) return
 
   const settings = await getPlatformSettings()
+  const subscriptionSnap = await db.collection('subscriptions').doc(`${uid}_fan`).get()
+  const planId = subscriptionSnap.data()?.planId as string | undefined
+  if (!planId) throw new Error(`Paid invoice ${invoice.id} has no subscription plan.`)
+  const planSnap = await db.collection('subscriptionPlans').doc(planId).get()
+  if (!planSnap.exists) throw new Error(`Paid invoice ${invoice.id} references missing plan ${planId}.`)
+  const planPriceMinor = planSnap.data()!.priceMinor as number
+  const configuredArtistPoolMinor = Math.round(planPriceMinor * (settings.artistAllocationPercent / 100))
+  if (configuredArtistPoolMinor <= 0) throw new Error(`Plan ${planId} has no artist allocation.`)
 
-  // One transaction per artist entry: the read-check-write on txRef must be
-  // atomic against a concurrent duplicate delivery of the same invoice
-  // event, or two overlapping deliveries could both see "no existing tx" and
-  // double-credit the artist's balance. A plain batch (read outside, write
-  // inside) does not provide that guarantee — a transaction does, because
-  // Firestore serializes conflicting transactions on the same document.
-  for (const [artistId, artistNetMinor] of entries) {
-    const txId = `${invoice.id}_${artistId}`
-    const txRef = db.collection('transactions').doc(txId)
+  const totalTaxMinor = Math.max(0, invoice.total - (invoice.total_excluding_tax ?? invoice.total))
+  const { processingFeeMinor, paymentIntentIds } = await paymentDetailsForInvoice(invoice.id)
+  const settlement = calculateNetRevenue(invoice.amount_paid, totalTaxMinor, processingFeeMinor)
+  const artistPoolMinor = Math.round(settlement.netRevenueMinor * (settings.artistAllocationPercent / 100))
+  const settlementRef = db.collection('billingSettlements').doc(invoice.id)
 
-    await db.runTransaction(async (tx) => {
-      const existing = await tx.get(txRef)
-      if (existing.exists) return
+  await db.runTransaction(async (tx) => {
+    const existingSettlement = await tx.get(settlementRef)
+    if (existingSettlement.exists) return
 
-      const grossMinor = settings.artistAllocationPercent > 0
-        ? Math.round(artistNetMinor / (settings.artistAllocationPercent / 100))
-        : 0
-      const netMinor = artistNetMinor
+    let allocatedToArtistsMinor = 0
+    for (const [artistId, requestedAllocationMinor] of entries) {
+      const allocationRatio = Math.min(1, requestedAllocationMinor / configuredArtistPoolMinor)
+      const grossMinor = Math.round(settlement.netRevenueMinor * allocationRatio)
+      const netMinor = Math.round(artistPoolMinor * allocationRatio)
       const platformFeeMinor = Math.max(0, grossMinor - netMinor)
+      allocatedToArtistsMinor += netMinor
+      const txId = `${invoice.id}_${artistId}`
 
-      tx.set(txRef, {
+      tx.set(db.collection('transactions').doc(txId), {
         transactionId: txId,
         type: 'subscription_income',
         artistId,
@@ -113,6 +182,9 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
         netMinor,
         currency: invoice.currency,
         stripeInvoiceId: invoice.id,
+        stripePaymentIntentId: paymentIntentIds[0] ?? null,
+        stripePaymentIntentIds: paymentIntentIds,
+        revenueBasis: 'net_after_tax_and_processing',
         promotedAt: null,
         refundedAt: null,
         createdAt: FieldValue.serverTimestamp(),
@@ -128,8 +200,25 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
         },
         { merge: true },
       )
+    }
+
+    tx.set(settlementRef, {
+      settlementId: invoice.id,
+      type: 'supporter_subscription',
+      userId: uid,
+      planId,
+      ...settlement,
+      platformFeePercent: settings.platformFeePercent,
+      artistAllocationPercent: settings.artistAllocationPercent,
+      artistPoolMinor,
+      allocatedToArtistsMinor,
+      unallocatedArtistPoolMinor: Math.max(0, artistPoolMinor - allocatedToArtistsMinor),
+      platformRevenueMinor: Math.max(0, settlement.netRevenueMinor - allocatedToArtistsMinor),
+      currency: invoice.currency,
+      stripePaymentIntentIds: paymentIntentIds,
+      createdAt: FieldValue.serverTimestamp(),
     })
-  }
+  })
 }
 
 async function handleInvoiceFailed(invoice: Stripe.Invoice) {
@@ -160,6 +249,15 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   if (!agreementId) return
 
   const agreementRef = db.collection('licenceAgreements').doc(agreementId)
+  const paymentIntent = session.payment_intent
+  if (!paymentIntent) throw new Error(`Licence checkout ${session.id} has no payment intent.`)
+  const settings = await getPlatformSettings()
+  const processingFeeMinor = await processingFeeForPaymentIntent(paymentIntent)
+  const customerPaidMinor = session.amount_total ?? 0
+  const taxMinor = session.total_details?.amount_tax ?? 0
+  const settlement = calculateNetRevenue(customerPaidMinor, taxMinor, processingFeeMinor)
+  const platformFeeMinor = Math.round(settlement.netRevenueMinor * (settings.djServiceFeePercent / 100))
+  const netMinor = settlement.netRevenueMinor - platformFeeMinor
 
   // The whole read-check-write must be one Firestore transaction: two
   // concurrent deliveries of the same event (Stripe explicitly documents
@@ -178,15 +276,22 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       ? db.collection('conversations').doc(requestSnap.data()!.conversationId as string)
       : null
 
-    const grossMinor = agreement.licenceFeeMinor as number
-    const platformFeeMinor = typeof agreement.platformFeeMinor === 'number'
-      ? agreement.platformFeeMinor
-      : Math.round(grossMinor * ((await getPlatformSettings()).djServiceFeePercent / 100))
-    const netMinor = typeof agreement.artistNetMinor === 'number' ? agreement.artistNetMinor : grossMinor - platformFeeMinor
+    const grossMinor = settlement.netRevenueMinor
     const txId = `licence_${agreementId}`
     const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id ?? null
 
-    tx.update(agreementRef, { paidAt: FieldValue.serverTimestamp(), status: 'active' })
+    tx.update(agreementRef, {
+      paidAt: FieldValue.serverTimestamp(),
+      status: 'active',
+      customerPaidMinor: settlement.customerPaidMinor,
+      taxMinor: settlement.taxMinor,
+      processingFeeMinor: settlement.processingFeeMinor,
+      netRevenueMinor: settlement.netRevenueMinor,
+      platformFeePercent: settings.djServiceFeePercent,
+      platformFeeMinor,
+      artistNetMinor: netMinor,
+      revenueBasis: 'net_after_tax_and_processing',
+    })
     tx.update(requestRef, { status: 'approved', updatedAt: FieldValue.serverTimestamp() })
     if (conversationRef) {
       writeSystemMessage(tx, conversationRef, agreement.djId, 'payment_status', 'Payment completed — track access unlocked.', {
@@ -205,6 +310,10 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       currency: agreement.currency,
       stripeCheckoutSessionId: session.id,
       stripePaymentIntentId: paymentIntentId,
+      customerPaidMinor: settlement.customerPaidMinor,
+      taxMinor: settlement.taxMinor,
+      processingFeeMinor: settlement.processingFeeMinor,
+      revenueBasis: 'net_after_tax_and_processing',
       promotedAt: null,
       refundedAt: null,
       createdAt: FieldValue.serverTimestamp(),
@@ -246,13 +355,9 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 }
 
 /**
- * Reverses the artist-balance credit for a refunded charge. Matches by
- * payment_intent — populated on DJ licence payment transactions (see
- * handleCheckoutSessionCompleted). Subscription/support-allocation income
- * has no payment_intent recorded on its transaction docs today, so a
- * refunded subscription invoice is NOT automatically reversed by this
- * handler — flagged as a known gap in SECURITY_AUDIT.md rather than
- * silently assumed to be covered. Reverses from pendingMinor first, then
+ * Reverses the corresponding share of an artist-balance credit for a
+ * partially or fully refunded charge. Matches payment intents for both
+ * supporter subscriptions and DJ licence payments. Reverses from pendingMinor first, then
  * availableMinor; if the funds have already been paid out (moved to
  * paidMinor), automatic reversal would push a balance negative for money
  * that already left the platform, so that case is flagged for manual admin
@@ -264,6 +369,8 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
   if (paymentIntentId) {
     const snap = await db.collection('transactions').where('stripePaymentIntentId', '==', paymentIntentId).get()
     for (const doc of snap.docs) matches.set(doc.id, doc)
+    const multiSnap = await db.collection('transactions').where('stripePaymentIntentIds', 'array-contains', paymentIntentId).get()
+    for (const doc of multiSnap.docs) matches.set(doc.id, doc)
   }
 
   for (const doc of matches.values()) {
@@ -271,23 +378,35 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
     await db.runTransaction(async (tx) => {
       const [txSnap, balanceSnap] = await Promise.all([tx.get(doc.ref), tx.get(balanceRef)])
       const data = txSnap.data()
-      if (!data || data.refundedAt) return
+      if (!data) return
       const netMinor = data.netMinor as number
+      const previousCustomerRefundedMinor = (data.refundedCustomerMinor as number) ?? 0
+      const newlyRefundedCustomerMinor = Math.max(0, charge.amount_refunded - previousCustomerRefundedMinor)
+      if (newlyRefundedCustomerMinor === 0) return
+      const refundedMinor = Math.min(
+        netMinor - ((data.refundedMinor as number) ?? 0),
+        Math.round(netMinor * (newlyRefundedCustomerMinor / charge.amount)),
+      )
+      if (refundedMinor <= 0) return
       const balance = balanceSnap.data() ?? {}
       const pending = (balance.pendingMinor as number) ?? 0
       const available = (balance.availableMinor as number) ?? 0
 
-      tx.update(doc.ref, { refundedAt: FieldValue.serverTimestamp(), refundedMinor: charge.amount_refunded })
+      tx.update(doc.ref, {
+        refundedAt: charge.refunded ? FieldValue.serverTimestamp() : null,
+        refundedCustomerMinor: charge.amount_refunded,
+        refundedMinor: FieldValue.increment(refundedMinor),
+      })
 
-      if (pending >= netMinor) {
-        tx.set(balanceRef, { pendingMinor: FieldValue.increment(-netMinor), updatedAt: FieldValue.serverTimestamp() }, { merge: true })
-      } else if (available >= netMinor) {
-        tx.set(balanceRef, { availableMinor: FieldValue.increment(-netMinor), updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+      if (pending >= refundedMinor) {
+        tx.set(balanceRef, { pendingMinor: FieldValue.increment(-refundedMinor), updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+      } else if (available >= refundedMinor) {
+        tx.set(balanceRef, { availableMinor: FieldValue.increment(-refundedMinor), updatedAt: FieldValue.serverTimestamp() }, { merge: true })
       } else {
         tx.set(db.collection('auditLogs').doc(), {
           adminId: 'system',
           action: 'refund_requires_manual_reconciliation',
-          details: { transactionId: doc.id, artistId: data.artistId, netMinor, reason: 'funds already promoted/paid out' },
+          details: { transactionId: doc.id, artistId: data.artistId, refundedMinor, reason: 'funds already promoted/paid out' },
           createdAt: FieldValue.serverTimestamp(),
         })
       }

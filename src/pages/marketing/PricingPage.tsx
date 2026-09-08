@@ -17,9 +17,10 @@ const FEATURE_LABELS: Partial<Record<PlanFeatureKey, string>> = {
 }
 
 function featureLabels(plan: SubscriptionPlan): string[] {
-  return Object.entries(plan.features)
+  const labels = Object.entries(plan.features)
     .filter(([, enabled]) => enabled)
     .map(([key]) => FEATURE_LABELS[key as PlanFeatureKey] ?? key)
+  return [...labels, '80% of net membership revenue goes to artists']
 }
 
 export function PricingPage() {
@@ -47,7 +48,7 @@ export function PricingPage() {
         <section className="mt-16">
           <div className="mb-7 flex items-end justify-between gap-6 border-b border-white/10 pb-5">
             <div><p className="eyebrow">For listeners</p><h2 className="mt-2 text-3xl font-medium tracking-[-0.04em]">Listen free, or become a supporter.</h2></div>
-            <p className="hidden max-w-sm text-right text-sm leading-6 text-ink-2 md:block">Supporter pricing is set by the platform and billed securely through Stripe.</p>
+            <p className="hidden max-w-sm text-right text-sm leading-6 text-ink-2 md:block">One optional £4.99 monthly membership. No confusing upgrade ladder.</p>
           </div>
           {plans === null ? <LoadingState /> : (
             <div className="grid gap-3 md:grid-cols-2">
@@ -78,8 +79,13 @@ export function PricingPage() {
             <PriceCard index={0} title="Artist" price="Free" description="Release music, grow supporters, reach opted-in DJs, and manage revenue." features={['Up to 10 stored tracks', 'Releases, analytics and supporter content', 'DJ outreach, licensing and payouts']} cta={firebaseUser && hasRole('artist') ? 'Open artist dashboard' : 'Create artist profile'} to={firebaseUser ? (hasRole('artist') ? '/dashboard/artist' : '/onboarding/add-role?role=artist') : '/sign-up?role=artist'} />
             <PriceCard index={1} title="DJ" price="Free" description="Discover releases and agree track licences directly with artists." features={['Direct artist-approved licence requests', 'Filters, crates, notes and analytics', 'Verification and secure downloads']} cta={firebaseUser && hasRole('dj') ? 'Open DJ workspace' : 'Create DJ profile'} to={firebaseUser ? (hasRole('dj') ? '/dj/discover' : '/onboarding/add-role?role=dj') : '/sign-up?role=dj'} />
           </div>
-          <p className="mt-6 text-center text-xs leading-5 text-ink-3">DJ licence prices are agreed with each artist. The configured transaction fee and artist proceeds are shown before payment.</p>
+          <p className="mt-6 text-center text-xs leading-5 text-ink-3">DJ licence prices are agreed with each artist. Wavelength takes 15% of net transaction revenue; the artist receives 85%.</p>
+          <p className="mt-2 text-center text-xs leading-5 text-ink-3">Artist earnings clear after 7 days and can be withdrawn once the available balance reaches £25.</p>
         </section>
+
+        <p className="mx-auto mt-12 max-w-3xl text-center text-xs leading-5 text-ink-3">
+          Revenue shares are calculated after applicable tax, refunds and payment-processing fees. Exact amounts are recorded for every completed payment.
+        </p>
       </main>
     </div>
   )

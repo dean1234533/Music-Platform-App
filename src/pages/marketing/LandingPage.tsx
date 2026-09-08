@@ -186,7 +186,7 @@ export function LandingPage() {
                 <span className="text-4xl font-medium tracking-[-0.05em] text-brand-400">{supporterPlan ? formatCurrency(supporterPlan.priceMinor, supporterPlan.currency) : 'Flexible'}</span>
                 {supporterPlan ? <span className="pb-1 text-sm text-ink-2">/{supporterPlan.interval}</span> : null}
               </div>
-              <p className="mt-5 text-sm leading-6 text-ink-1">Direct your monthly membership towards the independent artists you choose and unlock their supporter-only releases and rewards.</p>
+              <p className="mt-5 text-sm leading-6 text-ink-1">Direct your monthly membership towards the independent artists you choose. Artists share 80% of net membership revenue.</p>
               <Link to="/sign-up?role=fan" className="mt-8 inline-flex items-center gap-2 rounded-full bg-brand-500 px-5 py-3 text-sm font-semibold text-surface-0 transition hover:bg-brand-400">Become a supporter <ArrowRight className="h-4 w-4" /></Link>
             </div>
           </div>

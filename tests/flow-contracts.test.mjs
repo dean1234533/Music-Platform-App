@@ -37,6 +37,20 @@ test('launch supporter pricing stays low-friction and legacy tiers are retired',
   assert.doesNotMatch(read('src/pages/marketing/PricingPage.tsx'), /artificial limits/i)
 })
 
+test('revenue shares use net payment revenue and expose the launch percentages', () => {
+  const webhook = read('functions/src/stripe/webhook.ts')
+  const pricing = read('src/pages/marketing/PricingPage.tsx')
+  assert.match(webhook, /net_after_tax_and_processing/)
+  assert.match(webhook, /paymentDetailsForInvoice/)
+  assert.match(webhook, /billingSettlements/)
+  assert.match(webhook, /stripePaymentIntentIds/)
+  assert.match(webhook, /newlyRefundedCustomerMinor/)
+  assert.match(read('functions/src/payouts/promoteBalances.ts'), /netMinor - \(data\.refundedMinor \?\? 0\)/)
+  assert.match(pricing, /80% of net membership revenue/)
+  assert.match(pricing, /takes 15% of net transaction revenue/)
+  assert.match(pricing, /available balance reaches £25/)
+})
+
 test('email signup cannot continue before verification', () => {
   const page = read('src/pages/auth/VerifyEmailPage.tsx')
   assert.match(page, /emailVerified/)

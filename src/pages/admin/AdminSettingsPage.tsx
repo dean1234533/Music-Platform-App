@@ -370,19 +370,19 @@ export function AdminSettingsPage() {
         <h2 className="mb-3 text-lg font-semibold text-ink-0">Platform fees</h2>
         <div className="grid grid-cols-2 gap-3 rounded-xl border border-surface-border bg-surface-1 p-4 sm:grid-cols-4">
           <div>
-            <Label>Platform fee %</Label>
+            <Label>Platform share of net subscriptions %</Label>
             <Input type="number" value={feeForm.platformFeePercent} onChange={(e) => setFeeForm((f) => ({ ...f, platformFeePercent: e.target.value }))} />
           </div>
           <div>
-            <Label>Artist allocation %</Label>
+            <Label>Artist share of net subscriptions %</Label>
             <Input type="number" value={feeForm.artistAllocationPercent} onChange={(e) => setFeeForm((f) => ({ ...f, artistAllocationPercent: e.target.value }))} />
           </div>
           <div>
-            <Label>DJ service fee %</Label>
+            <Label>Platform share of net DJ licences %</Label>
             <Input type="number" value={feeForm.djServiceFeePercent} onChange={(e) => setFeeForm((f) => ({ ...f, djServiceFeePercent: e.target.value }))} />
           </div>
           <div>
-            <Label>Min payout (minor units)</Label>
+            <Label>Minimum artist payout (pence)</Label>
             <Input type="number" value={feeForm.minimumPayoutMinor} onChange={(e) => setFeeForm((f) => ({ ...f, minimumPayoutMinor: e.target.value }))} />
           </div>
           <div className="col-span-2 sm:col-span-4">
