@@ -63,4 +63,5 @@ export {
   cleanupResolvedCopyrightClaims,
   cleanupOldAuditLogs,
   cleanupOldRateLimits,
+  cleanupOrphanedUploads,
 } from './retention/cleanup.js'

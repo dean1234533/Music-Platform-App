@@ -247,3 +247,43 @@ export const cleanupOldRateLimits = onSchedule('every 24 hours', async () => {
   const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
   await deleteQueryBatched(db.collection('rateLimits').where('windowStart', '<=', cutoff))
 })
+
+const ORPHAN_UPLOAD_AGE_HOURS = 24
+
+/**
+ * uploadTrackAssets uploads the master/streaming/preview/artwork files
+ * before createTrack ever writes the Firestore doc (the trackId is
+ * generated client-side up front so all four share it as a filename) — a
+ * closed tab, failed network request, or abandoned upload partway through
+ * leaves those Storage objects with nothing that will ever reference or
+ * delete them. This sweeps artists/*​/originals/ for files old enough that
+ * they're clearly not a still-in-progress upload, checks whether a track
+ * doc actually exists for that ID, and if not, deletes that file and its
+ * same-trackId siblings across the other three folders.
+ */
+export const cleanupOrphanedUploads = onSchedule('every 24 hours', async () => {
+  const bucket = getStorage().bucket()
+  const cutoffMs = Date.now() - ORPHAN_UPLOAD_AGE_HOURS * 60 * 60 * 1000
+
+  const [files] = await bucket.getFiles({ prefix: 'artists/', maxResults: 2000 })
+  const originals = files.filter((f) => f.name.includes('/originals/'))
+
+  for (const file of originals) {
+    const created = file.metadata.timeCreated ? new Date(file.metadata.timeCreated).getTime() : 0
+    if (created > cutoffMs) continue // still within the normal upload window
+
+    const match = file.name.match(/^artists\/([^/]+)\/originals\/([^./]+)\./)
+    if (!match) continue
+    const [, artistId, trackId] = match
+
+    const trackSnap = await db.collection('tracks').doc(trackId).get()
+    if (trackSnap.exists) continue // legitimate track — not an orphan
+
+    await Promise.all([
+      file.delete({ ignoreNotFound: true }),
+      bucket.deleteFiles({ prefix: `artists/${artistId}/streaming/${trackId}.` }).catch(() => undefined),
+      bucket.deleteFiles({ prefix: `artists/${artistId}/previews/${trackId}.` }).catch(() => undefined),
+      bucket.deleteFiles({ prefix: `artists/${artistId}/artwork/${trackId}.` }).catch(() => undefined),
+    ])
+  }
+})
