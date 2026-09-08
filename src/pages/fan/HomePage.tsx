@@ -80,6 +80,21 @@ export function HomePage() {
 
   const followedStoriesByArtist = useStoryRail(followedIds, ['public', 'followers'])
   const supportedStoriesByArtist = useStoryRail(supportedIds, ['public', 'supporters'])
+  const storiesByArtist = useMemo(() => {
+    const combined = new Map<string, StoryDoc[]>()
+    const artistIds = [...new Set([...supportedIds, ...followedIds])]
+
+    for (const artistId of artistIds) {
+      const stories = [
+        ...(supportedStoriesByArtist.get(artistId) ?? []),
+        ...(followedStoriesByArtist.get(artistId) ?? []),
+      ]
+      const uniqueStories = [...new Map(stories.map((story) => [story.storyId, story])).values()]
+      if (uniqueStories.length > 0) combined.set(artistId, uniqueStories)
+    }
+
+    return combined
+  }, [supportedIds, followedIds, supportedStoriesByArtist, followedStoriesByArtist])
 
   function openRail(byArtist: Map<string, StoryDoc[]>, artistId: string) {
     const groups: StoryGroup[] = Array.from(byArtist.entries()).map(([id, stories]) => ({ artistId: id, stories }))
@@ -90,6 +105,8 @@ export function HomePage() {
   if (loading) return <LoadingState label="Loading your feed…" />
 
   const fromFollowed = newReleases.filter((t) => followedIds.includes(t.artistId))
+  const followedReleaseIds = new Set(fromFollowed.map((track) => track.trackId))
+  const otherNewReleases = newReleases.filter((track) => !followedReleaseIds.has(track.trackId))
   const firstName = profile?.displayName?.split(' ')[0]
 
   return (
@@ -100,28 +117,15 @@ export function HomePage() {
         <p className="mt-3 text-base text-ink-2">Fresh releases and familiar voices, selected around you.</p>
       </div>
 
-      {followedStoriesByArtist.size > 0 ? (
+      {storiesByArtist.size > 0 ? (
         <div>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Stories from artists you follow</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Stories from your artists</h2>
           <StoryRail
-            groups={Array.from(followedStoriesByArtist.entries()).map(([artistId, stories]) => ({
+            groups={Array.from(storiesByArtist.entries()).map(([artistId, stories]) => ({
               artistId,
               hasUnseen: stories.some((s) => !viewedStoryIds.has(s.storyId)),
             }))}
-            onOpen={(artistId) => openRail(followedStoriesByArtist, artistId)}
-          />
-        </div>
-      ) : null}
-
-      {supportedStoriesByArtist.size > 0 ? (
-        <div>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Stories from artists you support</h2>
-          <StoryRail
-            groups={Array.from(supportedStoriesByArtist.entries()).map(([artistId, stories]) => ({
-              artistId,
-              hasUnseen: stories.some((s) => !viewedStoryIds.has(s.storyId)),
-            }))}
-            onOpen={(artistId) => openRail(supportedStoriesByArtist, artistId)}
+            onOpen={(artistId) => openRail(storiesByArtist, artistId)}
           />
         </div>
       ) : null}
@@ -140,7 +144,9 @@ export function HomePage() {
         />
       ) : null}
 
-      <Section title="New releases" tracks={newReleases} />
+      {otherNewReleases.length > 0 || fromFollowed.length === 0 ? (
+        <Section title="New releases" tracks={otherNewReleases} />
+      ) : null}
 
       {viewerGroups && viewerInitialArtistId ? (
         <StoryViewer

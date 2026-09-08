@@ -82,6 +82,15 @@ test('browser tab uses the high-contrast BackTheVibes favicon', () => {
   assert.match(favicon, /stroke-linecap="round"/)
 })
 
+test('the fan home feed does not repeat artists or releases across sections', () => {
+  const home = read('src/pages/fan/HomePage.tsx')
+  assert.match(home, /Stories from your artists/)
+  assert.match(home, /new Map\(stories\.map\(\(story\) => \[story\.storyId, story\]\)\)/)
+  assert.match(home, /followedReleaseIds/)
+  assert.match(home, /otherNewReleases/)
+  assert.doesNotMatch(home, /Stories from artists you support/)
+})
+
 test('notifications use Firestore IDs and navigate their deep links', () => {
   assert.match(read('src/services/notificationService.ts'), /notificationId: d\.id/)
   const page = read('src/pages/fan/NotificationsPage.tsx')
