@@ -100,7 +100,7 @@ Audit date: 2026-09-07. Scope: the existing React/Firebase/Stripe application. T
 | 80 | Automated coverage | Repository had no tests. | Added zero-dependency flow/rules contract tests. Full Firebase emulator and Stripe integration suites remain absent. | FAIL |
 | 81 | Manual checklist | None existed. | This table is the requested executable checklist with honest results. | PASS |
 | 82 | Product flow document | No single actual-behaviour document. | Added `PRODUCT_FLOW.md`. | PASS |
-| 83 | Build check | No test scripts; rules emulator unavailable. | TypeScript/build, lint, functions compile and contract tests run. Emulator is blocked by missing Java and 100% disk. | NEEDS MANUAL TEST |
+| 83 | Build check | No test scripts; rules emulator unavailable. | TypeScript/build, lint, functions compile, contract tests and Firebase rules compile/deploy all completed. Behavioural emulator tests are blocked by missing Java and 100% disk. | NEEDS MANUAL TEST |
 | 84 | Acceptance test | Cannot truthfully certify email, Stripe, push, PWA and two-party flows without test identities/external events. | Critical code breaks fixed; remaining manual acceptance sequence is below. | NEEDS MANUAL TEST |
 
 ## Manual acceptance checklist
@@ -118,6 +118,7 @@ Audit date: 2026-09-07. Scope: the existing React/Firebase/Stripe application. T
 - `npm run lint`: PASS with pre-existing React-effect/Fast Refresh warnings and no errors.
 - `npm --prefix functions run build`: PASS.
 - `npm test`: PASS after adding source-level journey/security invariants.
-- Firebase rules compilation/deployment: required before release.
+- Firebase Firestore and Storage rules compilation/deployment: PASS; both rulesets were released.
+- Audit backend functions (`getTrackPlaybackUrl`, `deleteTrack`, account deletion and notification changes): PASS; deployed successfully. Updating the pre-existing Auth blocking function returned `OPERATION_NOT_ALLOWED` because this Firebase project is not upgraded to Identity Platform; the application also enforces suspended-profile denial in `ProtectedRoute`.
 - Firebase emulator behavioural tests: NEEDS MANUAL TEST on a machine with Java; this host has no Java runtime and only 86 MiB free, so the Firebase test dependency/emulator could not be installed or started.
 - Stripe/email/push/PWA/two-user flows: NEEDS MANUAL TEST with test accounts and providers.
