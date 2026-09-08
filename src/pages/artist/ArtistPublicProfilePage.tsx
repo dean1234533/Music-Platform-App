@@ -154,9 +154,13 @@ export function ArtistPublicProfilePage() {
     <div className="min-h-svh overflow-hidden bg-surface-0 pb-24 text-ink-0">
       <header className="relative z-30 mx-auto flex h-20 max-w-[1440px] items-center justify-between px-5 sm:px-8 lg:px-12">
         <Link to="/" aria-label="BackTheVibes home"><BrandMark /></Link>
-        <Link to="/app/discover" className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-ink-1 transition hover:border-white/20 hover:text-white">
-          <ArrowLeft className="h-4 w-4" /> Discover
-        </Link>
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-ink-1 transition hover:border-white/20 hover:text-white"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back
+        </button>
       </header>
 
       <div className="relative h-44 w-full overflow-hidden border-y border-white/[0.06] bg-surface-2 sm:h-52 lg:h-56">
@@ -219,7 +223,7 @@ export function ArtistPublicProfilePage() {
           </div>
           <div className="flex shrink-0 gap-2 self-stretch sm:self-auto">
             <FollowButton artistId={artist.artistId} />
-            <SupportButton />
+            {!firebaseUser || !hasRole('dj') || hasRole('fan') ? <SupportButton /> : null}
             <ShareButton
               url={artistShareUrl(artist.slug)}
               title={artist.name}
