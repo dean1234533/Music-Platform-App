@@ -2,6 +2,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import type { DocumentData } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
+import { requireActiveUser } from '../roles.js'
 import { writeSystemMessage } from '../messaging/messages.js'
 import { writeAgreementVersion, type AgreementTerms } from './agreements.js'
 
@@ -77,6 +78,7 @@ async function enforceTrackDealSettings(
 /** Only the artist can open a negotiation with the first offer. */
 export const sendOffer = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
   const { requestId, ...terms } = request.data ?? {}
   validateTerms(terms)
@@ -112,6 +114,7 @@ export const sendOffer = onCall(async (request) => {
 /** Either party can counter the other's currently pending offer. */
 export const counterOffer = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
   const { requestId, ...terms } = request.data ?? {}
   validateTerms(terms)
@@ -158,6 +161,7 @@ export const counterOffer = onCall(async (request) => {
 /** Accepting the other party's pending offer freezes terms and generates the contract. */
 export const acceptOffer = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
   const { requestId } = request.data ?? {}
 
@@ -217,6 +221,7 @@ export const acceptOffer = onCall(async (request) => {
 /** The offer's own creator can withdraw it while still pending. */
 export const withdrawOffer = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
   const { requestId } = request.data ?? {}
 

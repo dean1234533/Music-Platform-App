@@ -1,10 +1,12 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { db } from '../admin.js'
+import { requireActiveUser } from '../roles.js'
 import { getStripe, stripeSecretKey } from './client.js'
 import { getPlatformSettings } from '../platformSettings.js'
 
 export const createLicencePaymentSession = onCall({ secrets: [stripeSecretKey] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const { agreementId, successUrl, cancelUrl } = request.data ?? {}
   if (!agreementId || !successUrl || !cancelUrl) {
     throw new HttpsError('invalid-argument', 'agreementId, successUrl, and cancelUrl are required.')

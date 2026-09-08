@@ -1,7 +1,7 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
-import { userHasRole } from '../roles.js'
+import { requireActiveUser, userHasRole } from '../roles.js'
 
 // Mirrors src/constants/mediaConfig.ts's STORY_* constants — rules/Functions
 // can't import client TS, so these are hand-kept-in-sync (same convention
@@ -31,6 +31,7 @@ const CTA_TYPES = ['track', 'follow', 'support'] as const
  */
 export const createStory = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const artistId = request.auth.uid
   if (!(await userHasRole(artistId, 'artist'))) {
     throw new HttpsError('permission-denied', 'Only artists can post Stories.')
@@ -120,6 +121,7 @@ export const createStory = onCall(async (request) => {
 
 export const toggleStoryHighlight = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const { storyId, isHighlight, highlightGroup } = request.data ?? {}
   if (!storyId || typeof isHighlight !== 'boolean') {
     throw new HttpsError('invalid-argument', 'storyId and isHighlight are required.')

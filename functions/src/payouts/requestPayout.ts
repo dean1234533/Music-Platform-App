@@ -1,11 +1,13 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
+import { requireActiveUser } from '../roles.js'
 import { getPlatformSettings } from '../platformSettings.js'
 import { getStripe, stripeSecretKey } from '../stripe/client.js'
 
 export const requestPayout = onCall({ secrets: [stripeSecretKey] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const artistId = request.auth.uid
   const balanceRef = db.collection('artistBalances').doc(artistId)
 

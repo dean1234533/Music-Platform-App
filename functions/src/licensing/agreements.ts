@@ -3,6 +3,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import type { WriteBatch, DocumentReference, DocumentData } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
+import { requireActiveUser } from '../roles.js'
 import { writeSystemMessage } from '../messaging/messages.js'
 
 /** Deterministic fingerprint of the agreed terms — a signature records the exact contentHash it was given for, so any (impossible, since writes are server-only) tampering after signing would be independently detectable. */
@@ -137,6 +138,7 @@ interface ProposeAgreementInput {
  */
 export const proposeAgreement = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const input = request.data as ProposeAgreementInput
   if (!input?.requestId) throw new HttpsError('invalid-argument', 'requestId is required.')
 
@@ -194,6 +196,7 @@ export const proposeAgreement = onCall(async (request) => {
  */
 export const signAgreement = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
   const { agreementId, agreedToTerms, legalName, signatureType, signatureReference, authorityConfirmed } = request.data ?? {}
   if (!agreementId || typeof agreementId !== 'string') throw new HttpsError('invalid-argument', 'agreementId is required.')

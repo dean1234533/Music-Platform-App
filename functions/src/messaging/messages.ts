@@ -2,6 +2,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import type { DocumentData, DocumentReference } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
+import { requireActiveUser } from '../roles.js'
 import { enforceRateLimit } from '../rateLimit.js'
 
 export type MessageKind = 'text' | 'system' | 'offer_card' | 'contract_status' | 'payment_status'
@@ -55,6 +56,7 @@ const MAX_MESSAGE_LENGTH = 4000
 
 export const sendMessage = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
   const { conversationId, text } = request.data ?? {}
   if (!conversationId || typeof conversationId !== 'string') {

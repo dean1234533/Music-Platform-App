@@ -1,6 +1,7 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import { db } from './admin.js'
+import { requireActiveUser } from './roles.js'
 import { enforceRateLimit } from './rateLimit.js'
 import { getStorage } from 'firebase-admin/storage'
 
@@ -67,6 +68,7 @@ async function deleteQuery(query: FirebaseFirestore.Query): Promise<void> {
 
 export const deleteTrack = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const trackId = request.data?.trackId
   if (!trackId || typeof trackId !== 'string') throw new HttpsError('invalid-argument', 'trackId is required.')
   const ref = db.collection('tracks').doc(trackId)

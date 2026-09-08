@@ -1,6 +1,7 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
+import { requireActiveUser } from '../roles.js'
 
 const RIGHTS_DECLARATION_VERSION = '2026-09-07'
 
@@ -20,6 +21,7 @@ const RIGHTS_CONSEQUENCES_TEXT =
  */
 export const recordRightsDeclaration = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
   const { trackId, agreed } = request.data ?? {}
   if (!trackId || typeof trackId !== 'string') throw new HttpsError('invalid-argument', 'trackId is required.')
@@ -47,6 +49,7 @@ export const recordRightsDeclaration = onCall(async (request) => {
 /** ToS/Privacy acceptance — no cross-doc validation needed, so this stays a simple append-only record. */
 export const recordLegalAcceptance = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
   const { docType, version } = request.data ?? {}
   if (!['terms', 'privacy', 'copyright_policy', 'dj_licensing_terms'].includes(docType)) {

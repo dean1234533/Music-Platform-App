@@ -1,6 +1,7 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
+import { requireActiveUser } from '../roles.js'
 import { getStripe, stripeSecretKey } from './client.js'
 
 function accountRef(artistId: string) {
@@ -14,6 +15,7 @@ function accountRef(artistId: string) {
  */
 export const createConnectOnboardingLink = onCall({ secrets: [stripeSecretKey] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const artistId = request.auth.uid
   const { returnUrl, refreshUrl } = request.data ?? {}
   if (!returnUrl || !refreshUrl) throw new HttpsError('invalid-argument', 'returnUrl and refreshUrl are required.')
@@ -57,6 +59,7 @@ export const createConnectOnboardingLink = onCall({ secrets: [stripeSecretKey] }
 
 export const createConnectDashboardLink = onCall({ secrets: [stripeSecretKey] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const snap = await accountRef(request.auth.uid).get()
   const stripeAccountId = snap.data()?.stripeAccountId as string | undefined
   if (!stripeAccountId) throw new HttpsError('failed-precondition', 'No connected Stripe account found.')

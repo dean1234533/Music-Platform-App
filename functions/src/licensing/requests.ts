@@ -1,7 +1,7 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
-import { userHasRole } from '../roles.js'
+import { requireActiveUser, userHasRole } from '../roles.js'
 import { writeSystemMessage } from '../messaging/messages.js'
 import { enforceRateLimit } from '../rateLimit.js'
 
@@ -22,6 +22,7 @@ const INTENDED_USES = [
  */
 export const submitLicenceRequest = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const djId = request.auth.uid
   if (!(await userHasRole(djId, 'dj'))) {
     throw new HttpsError('permission-denied', 'A DJ profile is required to request tracks.')
@@ -141,6 +142,7 @@ const DJ_ACTIONS = ['cancel'] as const
 
 export const respondToLicenceRequest = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
   const { requestId, action } = request.data ?? {}
   if (!requestId || typeof requestId !== 'string') throw new HttpsError('invalid-argument', 'requestId is required.')

@@ -1,6 +1,7 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
+import { requireActiveUser } from '../roles.js'
 import { requireAdmin, writeAuditLog } from './guard.js'
 import { enforceRateLimit } from '../rateLimit.js'
 
@@ -26,6 +27,7 @@ const RESTRICTABLE_CAPABILITIES = ['dj_licensing', 'discovery', 'streaming'] as 
  */
 export const submitCopyrightClaim = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   await enforceRateLimit(`submitCopyrightClaim_${request.auth.uid}`, 5, 60 * 60)
   const {
     claimId,
@@ -149,6 +151,7 @@ export const reviewCopyrightClaim = onCall(async (request) => {
 /** The artist's chance to respond to a claim affecting their music with explanation/evidence. */
 export const submitArtistResponse = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const { claimId, response } = request.data ?? {}
   if (!claimId || typeof response !== 'string' || !response.trim()) {
     throw new HttpsError('invalid-argument', 'claimId and a response are required.')
@@ -177,6 +180,7 @@ export const submitArtistResponse = onCall(async (request) => {
  */
 export const submitCounterNotice = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const { claimId, counterNoticeText } = request.data ?? {}
   if (!claimId || typeof counterNoticeText !== 'string' || !counterNoticeText.trim()) {
     throw new HttpsError('invalid-argument', 'claimId and counterNoticeText are required.')

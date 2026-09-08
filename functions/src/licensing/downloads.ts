@@ -2,7 +2,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import { getStorage } from 'firebase-admin/storage'
 import { db } from '../admin.js'
-import { userHasRole } from '../roles.js'
+import { requireActiveUser, userHasRole } from '../roles.js'
 
 const SIGNED_URL_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
@@ -15,6 +15,7 @@ const SIGNED_URL_TTL_MS = 5 * 60 * 1000 // 5 minutes
  */
 export const getSecureDownloadUrl = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const djId = request.auth.uid
   const { agreementId } = request.data ?? {}
   if (!agreementId || typeof agreementId !== 'string') {

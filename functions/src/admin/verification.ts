@@ -1,12 +1,14 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
+import { requireActiveUser } from '../roles.js'
 import { requireAdmin, writeAuditLog } from './guard.js'
 
 type ProfileType = 'artist' | 'dj'
 
 export const submitVerificationRequest = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
   const profileType = request.data?.profileType as ProfileType | undefined
   if (profileType !== 'artist' && profileType !== 'dj') {
