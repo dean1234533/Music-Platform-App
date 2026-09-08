@@ -211,6 +211,7 @@ function App() {
               <Route path="dj-requests" element={<ArtistDJRequestsPage />} />
               <Route path="deals" element={<DjDealsPage />} />
               <Route path="revenue" element={<RevenuePage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
               <Route path="plan" element={<Navigate replace to="/dashboard/artist" />} />
               <Route path="settings" element={<ArtistSettingsPage />} />
             </Route>
@@ -233,6 +234,7 @@ function App() {
               <Route path="sets" element={<DJCratesPage />} />
               <Route path="analytics" element={<DJAnalyticsPage />} />
               <Route path="profile" element={<DJProfilePage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
               <Route path="plan" element={<Navigate replace to="/dj/profile" />} />
             </Route>
 

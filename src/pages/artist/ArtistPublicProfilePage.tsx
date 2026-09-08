@@ -328,7 +328,7 @@ export function ArtistPublicProfilePage() {
           </div>
         ) : null}
 
-        {firebaseUser && !isSupporting ? (
+        {firebaseUser && !isSupporting && (!hasRole('dj') || hasRole('fan')) ? (
           <UpgradePrompt
             role="fan"
             reason={`Supporter-only posts and exclusive tracks from ${artist.name} are for supporters.`}
