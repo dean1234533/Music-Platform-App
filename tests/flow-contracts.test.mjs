@@ -58,6 +58,20 @@ test('email signup cannot continue before verification', () => {
   assert.match(page, /not verified yet/)
 })
 
+test('install prompt is available before sign-in and first-time profiles are awaited', () => {
+  const banner = read('src/components/pwa/InstallBanner.tsx')
+  const signIn = read('src/pages/auth/SignInPage.tsx')
+  const signUp = read('src/pages/auth/SignUpPage.tsx')
+  const authContext = read('src/contexts/AuthContext.tsx')
+  const users = read('src/services/userService.ts')
+  assert.doesNotMatch(banner, /firebaseUser/)
+  assert.match(signIn, /await ensureUserDocument\(user\)/)
+  assert.match(signUp, /await ensureUserDocument\(credential\.user\)/)
+  assert.match(authContext, /profileReadyUid !== firebaseUser\.uid/)
+  assert.match(users, /getIdToken\(true\)/)
+  assert.match(users, /permission-denied[\s\S]*?unavailable/)
+})
+
 test('notifications use Firestore IDs and navigate their deep links', () => {
   assert.match(read('src/services/notificationService.ts'), /notificationId: d\.id/)
   const page = read('src/pages/fan/NotificationsPage.tsx')

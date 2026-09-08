@@ -26,40 +26,38 @@ function sleep(ms: number): Promise<void> {
  * safe defaults — roles/subscriptionStatus can't be escalated this way
  * because Firestore rules pin their values on create.
  *
- * Right after signInWithPopup resolves, the Firestore SDK's own auth-token
- * listener can briefly lag behind the auth state onAuthStateChanged just
- * fired — the very first write can lose that race and get evaluated with
- * request.auth still null, i.e. permission-denied. Forcing a fresh ID token
- * closes most of that gap; the one retry covers what's left.
+ * Right after sign-in resolves, the Firestore SDK's auth-token listener can
+ * briefly lag behind Firebase Auth. A forced token refresh plus bounded retry
+ * keeps that startup race from surfacing as a broken first-time profile.
  */
 export async function ensureUserDocument(user: User): Promise<void> {
-  await user.getIdToken()
-
   const ref = userRef(user.uid)
-  const write = async () => {
-    const existing = await getDoc(ref)
-    if (existing.exists()) return
-    await setDoc(ref, {
-      uid: user.uid,
-      displayName: user.displayName ?? null,
-      email: user.email ?? null,
-      photoURL: user.photoURL ?? null,
-      roles: [] as UserRole[],
-      onboardingComplete: false,
-      subscriptionStatus: 'none',
-      notificationPreferences: { email: true, inApp: true },
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    })
-  }
+  const retryDelays = [0, 250, 500, 1_000, 2_000]
 
-  try {
-    await write()
-  } catch (error) {
-    const code = (error as { code?: string } | null)?.code
-    if (code !== 'permission-denied') throw error
-    await sleep(500)
-    await write()
+  for (let attempt = 0; attempt < retryDelays.length; attempt += 1) {
+    if (retryDelays[attempt] > 0) await sleep(retryDelays[attempt])
+    try {
+      await user.getIdToken(true)
+      const existing = await getDoc(ref)
+      if (existing.exists()) return
+      await setDoc(ref, {
+        uid: user.uid,
+        displayName: user.displayName ?? null,
+        email: user.email ?? null,
+        photoURL: user.photoURL ?? null,
+        roles: [] as UserRole[],
+        onboardingComplete: false,
+        subscriptionStatus: 'none',
+        notificationPreferences: { email: true, inApp: true },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+      return
+    } catch (error) {
+      const code = (error as { code?: string } | null)?.code
+      const retryable = code === 'permission-denied' || code === 'unavailable'
+      if (!retryable || attempt === retryDelays.length - 1) throw error
+    }
   }
 }
 

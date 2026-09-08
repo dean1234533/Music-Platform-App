@@ -5,15 +5,17 @@ import { Input, Label } from '@/components/common/Input'
 import { Button } from '@/components/common/Button'
 import { signInWithEmail, signInWithGoogle, signOut } from '@/services/authService'
 import { friendlyAuthError } from '@/utils/authErrors'
-import { getUserProfile } from '@/services/userService'
+import { ensureUserDocument, getUserProfile } from '@/services/userService'
+import type { User } from 'firebase/auth'
 
 const SUSPENDED_MESSAGE = 'This account has been suspended. Contact support if you believe this is a mistake.'
 
 /** Thrown to short-circuit sign-in for a suspended account before it ever reaches a protected route. */
 class SuspendedAccountError extends Error {}
 
-async function dashboardAfterSignIn(uid: string): Promise<string> {
-  const profile = await getUserProfile(uid)
+async function dashboardAfterSignIn(user: User): Promise<string> {
+  await ensureUserDocument(user)
+  const profile = await getUserProfile(user.uid)
   if (profile?.suspended) {
     await signOut()
     throw new SuspendedAccountError(SUSPENDED_MESSAGE)
@@ -43,7 +45,7 @@ export function SignInPage() {
     setLoading(true)
     try {
       const credential = await signInWithEmail(email, password)
-      navigate(redirectTo ?? (await dashboardAfterSignIn(credential.user.uid)))
+      navigate(redirectTo ?? (await dashboardAfterSignIn(credential.user)))
     } catch (err) {
       setError(err instanceof SuspendedAccountError ? err.message : friendlyAuthError(err))
     } finally {
@@ -56,7 +58,7 @@ export function SignInPage() {
     setGoogleLoading(true)
     try {
       const credential = await signInWithGoogle()
-      navigate(redirectTo ?? (await dashboardAfterSignIn(credential.user.uid)))
+      navigate(redirectTo ?? (await dashboardAfterSignIn(credential.user)))
     } catch (err) {
       setError(err instanceof SuspendedAccountError ? err.message : friendlyAuthError(err))
     } finally {

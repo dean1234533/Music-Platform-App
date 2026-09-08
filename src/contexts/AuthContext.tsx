@@ -17,10 +17,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [initializing, setInitializing] = useState(true)
+  const [profileReadyUid, setProfileReadyUid] = useState<string | null>(null)
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user)
+      setProfileReadyUid(null)
+      setInitializing(true)
       if (!user) {
         setProfile(null)
         setInitializing(false)
@@ -28,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       try {
         await ensureUserDocument(user)
+        setProfileReadyUid(user.uid)
       } catch (error) {
         console.error('Could not initialise the user profile.', error)
         setProfile(null)
@@ -38,13 +42,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    if (!firebaseUser) return
-    const unsubscribeProfile = subscribeToUserProfile(firebaseUser.uid, (nextProfile) => {
-      setProfile(nextProfile)
-      setInitializing(false)
-    })
+    if (!firebaseUser || profileReadyUid !== firebaseUser.uid) return
+    const unsubscribeProfile = subscribeToUserProfile(
+      firebaseUser.uid,
+      (nextProfile) => {
+        setProfile(nextProfile)
+        setInitializing(false)
+      },
+      () => setInitializing(false),
+    )
     return unsubscribeProfile
-  }, [firebaseUser])
+  }, [firebaseUser, profileReadyUid])
 
   const value = useMemo<AuthContextValue>(
     () => ({

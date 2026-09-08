@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Download, Share, X } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContext'
 import { useInstallPrompt } from '@/hooks/useInstallPrompt'
 import { Button } from '@/components/common/Button'
 
@@ -26,23 +25,17 @@ function dismiss(): void {
 }
 
 /**
- * Shown to every authenticated role — fan, artist, DJ, and admin alike, per
- * spec: installability is not a fan-only perk. Suppressed entirely once the
- * app is already running standalone, and for DISMISS_DAYS after "Not Now".
- * Manually reachable at any time from the account controls shared by fan,
- * artist, DJ, and admin settings.
+ * Shown to visitors as well as every authenticated role. Chrome only exposes
+ * its deferred install prompt after a user gesture, so the banner must remain
+ * reachable before sign-in instead of silently suppressing the native prompt.
+ * It is hidden once the app is standalone and for DISMISS_DAYS after dismissal.
  */
 export function InstallBanner() {
-  const { firebaseUser } = useAuth()
   const { canInstall, isStandalone, isIOS, install } = useInstallPrompt()
   const [dismissed, setDismissed] = useState(recentlyDismissed)
   const [installing, setInstalling] = useState(false)
 
-  useEffect(() => {
-    setDismissed(recentlyDismissed())
-  }, [firebaseUser])
-
-  if (!firebaseUser || isStandalone || dismissed) return null
+  if (isStandalone || dismissed) return null
   if (!canInstall && !isIOS) return null
 
   async function handleInstall() {

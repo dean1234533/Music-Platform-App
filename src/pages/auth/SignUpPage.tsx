@@ -6,6 +6,7 @@ import { Button } from '@/components/common/Button'
 import { PasswordStrengthMeter } from '@/components/auth/PasswordStrengthMeter'
 import { signInWithGoogle, signUpWithEmail } from '@/services/authService'
 import { friendlyAuthError } from '@/utils/authErrors'
+import { ensureUserDocument } from '@/services/userService'
 import { checkPassword, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 
 export function SignUpPage() {
@@ -45,7 +46,8 @@ export function SignUpPage() {
     setError(null)
     setGoogleLoading(true)
     try {
-      await signInWithGoogle()
+      const credential = await signInWithGoogle()
+      await ensureUserDocument(credential.user)
       navigate(`/onboarding${roleQuery}`)
     } catch (err) {
       setError(friendlyAuthError(err))
