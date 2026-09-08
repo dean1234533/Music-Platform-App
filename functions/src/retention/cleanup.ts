@@ -181,6 +181,39 @@ export const expireStaleNegotiations = onSchedule('every 24 hours', async () => 
  * retention window — then its record (and the download logs/acceptance
  * logs tied to it) is removed, unless under legal hold.
  */
+/**
+ * A contract's own licence duration (expiryDate) lapsing is distinct from the
+ * multi-year retention window above: this flips status active -> expired the
+ * day after the licence period ends and notifies both parties, so "Expired"
+ * on the My Agreements page and getSecureDownloadUrl's live expiry check
+ * (functions/src/licensing/downloads.ts) agree with the record everyone sees.
+ */
+export const expireActiveContracts = onSchedule('every 24 hours', async () => {
+  const today = new Date().toISOString().slice(0, 10)
+  const snap = await db.collection('licenceAgreements').where('status', '==', 'active').get()
+  const batch = db.batch()
+  let writes = 0
+  for (const doc of snap.docs) {
+    const agreement = doc.data()
+    if (!agreement.expiryDate || agreement.expiryDate >= today) continue
+    batch.update(doc.ref, { status: 'expired' })
+    for (const userId of [agreement.artistId, agreement.djId]) {
+      batch.set(db.collection('notifications').doc(), {
+        userId,
+        type: 'contract_expired',
+        title: 'Licence expired',
+        body: 'The licence period on this agreement has ended.',
+        linkTo: `/agreements/${doc.id}`,
+        read: false,
+        createdAt: FieldValue.serverTimestamp(),
+      })
+    }
+    writes += 1
+    if (writes >= 150) break // stay well under the 500-write batch limit (3 writes per agreement)
+  }
+  if (writes > 0) await batch.commit()
+})
+
 export const cleanupExpiredContracts = onSchedule('every 24 hours', async () => {
   const { contractYears } = await getDataRetentionSettings()
   const cutoff = cutoffDaysAgo(contractYears * 365)

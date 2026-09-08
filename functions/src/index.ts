@@ -58,6 +58,7 @@ export {
   cleanupExpiredDraftOffers,
   cleanupInactiveChats,
   expireStaleNegotiations,
+  expireActiveContracts,
   cleanupExpiredContracts,
   cleanupResolvedCopyrightClaims,
   cleanupOldAuditLogs,
