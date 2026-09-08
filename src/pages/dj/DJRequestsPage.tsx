@@ -9,6 +9,7 @@ import { getDealsByIds } from '@/services/dealService'
 import { subscribeDJProfile, updateDJProfile } from '@/services/djService'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { TrackCard } from '@/components/music/TrackCard'
+import { RequestDjAccessModal } from '@/components/track/RequestDjAccessModal'
 import { Button } from '@/components/common/Button'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/StateViews'
 import type { LicenceRequestDoc } from '@/types/licence'
@@ -19,6 +20,11 @@ import { formatCurrency } from '@/utils/format'
 interface DealOpportunity {
   deal: DjDealDoc
   track: TrackDoc
+}
+
+interface RequestTarget {
+  trackId: string
+  dealId?: string
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -44,6 +50,7 @@ export function DJRequestsPage() {
   const [dealOpportunities, setDealOpportunities] = useState<DealOpportunity[] | null>(null)
   const [promoOptIn, setPromoOptIn] = useState<boolean | null>(null)
   const [enablingPromos, setEnablingPromos] = useState(false)
+  const [requestTarget, setRequestTarget] = useState<RequestTarget | null>(null)
 
   useEffect(() => {
     if (!firebaseUser) return
@@ -111,7 +118,7 @@ export function DJRequestsPage() {
           <EmptyState
             icon={<MessageSquare className="h-8 w-8 text-dj-400" />}
             title="You haven’t sent a request yet"
-            description="Choose a track below, open its page and select Request DJ access. The request will then appear here."
+            description="Choose a track below and select Request access. The request will then appear here."
             action={(
               <Link
                 to="/dj/discover"
@@ -165,7 +172,12 @@ export function DJRequestsPage() {
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {dealOpportunities.map(({ deal, track }) => (
-              <DealOpportunityCard key={`${track.trackId}-${deal.dealId}`} deal={deal} track={track} />
+              <DealOpportunityCard
+                key={`${track.trackId}-${deal.dealId}`}
+                deal={deal}
+                track={track}
+                onRequest={() => setRequestTarget({ trackId: track.trackId, dealId: deal.dealId })}
+              />
             ))}
           </div>
         )}
@@ -176,7 +188,7 @@ export function DJRequestsPage() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-dj-400">Open for DJs</p>
             <h2 className="mt-1 text-xl font-semibold text-ink-0">Tracks accepting requests</h2>
-            <p className="mt-1 text-sm text-ink-2">Open a track to review its terms and send the artist a request.</p>
+            <p className="mt-1 text-sm text-ink-2">Send the artist a request directly—no deal package is required.</p>
           </div>
           <Link to="/dj/discover" className="hidden items-center gap-1 text-sm font-medium text-dj-400 hover:text-dj-300 sm:flex">
             See all <ArrowRight className="h-4 w-4" />
@@ -194,11 +206,24 @@ export function DJRequestsPage() {
         ) : (
           <div className="flex gap-4 overflow-x-auto pb-2">
             {openTracks.map((track) => (
-              <TrackCard key={track.trackId} track={track} queue={openTracks} />
+              <div key={track.trackId} className="flex w-44 shrink-0 flex-col gap-3 sm:w-52">
+                <TrackCard track={track} queue={openTracks} />
+                <Button size="sm" onClick={() => setRequestTarget({ trackId: track.trackId })} className="w-full">
+                  Request access
+                </Button>
+              </div>
             ))}
           </div>
         )}
       </section>
+
+      {requestTarget ? (
+        <RequestDjAccessModal
+          trackId={requestTarget.trackId}
+          dealId={requestTarget.dealId}
+          onClose={() => setRequestTarget(null)}
+        />
+      ) : null}
     </div>
   )
 }
@@ -211,27 +236,27 @@ function dealPriceLabel(deal: DjDealDoc): string {
   return 'Custom quote'
 }
 
-function DealOpportunityCard({ deal, track }: { deal: DjDealDoc; track: TrackDoc }) {
+function DealOpportunityCard({ deal, track, onRequest }: { deal: DjDealDoc; track: TrackDoc; onRequest: () => void }) {
   const artist = useArtistSummary(track.artistId)
 
   return (
-    <Link
-      to={`/track/${track.trackId}`}
-      className="group flex min-w-0 items-center gap-4 rounded-2xl border border-surface-border bg-surface-1 p-4 transition hover:border-dj-500/40 hover:bg-surface-2"
-    >
-      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface-3">
-        {track.artworkURL ? <img src={track.artworkURL} alt="" className="h-full w-full object-cover" /> : null}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-3">
-          <p className="truncate text-sm font-semibold text-ink-0">{deal.name}</p>
-          <span className="shrink-0 text-xs font-semibold text-dj-400">{dealPriceLabel(deal)}</span>
+    <div className="flex min-w-0 flex-col gap-4 rounded-2xl border border-surface-border bg-surface-1 p-4 transition hover:border-dj-500/40">
+      <Link to={`/track/${track.trackId}`} className="group flex min-w-0 items-center gap-4">
+        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface-3">
+          {track.artworkURL ? <img src={track.artworkURL} alt="" className="h-full w-full object-cover" /> : null}
         </div>
-        <p className="mt-1 truncate text-xs text-ink-1">{track.title} · {artist?.name ?? 'Artist'}</p>
-        <p className="mt-1 line-clamp-1 text-xs text-ink-3">{deal.description || deal.permittedUse}</p>
-      </div>
-      <ArrowRight className="h-4 w-4 shrink-0 text-ink-3 transition group-hover:translate-x-0.5 group-hover:text-dj-400" />
-    </Link>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <p className="truncate text-sm font-semibold text-ink-0">{deal.name}</p>
+            <span className="shrink-0 text-xs font-semibold text-dj-400">{dealPriceLabel(deal)}</span>
+          </div>
+          <p className="mt-1 truncate text-xs text-ink-1">{track.title} · {artist?.name ?? 'Artist'}</p>
+          <p className="mt-1 line-clamp-1 text-xs text-ink-3">{deal.description || deal.permittedUse}</p>
+        </div>
+        <ArrowRight className="h-4 w-4 shrink-0 text-ink-3 transition group-hover:translate-x-0.5 group-hover:text-dj-400" />
+      </Link>
+      <Button size="sm" onClick={onRequest} className="w-full">Request this deal</Button>
+    </div>
   )
 }
 

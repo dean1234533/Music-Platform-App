@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Pause, Play, SkipBack, SkipForward, Volume2 } from 'lucide-react'
+import { Pause, Play, SkipBack, SkipForward, Volume2, X } from 'lucide-react'
 import { usePlayer } from '@/contexts/PlayerContext'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { useAuth } from '@/contexts/AuthContext'
@@ -8,7 +8,7 @@ import { FollowButton } from '@/components/music/FollowButton'
 import { TrackActions } from '@/components/music/TrackActions'
 
 export function PlayerBar() {
-  const { currentTrack, isPlaying, isLoading, progressSec, durationSec, volume, togglePlay, seek, next, previous, setVolume } =
+  const { currentTrack, isPlaying, isLoading, progressSec, durationSec, volume, togglePlay, seek, next, previous, closePlayer, setVolume } =
     usePlayer()
   const artist = useArtistSummary(currentTrack?.artistId ?? null)
   const { firebaseUser } = useAuth()
@@ -107,6 +107,16 @@ export function PlayerBar() {
         {firebaseUser ? (
           <div className="hidden shrink-0 sm:block"><TrackActions track={currentTrack} /></div>
         ) : null}
+
+        <button
+          type="button"
+          onClick={closePlayer}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-2 transition hover:bg-white/[0.08] hover:text-ink-0"
+          aria-label="Close player"
+          title="Close player"
+        >
+          <X className="h-5 w-5" />
+        </button>
       </div>
     </div>
   )

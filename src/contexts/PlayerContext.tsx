@@ -26,6 +26,7 @@ interface PlayerContextValue {
   seek: (seconds: number) => void
   next: () => void
   previous: () => void
+  closePlayer: () => void
   setVolume: (volume: number) => void
 }
 
@@ -172,6 +173,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const next = useCallback(() => stepQueue(1), [stepQueue])
   const previous = useCallback(() => stepQueue(-1), [stepQueue])
 
+  const closePlayer = useCallback(() => {
+    const audio = audioRef.current
+    if (audio) {
+      audio.pause()
+      audio.removeAttribute('src')
+      audio.load()
+    }
+    setCurrentTrack(null)
+    setQueue([])
+    setIsPlaying(false)
+    setIsLoading(false)
+    setProgressSec(0)
+    setDurationSec(0)
+  }, [])
+
   const setVolume = useCallback((value: number) => {
     setVolumeState(value)
     if (audioRef.current) audioRef.current.volume = value
@@ -191,6 +207,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       seek,
       next,
       previous,
+      closePlayer,
       setVolume,
     }),
     [
@@ -206,6 +223,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       seek,
       next,
       previous,
+      closePlayer,
       setVolume,
     ],
   )
