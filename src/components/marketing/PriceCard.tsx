@@ -44,7 +44,9 @@ export function PriceCard({ index, title, price, suffix, description, features, 
       <p className="mt-6 text-5xl font-medium tracking-[-0.055em]">{price}<span className={`ml-1 text-sm font-medium tracking-normal ${featured ? 'text-ink-2 md:text-surface-0/60' : 'text-ink-2'}`}>{suffix}</span></p>
       <p className={`mt-4 text-sm leading-6 ${featured ? 'text-ink-2 md:text-surface-0/70' : 'text-ink-2'}`}>{description}</p>
       <ul className="mt-8 space-y-3">{features.map((feature) => <li key={feature} className="flex items-center gap-3 text-sm"><Check className="h-4 w-4 shrink-0" />{feature}</li>)}</ul>
-      <Link to={to} className={`mt-auto block rounded-full px-5 py-3 text-center text-sm font-semibold transition ${featured ? 'bg-brand-500 text-surface-0 hover:bg-brand-400 md:bg-surface-0 md:text-ink-0 md:hover:bg-surface-2' : 'bg-ink-0 text-surface-0 hover:bg-brand-400'}`}>{cta}</Link>
+      <div className="mt-auto pt-10">
+        <Link to={to} className={`block rounded-full px-5 py-3 text-center text-sm font-semibold transition ${featured ? 'bg-brand-500 text-surface-0 hover:bg-brand-400 md:bg-surface-0 md:text-ink-0 md:hover:bg-surface-2' : 'bg-ink-0 text-surface-0 hover:bg-brand-400'}`}>{cta}</Link>
+      </div>
     </div>
   )
 }
