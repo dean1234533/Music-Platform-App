@@ -3,17 +3,16 @@ import { db } from '@/lib/firebase'
 import { callable } from '@/lib/callable'
 import type { SubscriptionDoc } from '@/types/subscription'
 
-const startCheckout = callable<{ planId: string; role: 'fan'; successUrl: string; cancelUrl: string }, { url: string }>(
+const startCheckout = callable<{ planId: string; role: 'fan' | 'artist'; successUrl: string; cancelUrl: string }, { url: string }>(
   'createCheckoutSession',
 )
 const startBillingPortal = callable<{ returnUrl: string }, { url: string }>('createBillingPortalSession')
 
-export async function subscribeToPlan(planId: string): Promise<void> {
+export async function subscribeToPlan(planId: string, role: 'fan' | 'artist' = 'fan', returnPath = '/app/subscription'): Promise<void> {
   const origin = window.location.origin
-  const returnPath = '/app/subscription'
   const { url } = await startCheckout({
     planId,
-    role: 'fan',
+    role,
     successUrl: `${origin}${returnPath}?checkout=success`,
     cancelUrl: `${origin}${returnPath}?checkout=cancelled`,
   })
@@ -29,9 +28,10 @@ export function subscribeToOwnSubscription(
   uid: string,
   onChange: (sub: SubscriptionDoc | null) => void,
   onError?: (error: Error) => void,
+  role: 'fan' | 'artist' = 'fan',
 ) {
   return onSnapshot(
-    doc(db, 'subscriptions', `${uid}_fan`),
+    doc(db, 'subscriptions', `${uid}_${role}`),
     (snap) => {
       onChange(snap.exists() ? (snap.data() as SubscriptionDoc) : null)
     },

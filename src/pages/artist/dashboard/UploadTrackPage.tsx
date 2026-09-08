@@ -6,6 +6,7 @@ import { getArtistProfile } from '@/services/artistService'
 import { deriveAudioAssets } from '@/services/audioProcessing'
 import { compressImage } from '@/services/imageProcessing'
 import { recordRightsDeclaration } from '@/services/legalService'
+import { subscribeToOwnSubscription, subscribeToPlan } from '@/services/subscriptionService'
 import { useMediaUpload } from '@/hooks/useMediaUpload'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
@@ -13,6 +14,7 @@ import { UploadProgress } from '@/components/common/UploadProgress'
 import { formatFileSize, MAX_AUDIO_MB, MAX_IMAGE_MB, validateAudioFile, validateImageFile } from '@/utils/uploadLimits'
 import { PREVIEW_MAX_DURATION_SEC, PREVIEW_MIN_DURATION_SEC, SUGGESTED_PREVIEW_DURATIONS_SEC } from '@/constants/mediaConfig'
 import type { LicenceMode, TrackRightsMetadata, TrackVisibility } from '@/types/track'
+import type { SubscriptionDoc } from '@/types/subscription'
 import { CAMELOT_KEYS, GENRES, MOODS } from '@/constants/musicTaxonomy'
 import { MAX_STORED_TRACKS_PER_ARTIST } from '@/constants/platformLimits'
 
@@ -81,6 +83,28 @@ export function UploadTrackPage() {
     })
   }, [firebaseUser])
 
+  const [membership, setMembership] = useState<SubscriptionDoc | null | undefined>(undefined)
+  const [membershipCheckoutLoading, setMembershipCheckoutLoading] = useState(false)
+  const [membershipError, setMembershipError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!firebaseUser) return
+    return subscribeToOwnSubscription(firebaseUser.uid, setMembership, undefined, 'artist')
+  }, [firebaseUser])
+
+  const hasActiveMembership = membership?.status === 'active' || membership?.status === 'trialing'
+
+  async function handleSubscribeToMembership() {
+    setMembershipCheckoutLoading(true)
+    setMembershipError(null)
+    try {
+      await subscribeToPlan('artist_membership', 'artist', '/dashboard/artist/upload')
+    } catch (err) {
+      setMembershipError(err instanceof Error ? err.message : 'Could not start checkout. Please try again.')
+      setMembershipCheckoutLoading(false)
+    }
+  }
+
   const [masterFile, setMasterFile] = useState<File | null>(null)
   const [artworkFile, setArtworkFile] = useState<File | null>(null)
   const [fileErrors, setFileErrors] = useState<{ master?: string; artwork?: string }>({})
@@ -124,6 +148,10 @@ export function UploadTrackPage() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     if (!firebaseUser) return
+    if (!hasActiveMembership) {
+      setError('An active Artist Membership is required to publish tracks.')
+      return
+    }
     const artistProfile = await getArtistProfile(firebaseUser.uid)
     const currentTrackCount = artistProfile?.trackCount
     if (currentTrackCount === undefined) {
@@ -241,6 +269,19 @@ export function UploadTrackPage() {
         Upload one master file — we'll automatically create an optimised streaming version and a
         preview clip. The master stays private.
       </p>
+
+      {membership !== undefined && !hasActiveMembership ? (
+        <div className="mt-5 rounded-xl border border-warning-500/25 bg-warning-500/[0.06] px-4 py-4 text-sm leading-6 text-ink-1">
+          <p className="font-medium text-ink-0">Artist Membership required to publish</p>
+          <p className="mt-1 text-ink-2">
+            Your dashboard stays open, but publishing a track needs an active Artist Membership — £29.99/year.
+          </p>
+          {membershipError ? <p className="mt-2 text-danger-500">{membershipError}</p> : null}
+          <Button className="mt-3" size="sm" loading={membershipCheckoutLoading} onClick={handleSubscribeToMembership}>
+            Subscribe — £29.99/year
+          </Button>
+        </div>
+      ) : null}
 
       <div className="mt-5 flex items-center justify-between rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm">
         <span className="text-ink-1">Stored track allowance</span>
@@ -539,7 +580,7 @@ export function UploadTrackPage() {
         {mediaUpload.state.stage !== 'idle' ? <UploadProgress state={mediaUpload.state} /> : null}
         {error ? <p className="text-sm text-danger-500">{error}</p> : null}
 
-        <Button type="submit" loading={submitting} disabled={storedTrackCount === null || storedTrackCount >= MAX_STORED_TRACKS_PER_ARTIST} className="w-fit">
+        <Button type="submit" loading={submitting} disabled={storedTrackCount === null || storedTrackCount >= MAX_STORED_TRACKS_PER_ARTIST || !hasActiveMembership} className="w-fit">
           Publish track
         </Button>
         </fieldset>

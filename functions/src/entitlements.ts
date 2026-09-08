@@ -1,6 +1,6 @@
 import { db } from './admin.js'
 
-export const PLAN_ROLES = ['fan'] as const
+export const PLAN_ROLES = ['fan', 'artist'] as const
 export type PlanRole = (typeof PLAN_ROLES)[number]
 export const PLAN_TIERS = ['free', 'mid', 'top'] as const
 export type PlanTier = (typeof PLAN_TIERS)[number]

@@ -19,6 +19,7 @@ export interface UserProfile {
   updatedAt: Timestamp | null
   onboardingComplete: boolean
   subscriptionStatus: SubscriptionStatus
+  artistMembershipStatus?: SubscriptionStatus
   notificationPreferences: NotificationPreferences
   stripeCustomerId?: string
   suspended?: boolean

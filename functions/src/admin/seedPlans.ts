@@ -4,9 +4,7 @@ import { db } from '../admin.js'
 import { requireAdmin, writeAuditLog } from './guard.js'
 import type { PlanDoc } from '../entitlements.js'
 
-type SeedPlan = Omit<PlanDoc, 'stripePriceId'> & { stripePriceId: null }
-
-const SEED_PLANS: SeedPlan[] = [
+export const SEED_PLANS: PlanDoc[] = [
   {
     planId: 'fan_free', name: 'Free Listener', role: 'fan', tier: 'free', priceMinor: 0,
     currency: 'gbp', interval: 'month', stripePriceId: null, active: true, isDefaultFree: true,
@@ -14,9 +12,14 @@ const SEED_PLANS: SeedPlan[] = [
   },
   {
     planId: 'fan_supporter', name: 'Supporter', role: 'fan', tier: 'mid', priceMinor: 499,
-    currency: 'gbp', interval: 'month', stripePriceId: null, active: true, isDefaultFree: false,
+    currency: 'gbp', interval: 'month', stripePriceId: 'price_1UDHcsF82zwiwbNndswJySme', active: true, isDefaultFree: false,
     features: { supporterContent: true, earlyAccess: true, polls: true, artistDefinedPerks: true },
     limits: {}, displayOrder: 1, recommended: true,
+  },
+  {
+    planId: 'artist_membership', name: 'Artist Membership', role: 'artist', tier: 'mid', priceMinor: 2999,
+    currency: 'gbp', interval: 'year', stripePriceId: 'price_1UDHdQF82zwiwbNn32d3qwhL', active: true, isDefaultFree: false,
+    features: {}, limits: {}, displayOrder: 0, recommended: true,
   },
 ]
 

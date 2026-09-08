@@ -1,7 +1,7 @@
 import type { SubscriptionPlan } from './platformSettings'
 
-/** Recurring subscriptions belong to listeners only. Artist and DJ accounts are free. */
-export const PLAN_ROLES = ['fan'] as const
+/** DJ accounts are free — DJs pay per-licence instead (see licenceService.ts). */
+export const PLAN_ROLES = ['fan', 'artist'] as const
 export type PlanRole = (typeof PLAN_ROLES)[number]
 
 export const PLAN_TIERS = ['free', 'mid', 'top'] as const

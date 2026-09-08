@@ -90,10 +90,6 @@ export function SubscriptionPage() {
         </div>
       ) : (
         <>
-          <div className="rounded-2xl border border-warning-500/25 bg-warning-500/[0.06] px-5 py-4 text-sm leading-6 text-ink-1">
-            Payments are not connected yet. You can compare plans now; checkout will become available when billing is enabled.
-          </div>
-
           {checkoutError ? <p className="text-sm text-danger-500">{checkoutError}</p> : null}
 
           {plans === null ? (

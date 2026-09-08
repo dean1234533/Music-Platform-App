@@ -8,10 +8,13 @@ import { getStripe, stripeSecretKey, stripeWebhookSecret } from './client.js'
 import { mapSubscriptionStatus } from '../entitlements.js'
 import { writeSystemMessage } from '../messaging/messages.js'
 
-function isFanSubscription(subscription: Stripe.Subscription): boolean {
+const SUPPORTED_SUBSCRIPTION_ROLES = new Set(['fan', 'artist'])
+
+function subscriptionRoleOf(subscription: Stripe.Subscription): 'fan' | 'artist' | null {
   const role = subscription.metadata?.role
   // Pre-role subscriptions were fan subscriptions. Explicit legacy creator roles are ignored.
-  return !role || role === 'fan'
+  if (!role) return 'fan'
+  return SUPPORTED_SUBSCRIPTION_ROLES.has(role) ? (role as 'fan' | 'artist') : null
 }
 
 async function findUidByCustomerId(customerId: string): Promise<string | null> {
@@ -83,7 +86,8 @@ async function paymentDetailsForInvoice(invoiceId: string): Promise<{ processing
 }
 
 async function upsertSubscriptionRecord(subscription: Stripe.Subscription) {
-  if (!isFanSubscription(subscription)) {
+  const role = subscriptionRoleOf(subscription)
+  if (!role) {
     logger.info('Ignoring retired creator subscription', { subscriptionId: subscription.id, role: subscription.metadata?.role })
     return
   }
@@ -94,7 +98,6 @@ async function upsertSubscriptionRecord(subscription: Stripe.Subscription) {
     return
   }
 
-  const role = 'fan'
   const status = mapSubscriptionStatus(subscription.status)
   const item = subscription.items.data[0]
 
@@ -116,14 +119,45 @@ async function upsertSubscriptionRecord(subscription: Stripe.Subscription) {
     { merge: true },
   )
 
-  // subscriptionStatus on users/{uid} is fan-role-only — see docs/FIRESTORE_SCHEMA.md.
-  if (role === 'fan') {
-    await db.collection('users').doc(uid).update({
-      subscriptionStatus: status,
-      updatedAt: FieldValue.serverTimestamp(),
-    })
-  }
+  // Denormalized per-role status fields on users/{uid} — see docs/FIRESTORE_SCHEMA.md.
+  const statusField = role === 'fan' ? 'subscriptionStatus' : 'artistMembershipStatus'
+  await db.collection('users').doc(uid).update({
+    [statusField]: status,
+    updatedAt: FieldValue.serverTimestamp(),
+  })
+}
 
+/**
+ * Artist Membership income doesn't get split to any artist — it's straight
+ * platform revenue, so this just records the accounting entry (matching the
+ * `transactions` pattern every other payment type already writes into) with
+ * no artist-balance credit. Idempotent on invoice.id like the other handlers.
+ */
+async function recordArtistMembershipIncome(invoice: Stripe.Invoice, uid: string) {
+  const txId = `artist_membership_${invoice.id}`
+  const existing = await db.collection('transactions').doc(txId).get()
+  if (existing.exists) return
+
+  const totalTaxMinor = Math.max(0, invoice.total - (invoice.total_excluding_tax ?? invoice.total))
+  const { processingFeeMinor, paymentIntentIds } = await paymentDetailsForInvoice(invoice.id)
+  const settlement = calculateNetRevenue(invoice.amount_paid, totalTaxMinor, processingFeeMinor)
+
+  await db.collection('transactions').doc(txId).set({
+    transactionId: txId,
+    type: 'artist_membership_income',
+    artistId: uid,
+    grossMinor: settlement.customerPaidMinor,
+    platformFeeMinor: 0,
+    netMinor: settlement.netRevenueMinor,
+    currency: invoice.currency,
+    stripeInvoiceId: invoice.id,
+    stripePaymentIntentId: paymentIntentIds[0] ?? null,
+    stripePaymentIntentIds: paymentIntentIds,
+    revenueBasis: 'net_after_tax_and_processing',
+    promotedAt: null,
+    refundedAt: null,
+    createdAt: FieldValue.serverTimestamp(),
+  })
 }
 
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
@@ -131,11 +165,16 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     return
   }
   const subscriptionRole = invoice.parent?.subscription_details?.metadata?.role
-  if (subscriptionRole && subscriptionRole !== 'fan') return
+  if (subscriptionRole && !SUPPORTED_SUBSCRIPTION_ROLES.has(subscriptionRole)) return
   const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id
   if (!customerId) return
   const uid = await findUidByCustomerId(customerId)
   if (!uid) return
+
+  if (subscriptionRole === 'artist') {
+    await recordArtistMembershipIncome(invoice, uid)
+    return
+  }
 
   const allocationSnap = await db.collection('supportAllocations').doc(uid).get()
   if (!allocationSnap.exists) return
@@ -227,8 +266,12 @@ async function handleInvoiceFailed(invoice: Stripe.Invoice) {
   const uid = await findUidByCustomerId(customerId)
   if (!uid) return
 
+  const subscriptionRole = invoice.parent?.subscription_details?.metadata?.role
+  const isArtist = subscriptionRole === 'artist'
+  const statusField = isArtist ? 'artistMembershipStatus' : 'subscriptionStatus'
+
   await db.collection('users').doc(uid).update({
-    subscriptionStatus: 'past_due',
+    [statusField]: 'past_due',
     updatedAt: FieldValue.serverTimestamp(),
   })
 
@@ -236,8 +279,10 @@ async function handleInvoiceFailed(invoice: Stripe.Invoice) {
     userId: uid,
     type: 'payment_required',
     title: 'Payment failed',
-    body: 'Your subscription payment failed. Update your payment method to keep supporting your artists.',
-    linkTo: '/app/subscription',
+    body: isArtist
+      ? 'Your Artist Membership payment failed. Update your payment method to keep publishing music.'
+      : 'Your subscription payment failed. Update your payment method to keep supporting your artists.',
+    linkTo: isArtist ? '/dashboard/artist/settings' : '/app/subscription',
     read: false,
     createdAt: FieldValue.serverTimestamp(),
   })

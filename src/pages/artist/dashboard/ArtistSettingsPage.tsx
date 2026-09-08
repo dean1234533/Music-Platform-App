@@ -5,12 +5,14 @@ import { subscribeArtistProfile, updateArtistProfile } from '@/services/artistSe
 import { subscribeOwnVerificationRequests, submitVerificationRequest } from '@/services/verificationService'
 import { uploadArtistCover, uploadArtistPhoto } from '@/services/profileMediaService'
 import { signOut } from '@/services/authService'
+import { openBillingPortal, subscribeToOwnSubscription, subscribeToPlan } from '@/services/subscriptionService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
 import { LoadingState, EmptyState } from '@/components/common/StateViews'
 import { AccountSecuritySection } from '@/components/account/AccountSecuritySection'
 import { validateImageFile } from '@/utils/uploadLimits'
 import type { ArtistProfile, DJRequestPolicy } from '@/types/artist'
+import type { SubscriptionDoc } from '@/types/subscription'
 
 const DJ_POLICY_OPTIONS: { value: DJRequestPolicy; label: string }[] = [
   { value: 'anyone', label: 'Anyone' },
@@ -242,6 +244,11 @@ export function ArtistSettingsPage() {
       </section>
 
       <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Membership</h2>
+        <MembershipSection uid={artist.artistId} />
+      </section>
+
+      <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Payout settings</h2>
         <div className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm text-ink-1">
           Connect your Stripe payout account from the Revenue tab.
@@ -262,6 +269,54 @@ export function ArtistSettingsPage() {
           Sign out
         </Button>
       </section>
+    </div>
+  )
+}
+
+function MembershipSection({ uid }: { uid: string }) {
+  const [membership, setMembership] = useState<SubscriptionDoc | null | undefined>(undefined)
+  const [checkoutLoading, setCheckoutLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => subscribeToOwnSubscription(uid, setMembership, undefined, 'artist'), [uid])
+
+  const isActive = membership?.status === 'active' || membership?.status === 'trialing'
+
+  async function handleSubscribe() {
+    setCheckoutLoading(true)
+    setError(null)
+    try {
+      await subscribeToPlan('artist_membership', 'artist', '/dashboard/artist/settings')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start checkout. Please try again.')
+      setCheckoutLoading(false)
+    }
+  }
+
+  if (membership === undefined) return <p className="text-sm text-ink-2">Checking membership status…</p>
+
+  if (isActive) {
+    return (
+      <div className="flex items-center justify-between rounded-xl border border-support-500/30 bg-support-500/5 px-4 py-3 text-sm">
+        <span className="text-ink-1">Artist Membership — active (£29.99/year)</span>
+        <Button variant="secondary" size="sm" onClick={openBillingPortal}>
+          Manage billing
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-xl border border-warning-500/25 bg-warning-500/[0.06] px-4 py-3 text-sm leading-6 text-ink-1">
+      <p>
+        {membership?.status === 'past_due'
+          ? 'Your last Artist Membership payment failed — publishing is paused until it’s resolved.'
+          : 'No active Artist Membership. Publishing new tracks requires membership — £29.99/year.'}
+      </p>
+      {error ? <p className="mt-2 text-danger-500">{error}</p> : null}
+      <Button className="mt-3" size="sm" loading={checkoutLoading} onClick={membership?.status === 'past_due' ? openBillingPortal : handleSubscribe}>
+        {membership?.status === 'past_due' ? 'Update payment' : 'Subscribe — £29.99/year'}
+      </Button>
     </div>
   )
 }

@@ -118,6 +118,9 @@ service cloud.firestore {
         // Keep this finite storage allowance in sync with platformLimits.ts.
         && exists(/databases/$(database)/documents/artistProfiles/$(request.auth.uid))
         && get(/databases/$(database)/documents/artistProfiles/$(request.auth.uid)).data.get('trackCount', 0) < 10
+        // Publishing requires an active Artist Membership — dashboard access itself stays open.
+        && exists(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_artist'))
+        && get(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_artist')).data.status in ['active', 'trialing']
         && request.resource.data.rightsConfirmed == true
         && request.resource.data.playCount == 0;
 

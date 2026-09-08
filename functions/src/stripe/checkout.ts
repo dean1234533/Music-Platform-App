@@ -21,7 +21,7 @@ export const createCheckoutSession = onCall({ secrets: [stripeSecretKey] }, asyn
   if (!planId || !role || !successUrl || !cancelUrl) {
     throw new HttpsError('invalid-argument', 'planId, role, successUrl, and cancelUrl are required.')
   }
-  if (role !== 'fan') throw new HttpsError('invalid-argument', 'Only fan supporter subscriptions are available.')
+  if (role !== 'fan' && role !== 'artist') throw new HttpsError('invalid-argument', 'Unsupported subscription role.')
 
   const planSnap = await db.collection('subscriptionPlans').doc(planId).get()
   if (!planSnap.exists) throw new HttpsError('not-found', 'Subscription plan not found.')
