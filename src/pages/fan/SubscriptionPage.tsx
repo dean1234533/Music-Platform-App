@@ -133,15 +133,17 @@ export function SubscriptionPage() {
                       </li>
                     ))}
                   </ul>
-                  <Button
-                    className="mt-auto w-full"
-                    variant={plan.priceMinor === 0 ? 'secondary' : 'primary'}
-                    disabled={plan.priceMinor === 0}
-                    loading={checkoutLoading === plan.planId}
-                    onClick={() => handleSubscribe(plan.planId)}
-                  >
-                    {plan.priceMinor === 0 ? 'Your current access' : `Choose ${plan.name}`}
-                  </Button>
+                  <div className="mt-auto pt-10">
+                    <Button
+                      className="w-full"
+                      variant={plan.priceMinor === 0 ? 'secondary' : 'primary'}
+                      disabled={plan.priceMinor === 0}
+                      loading={checkoutLoading === plan.planId}
+                      onClick={() => handleSubscribe(plan.planId)}
+                    >
+                      {plan.priceMinor === 0 ? 'Your current access' : `Choose ${plan.name}`}
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
