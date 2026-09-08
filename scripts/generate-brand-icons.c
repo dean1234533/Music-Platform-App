@@ -5,29 +5,31 @@
 static void stroke_brand_mark(CGContextRef context) {
   CGContextSetLineCap(context, kCGLineCapRound);
   CGContextSetLineJoin(context, kCGLineJoinRound);
-  CGContextSetLineWidth(context, 32);
-  CGContextSetRGBStrokeColor(context, 246.0 / 255.0, 247.0 / 255.0, 244.0 / 255.0, 1);
 
+  CGContextSetLineWidth(context, 26);
+  CGContextSetRGBStrokeColor(context, 246.0 / 255.0, 247.0 / 255.0, 244.0 / 255.0, 1);
+  CGContextStrokeEllipseInRect(context, CGRectMake(124, 124, 264, 264));
+
+  CGContextSetLineWidth(context, 42);
+  CGContextSetRGBStrokeColor(context, 5.0 / 255.0, 6.0 / 255.0, 7.0 / 255.0, 1);
   CGContextBeginPath(context);
-  CGContextMoveToPoint(context, 132, 112);
-  CGContextAddLineToPoint(context, 132, 400);
-  CGContextMoveToPoint(context, 132, 112);
-  CGContextAddLineToPoint(context, 240, 112);
-  CGContextAddCurveToPoint(context, 296, 112, 326, 140, 326, 184);
-  CGContextAddCurveToPoint(context, 326, 230, 292, 256, 236, 256);
-  CGContextAddLineToPoint(context, 132, 256);
-  CGContextMoveToPoint(context, 132, 256);
-  CGContextAddLineToPoint(context, 246, 256);
-  CGContextAddCurveToPoint(context, 308, 256, 340, 284, 340, 330);
-  CGContextAddCurveToPoint(context, 340, 376, 308, 400, 246, 400);
-  CGContextAddLineToPoint(context, 132, 400);
+  CGContextMoveToPoint(context, 76, 256);
+  CGContextAddCurveToPoint(context, 126, 256, 128, 206, 166, 206);
+  CGContextAddCurveToPoint(context, 204, 206, 204, 306, 240, 306);
+  CGContextAddCurveToPoint(context, 276, 306, 276, 172, 308, 172);
+  CGContextAddCurveToPoint(context, 344, 172, 344, 276, 374, 276);
+  CGContextAddCurveToPoint(context, 404, 276, 410, 256, 436, 256);
   CGContextStrokePath(context);
 
+  CGContextSetLineWidth(context, 18);
   CGContextSetRGBStrokeColor(context, 200.0 / 255.0, 243.0 / 255.0, 63.0 / 255.0, 1);
   CGContextBeginPath(context);
-  CGContextMoveToPoint(context, 310, 106);
-  CGContextAddLineToPoint(context, 374, 208);
-  CGContextAddLineToPoint(context, 438, 106);
+  CGContextMoveToPoint(context, 76, 256);
+  CGContextAddCurveToPoint(context, 126, 256, 128, 206, 166, 206);
+  CGContextAddCurveToPoint(context, 204, 206, 204, 306, 240, 306);
+  CGContextAddCurveToPoint(context, 276, 306, 276, 172, 308, 172);
+  CGContextAddCurveToPoint(context, 344, 172, 344, 276, 374, 276);
+  CGContextAddCurveToPoint(context, 404, 276, 410, 256, 436, 256);
   CGContextStrokePath(context);
 }
 
