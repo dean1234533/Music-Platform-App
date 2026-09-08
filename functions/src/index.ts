@@ -27,7 +27,7 @@ export { stripeConnectWebhook } from './stripe/connectWebhook.js'
 export { requestPayout } from './payouts/requestPayout.js'
 export { promotePendingBalances } from './payouts/promoteBalances.js'
 export { submitVerificationRequest, reviewVerificationRequest } from './admin/verification.js'
-export { submitCopyrightClaim, reviewCopyrightClaim, submitArtistResponse, submitCounterNotice } from './admin/copyright.js'
+export { submitCopyrightClaim, reviewCopyrightClaim, submitArtistResponse, submitCounterNotice, getCopyrightEvidenceUrls } from './admin/copyright.js'
 export { adminSetUserSuspension, adminSetTrackTakedown, adminDeleteStory } from './admin/moderation.js'
 export { blockSuspendedSignIn } from './admin/enforceSuspension.js'
 export { submitReport, adminResolveReport } from './admin/reports.js'
@@ -43,7 +43,7 @@ export { recordRightsDeclaration, recordLegalAcceptance } from './legal/acceptan
 export { onOriginalUploaded } from './tracks/onOriginalUploaded.js'
 
 // Artist Stories.
-export { createStory, toggleStoryHighlight } from './stories/stories.js'
+export { createStory, toggleStoryHighlight, getStoryMediaUrl } from './stories/stories.js'
 export { onStoryViewCreate, onStoryReactionCreate, onStoryReactionDelete, onStoryPollVoteCreate } from './stories/triggers.js'
 
 // Account security, deletion, data export, and retention/cleanup.

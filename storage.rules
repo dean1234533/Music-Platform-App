@@ -105,22 +105,26 @@ service firebase.storage {
       allow read: if true;
       allow write: if isOwner(artistId) && underVideoUploadLimit() && isStoryMedia();
     }
+    // followers/supporters/dj tiers are owner-only at Storage — cross-service
+    // firestore.get()/exists() calls from Storage rules don't work in this
+    // project (Firestore and the Storage bucket aren't in the same
+    // location; every such call here silently fails closed regardless of
+    // the logic). Entitled reads go through getStoryMediaUrl, which checks
+    // the same follows/supportRelationships/storiesDjEnabled conditions
+    // from a Cloud Function instead and hands back a short-lived signed
+    // URL — also fixing the separate issue that a permanent
+    // getDownloadURL() token, once stored on the story doc, would keep
+    // working after the viewer unfollowed/lost entitlement.
     match /artists/{artistId}/stories/followers/{fileName} {
-      allow read: if isOwner(artistId)
-        || (isSignedIn() && firestore.exists(/databases/(default)/documents/follows/$(request.auth.uid + '_' + artistId)));
+      allow read: if isOwner(artistId);
       allow write: if isOwner(artistId) && underVideoUploadLimit() && isStoryMedia();
     }
     match /artists/{artistId}/stories/supporters/{fileName} {
-      allow read: if isOwner(artistId)
-        || (isSignedIn() && firestore.exists(/databases/(default)/documents/supportRelationships/$(request.auth.uid + '_' + artistId)));
+      allow read: if isOwner(artistId);
       allow write: if isOwner(artistId) && underVideoUploadLimit() && isStoryMedia();
     }
-    // dj/ additionally requires the artist's own storiesDjEnabled opt-in —
-    // confirm this in an emulator test, it's the newest cross-service check.
     match /artists/{artistId}/stories/dj/{fileName} {
-      allow read: if isOwner(artistId)
-        || (isSignedIn() && 'dj' in firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.roles
-            && firestore.get(/databases/(default)/documents/artistProfiles/$(artistId)).data.get('storiesDjEnabled', false) == true);
+      allow read: if isOwner(artistId);
       allow write: if isOwner(artistId) && underVideoUploadLimit() && isStoryMedia();
     }
 
@@ -135,37 +139,32 @@ service firebase.storage {
     // client-side and evidence uploaded here before the claim doc itself is
     // written; only the claimant (once the claim exists) or an admin can
     // read it back. Images or PDFs, same size ceiling as images.
+    // Cross-service firestore.get()/exists() calls don't work in this
+    // project (see the previews/streaming comment above) — every branch
+    // below that depended on one always fails closed regardless of the
+    // actual claim/agreement state. Reads now go through
+    // getCopyrightEvidenceUrls (Admin SDK, checks the claim's reporterId
+    // or admin role, then lists the prefix directly and signs URLs) rather
+    // than a client-readable rule. Writes drop the ownership pre-check —
+    // claimId is an unguessable fresh ID, and submitCopyrightClaim itself
+    // validates the claim before trusting anything uploaded here.
     match /copyrightEvidence/{claimId}/{fileName} {
-      allow read: if isSignedIn() &&
-        (firestore.get(/databases/(default)/documents/copyrightClaims/$(claimId)).data.reporterId == request.auth.uid
-          || ('admin' in firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.roles));
-      // The claim doc is created *after* evidence is uploaded (claimId is a
-      // fresh client-generated ID, same upload-then-reference ordering as
-      // licenceSignatures), so the claim usually doesn't exist yet at write
-      // time — any signed-in user may write into a not-yet-existing claimId
-      // (impractical to target since it's an unguessable fresh ID). Once the
-      // claim exists, only its own reporter may write further evidence into
-      // it — this closes the gap where anyone who learns an existing claimId
-      // (e.g. the named artist, who is allowed to read the claim) could
-      // upload/overwrite files into someone else's evidence folder.
+      allow read: if false;
       allow write: if isSignedIn() && underImageUploadLimit() &&
-        (isImage() || request.resource.contentType == 'application/pdf') &&
-        (!firestore.exists(/databases/(default)/documents/copyrightClaims/$(claimId))
-          || firestore.get(/databases/(default)/documents/copyrightClaims/$(claimId)).data.reporterId == request.auth.uid);
+        (isImage() || request.resource.contentType == 'application/pdf');
     }
 
     // licenceSignatures/{agreementId}/{fileName} — drawn e-signature images.
-    // Uploaded by whichever party is signing, before calling signAgreement
-    // (same upload-then-reference ordering as copyrightEvidence). Only the
-    // two parties on the agreement (or an admin) can read them back.
-    function isPartyToAgreement(agreementId) {
-      let agreement = firestore.get(/databases/(default)/documents/licenceAgreements/$(agreementId)).data;
-      return request.auth.uid == agreement.artistId || request.auth.uid == agreement.djId;
-    }
+    // Nothing in the product currently displays a stored signature image
+    // back to anyone (ContractPage shows the legal name/typed signature,
+    // not the drawn PNG), so this stays write-only for now rather than
+    // building an unused read path — add a signed-URL callable here
+    // (matching getCopyrightEvidenceUrls) if/when the UI actually renders
+    // one. agreementId is an unguessable fresh ID; signAgreement validates
+    // the signature reference server-side before relying on it.
     match /licenceSignatures/{agreementId}/{fileName} {
-      allow read: if isSignedIn() &&
-        (isPartyToAgreement(agreementId) || ('admin' in firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.roles));
-      allow write: if isSignedIn() && isPartyToAgreement(agreementId) && underImageUploadLimit() && isImage();
+      allow read: if false;
+      allow write: if isSignedIn() && underImageUploadLimit() && isImage();
     }
 
     // exports/{uid}/{fileName} — user data exports (exportUserData). Never

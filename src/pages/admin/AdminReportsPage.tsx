@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { adminResolveReport, listCopyrightClaims, listOpenReports, reviewCopyrightClaim } from '@/services/adminService'
+import { getCopyrightEvidenceUrls } from '@/services/moderationService'
 import { Button } from '@/components/common/Button'
 import { TextArea } from '@/components/common/Input'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
@@ -23,6 +24,17 @@ export function AdminReportsPage() {
   const [claims, setClaims] = useState<CopyrightClaimDoc[] | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<Record<string, ClaimDraft>>({})
+  const [evidenceUrls, setEvidenceUrls] = useState<Record<string, string[] | 'loading'>>({})
+
+  async function loadEvidence(claimId: string) {
+    setEvidenceUrls((prev) => ({ ...prev, [claimId]: 'loading' }))
+    try {
+      const { urls } = await getCopyrightEvidenceUrls({ claimId })
+      setEvidenceUrls((prev) => ({ ...prev, [claimId]: urls }))
+    } catch {
+      setEvidenceUrls((prev) => ({ ...prev, [claimId]: [] }))
+    }
+  }
 
   useEffect(() => {
     void listOpenReports().then(setReports)
@@ -116,12 +128,22 @@ export function AdminReportsPage() {
                   ) : null}
 
                   {claim.evidenceUrls && claim.evidenceUrls.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {claim.evidenceUrls.map((url) => (
-                        <a key={url} href={url} target="_blank" rel="noreferrer" className="rounded-lg border border-surface-border px-2.5 py-1.5 text-xs text-brand-400 hover:underline">
-                          View evidence
-                        </a>
-                      ))}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {evidenceUrls[claim.claimId] === undefined ? (
+                        <Button size="sm" variant="secondary" onClick={() => loadEvidence(claim.claimId)}>
+                          Load evidence ({claim.evidenceUrls.length})
+                        </Button>
+                      ) : evidenceUrls[claim.claimId] === 'loading' ? (
+                        <span className="text-xs text-ink-3">Loading evidence…</span>
+                      ) : (evidenceUrls[claim.claimId] as string[]).length === 0 ? (
+                        <span className="text-xs text-danger-500">Could not load evidence.</span>
+                      ) : (
+                        (evidenceUrls[claim.claimId] as string[]).map((url, i) => (
+                          <a key={url} href={url} target="_blank" rel="noreferrer" className="rounded-lg border border-surface-border px-2.5 py-1.5 text-xs text-brand-400 hover:underline">
+                            View evidence {i + 1}
+                          </a>
+                        ))
+                      )}
                     </div>
                   ) : null}
 

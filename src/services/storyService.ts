@@ -74,6 +74,15 @@ export interface CreateStoryInput {
 
 export const createStory = callable<CreateStoryInput, { storyId: string }>('createStory')
 
+/**
+ * public-tier stories use story.mediaUrl directly (storage.rules makes that
+ * path genuinely public, no round-trip needed). Every other tier's media is
+ * owner-only at Storage — call this for a short-lived signed URL instead,
+ * checked server-side against the viewer's current follow/support/DJ
+ * entitlement each time rather than trusting a URL that could outlive it.
+ */
+export const getStoryMediaUrl = callable<{ storyId: string }, { url: string }>('getStoryMediaUrl')
+
 export async function deleteStory(storyId: string): Promise<void> {
   await deleteDoc(doc(db, 'stories', storyId))
 }

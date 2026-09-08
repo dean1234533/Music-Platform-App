@@ -1,5 +1,6 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
+import { getStorage } from 'firebase-admin/storage'
 import { db } from '../admin.js'
 import { requireActiveUser } from '../roles.js'
 import { requireAdmin, writeAuditLog } from './guard.js'
@@ -80,6 +81,40 @@ export const submitCopyrightClaim = onCall(async (request) => {
   })
 
   return { claimId }
+})
+
+/**
+ * Evidence files live under copyrightEvidence/{claimId}/ with no stored
+ * per-file path on the claim doc, so this lists that prefix directly via
+ * the Admin SDK (which isn't subject to Storage security rules at all,
+ * unlike a client-side firestore.get() cross-service rule check — those
+ * don't work in this project, see storage.rules) rather than trusting a
+ * client-supplied path list.
+ */
+export const getCopyrightEvidenceUrls = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
+  const { claimId } = request.data ?? {}
+  if (!claimId || typeof claimId !== 'string') throw new HttpsError('invalid-argument', 'claimId is required.')
+
+  const claimSnap = await db.collection('copyrightClaims').doc(claimId).get()
+  if (!claimSnap.exists) throw new HttpsError('not-found', 'Claim not found.')
+  const claim = claimSnap.data()!
+
+  const userSnap = await db.collection('users').doc(request.auth.uid).get()
+  const isAdmin = ((userSnap.data()?.roles ?? []) as string[]).includes('admin')
+  if (claim.reporterId !== request.auth.uid && !isAdmin) {
+    throw new HttpsError('permission-denied', 'Not authorised to view this claim’s evidence.')
+  }
+
+  const [files] = await getStorage().bucket().getFiles({ prefix: `copyrightEvidence/${claimId}/` })
+  const urls = await Promise.all(
+    files.map(async (file) => {
+      const [url] = await file.getSignedUrl({ action: 'read', expires: Date.now() + 10 * 60 * 1000 })
+      return url
+    }),
+  )
+  return { urls }
 })
 
 export const reviewCopyrightClaim = onCall(async (request) => {

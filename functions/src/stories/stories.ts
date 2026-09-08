@@ -1,5 +1,6 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
+import { getStorage } from 'firebase-admin/storage'
 import { db } from '../admin.js'
 import { requireActiveUser, userHasRole } from '../roles.js'
 
@@ -117,6 +118,62 @@ export const createStory = onCall(async (request) => {
   })
 
   return { storyId: storyRef.id }
+})
+
+async function canViewStory(uid: string | null, story: FirebaseFirestore.DocumentData): Promise<boolean> {
+  if (uid === story.artistId) return true
+  if (story.visibility === 'public') return true
+  if (!uid) return false
+
+  const userSnap = await db.collection('users').doc(uid).get()
+  const roles = (userSnap.data()?.roles ?? []) as string[]
+  if (roles.includes('admin')) return true
+
+  if (story.visibility === 'followers') {
+    return (await db.collection('follows').doc(`${uid}_${story.artistId}`).get()).exists
+  }
+  if (story.visibility === 'supporters') {
+    return (await db.collection('supportRelationships').doc(`${uid}_${story.artistId}`).get()).exists
+  }
+  if (story.visibility === 'dj') {
+    if (!roles.includes('dj')) return false
+    const artistSnap = await db.collection('artistProfiles').doc(story.artistId).get()
+    return artistSnap.data()?.storiesDjEnabled === true
+  }
+  return false
+}
+
+/**
+ * getDownloadURL() tokens are permanent and bypass Storage rules entirely
+ * once issued, so storing one directly on a followers/supporters/dj-tier
+ * story doc would let anyone who ever saw that URL keep using it after
+ * unfollowing, losing supporter status, or the artist changing their mind —
+ * the same problem getTrackPlaybackUrl solves for track audio. Public-tier
+ * stories skip this and use mediaUrl directly (storage.rules already makes
+ * artists/{artistId}/stories/public/ genuinely public, no signed URL needed).
+ */
+export const getStoryMediaUrl = onCall(async (request) => {
+  const { storyId } = request.data ?? {}
+  if (!storyId || typeof storyId !== 'string') throw new HttpsError('invalid-argument', 'storyId is required.')
+
+  const snap = await db.collection('stories').doc(storyId).get()
+  if (!snap.exists) throw new HttpsError('not-found', 'Story not found.')
+  const story = snap.data()!
+
+  if (!(await canViewStory(request.auth?.uid ?? null, story))) {
+    throw new HttpsError('permission-denied', 'You do not have access to this Story.')
+  }
+
+  const path = story.mediaStoragePath as string | null
+  if (!path) throw new HttpsError('failed-precondition', 'This Story has no media.')
+  const expectedPrefix = `artists/${story.artistId}/stories/`
+  if (!path.startsWith(expectedPrefix)) throw new HttpsError('failed-precondition', 'Invalid media path.')
+
+  const [url] = await getStorage().bucket().file(path).getSignedUrl({
+    action: 'read',
+    expires: Date.now() + 10 * 60 * 1000,
+  })
+  return { url }
 })
 
 export const toggleStoryHighlight = onCall(async (request) => {

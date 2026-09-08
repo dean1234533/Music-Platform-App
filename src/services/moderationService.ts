@@ -35,6 +35,8 @@ export const submitCopyrightClaim = callable<SubmitCopyrightClaimInput, { claimI
 
 export const submitArtistResponse = callable<{ claimId: string; response: string }, { ok: boolean }>('submitArtistResponse')
 
+export const getCopyrightEvidenceUrls = callable<{ claimId: string }, { urls: string[] }>('getCopyrightEvidenceUrls')
+
 export const submitCounterNotice = callable<{ claimId: string; counterNoticeText: string }, { ok: boolean }>(
   'submitCounterNotice',
 )
