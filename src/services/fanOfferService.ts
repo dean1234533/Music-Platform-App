@@ -63,6 +63,29 @@ export function subscribeArtistFanOffers(
   )
 }
 
+/** Platform-wide offers that an artist explicitly made available to every fan. */
+export function subscribeEveryoneFanOffers(
+  onChange: (offers: FanOfferDoc[]) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  const offersQuery = query(collection(db, 'fanOffers'), where('audience', '==', 'everyone'))
+  return onSnapshot(
+    offersQuery,
+    (snapshot) => {
+      const now = Date.now()
+      const offers = snapshot.docs
+        .map((item) => item.data() as FanOfferDoc)
+        .filter((offer) => !offer.expiresAt || offer.expiresAt.toMillis() > now)
+        .sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0))
+      onChange(offers)
+    },
+    (error) => {
+      console.error('[subscribeEveryoneFanOffers] listener error:', error)
+      onError?.(error)
+    },
+  )
+}
+
 export function subscribeVisibleFanOffers(
   artistId: string,
   viewer: { isFollowing: boolean; isSupporting: boolean },

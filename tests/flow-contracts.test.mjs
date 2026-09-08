@@ -91,6 +91,16 @@ test('the fan home feed does not repeat artists or releases across sections', ()
   assert.doesNotMatch(home, /Stories from artists you support/)
 })
 
+test('fan offers include platform-wide offers and preserve relationship access', () => {
+  const page = read('src/pages/fan/FanOffersPage.tsx')
+  const service = read('src/services/fanOfferService.ts')
+  assert.match(page, /subscribeEveryoneFanOffers\(setEveryoneOffers\)/)
+  assert.match(page, /isFollowing: followedIds\.includes\(artistId\)/)
+  assert.match(page, /isSupporting: supportedIds\.includes\(artistId\)/)
+  assert.match(page, /new Map<string, FanOfferDoc>/)
+  assert.match(service, /where\('audience', '==', 'everyone'\)/)
+})
+
 test('notifications use Firestore IDs and navigate their deep links', () => {
   assert.match(read('src/services/notificationService.ts'), /notificationId: d\.id/)
   const page = read('src/pages/fan/NotificationsPage.tsx')
