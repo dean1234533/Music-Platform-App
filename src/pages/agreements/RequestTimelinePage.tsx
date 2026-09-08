@@ -10,6 +10,7 @@ import {
 } from '@/services/licenceService'
 import { getUserProfile } from '@/services/userService'
 import { getTrack } from '@/services/trackService'
+import { getDealsByIds } from '@/services/dealService'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/StateViews'
 import { Button } from '@/components/common/Button'
@@ -18,6 +19,7 @@ import { OfferFormModal } from '@/components/licence/OfferFormModal'
 import { formatCurrency } from '@/utils/format'
 import type { LicenceAgreementDoc, LicenceOfferDoc, LicenceRequestDoc } from '@/types/licence'
 import type { TrackDoc } from '@/types/track'
+import type { DjDealDoc } from '@/types/deal'
 
 /**
  * /dj-requests/{requestId} — the replacement for the removed chat thread.
@@ -37,6 +39,7 @@ export function RequestTimelinePage() {
   const [agreement, setAgreement] = useState<LicenceAgreementDoc | null>(null)
   const [track, setTrack] = useState<TrackDoc | null>(null)
   const [djName, setDjName] = useState<string>('DJ')
+  const [sourceDeal, setSourceDeal] = useState<DjDealDoc | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [counterTarget, setCounterTarget] = useState<LicenceOfferDoc | null>(null)
   const [showSendOffer, setShowSendOffer] = useState(false)
@@ -68,6 +71,14 @@ export function RequestTimelinePage() {
     void getTrack(licenceRequest.trackId).then(setTrack)
     void getUserProfile(licenceRequest.djId).then((profile) => setDjName(profile?.displayName || 'DJ'))
   }, [licenceRequest])
+
+  useEffect(() => {
+    if (!licenceRequest?.dealId) {
+      setSourceDeal(null)
+      return
+    }
+    void getDealsByIds([licenceRequest.dealId]).then((rows) => setSourceDeal(rows[0] ?? null))
+  }, [licenceRequest?.dealId])
 
   if (licenceRequest === undefined && loadError) {
     return <ErrorState title="Something went wrong" description="Couldn't load this request. Try refreshing." />
@@ -141,6 +152,7 @@ export function RequestTimelinePage() {
             requestId={licenceRequest.requestId}
             uid={firebaseUser.uid}
             onCounter={(offer) => setCounterTarget(offer)}
+            onSendNew={isArtist ? () => setShowSendOffer(true) : undefined}
           />
         </section>
       ) : isArtist ? (
@@ -202,7 +214,7 @@ export function RequestTimelinePage() {
         <OfferFormModal requestId={licenceRequest.requestId} mode="counter" previousOffer={counterTarget} onClose={() => setCounterTarget(null)} />
       ) : null}
       {showSendOffer ? (
-        <OfferFormModal requestId={licenceRequest.requestId} mode="send" previousOffer={null} onClose={() => setShowSendOffer(false)} />
+        <OfferFormModal requestId={licenceRequest.requestId} mode="send" previousOffer={null} sourceDeal={sourceDeal} onClose={() => setShowSendOffer(false)} />
       ) : null}
     </div>
   )

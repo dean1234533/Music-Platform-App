@@ -4,11 +4,13 @@ import { FileSignature, SlidersHorizontal } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { respondToLicenceRequest, subscribeRequestsForArtist } from '@/services/licenceService'
 import { getTrack } from '@/services/trackService'
+import { getDealsByIds } from '@/services/dealService'
 import { Button } from '@/components/common/Button'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import { OfferCard } from '@/components/licence/OfferCard'
 import { OfferFormModal } from '@/components/licence/OfferFormModal'
 import type { LicenceOfferDoc, LicenceRequestDoc, LicenceRequestStatus } from '@/types/licence'
+import type { DjDealDoc } from '@/types/deal'
 
 const GROUPS: { status: LicenceRequestStatus[]; label: string }[] = [
   { status: ['submitted', 'artist_review', 'negotiating'], label: 'Needs your review' },
@@ -23,10 +25,12 @@ export function DJRequestsPage() {
   const { firebaseUser } = useAuth()
   const [requests, setRequests] = useState<LicenceRequestDoc[] | null>(null)
   const [trackTitles, setTrackTitles] = useState<Record<string, string>>({})
+  const [deals, setDeals] = useState<Record<string, DjDealDoc>>({})
   const [offerModal, setOfferModal] = useState<{
     requestId: string
     mode: 'send' | 'counter'
     previousOffer: LicenceOfferDoc | null
+    sourceDeal: DjDealDoc | null
   } | null>(null)
   const [busyRequestId, setBusyRequestId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -42,6 +46,16 @@ export function DJRequestsPage() {
     if (missing.length === 0) return
     void Promise.all(missing.map((id) => getTrack(id).then((track) => [id, track?.title ?? 'Track'] as const))).then((entries) => {
       setTrackTitles((previous) => ({ ...previous, ...Object.fromEntries(entries) }))
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requests])
+
+  useEffect(() => {
+    if (!requests) return
+    const missing = [...new Set(requests.map((request) => request.dealId).filter((id): id is string => Boolean(id) && !(id! in deals)))]
+    if (missing.length === 0) return
+    void getDealsByIds(missing).then((rows) => {
+      setDeals((previous) => ({ ...previous, ...Object.fromEntries(rows.map((deal) => [deal.dealId, deal])) }))
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requests])
@@ -81,7 +95,9 @@ export function DJRequestsPage() {
                   {group.label} ({items.length})
                 </h2>
                 <div className="grid gap-3 lg:grid-cols-2">
-                  {items.map((request) => (
+                  {items.map((request) => {
+                    const sourceDeal = request.dealId ? (deals[request.dealId] ?? null) : null
+                    return (
                     <article key={request.requestId} className="flex flex-col gap-4 rounded-2xl border border-surface-border bg-surface-1 p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div>
@@ -89,8 +105,8 @@ export function DJRequestsPage() {
                           <p className="mt-1 text-sm text-ink-2">
                             {request.dealId
                               ? request.currentAgreementId
-                                ? 'Your published deal was accepted.'
-                                : 'A DJ requested final terms for your deal.'
+                                ? `Your published deal "${sourceDeal?.name ?? 'deal'}" was accepted.`
+                                : `Requested against your deal "${sourceDeal?.name ?? 'Loading…'}"${sourceDeal ? ` (${sourceDeal.priceType.replaceAll('_', ' ')})` : ''} — set final terms below.`
                               : `Requested use: ${request.intendedUse.replaceAll('_', ' ')}`}
                           </p>
                           {!request.dealId && request.territory ? <p className="mt-1 text-xs text-ink-3">Territory: {request.territory}</p> : null}
@@ -116,15 +132,16 @@ export function DJRequestsPage() {
                           offerId={request.currentOfferId}
                           requestId={request.requestId}
                           uid={firebaseUser!.uid}
-                          onCounter={(offer) => setOfferModal({ requestId: request.requestId, mode: 'counter', previousOffer: offer })}
+                          onCounter={(offer) => setOfferModal({ requestId: request.requestId, mode: 'counter', previousOffer: offer, sourceDeal: null })}
+                          onSendNew={() => setOfferModal({ requestId: request.requestId, mode: 'send', previousOffer: null, sourceDeal })}
                         />
                       ) : request.status === 'submitted' ? (
                         <div className="flex flex-wrap gap-2">
                           <Button
                             size="sm"
-                            onClick={() => setOfferModal({ requestId: request.requestId, mode: 'send', previousOffer: null })}
+                            onClick={() => setOfferModal({ requestId: request.requestId, mode: 'send', previousOffer: null, sourceDeal })}
                           >
-                            <SlidersHorizontal className="h-4 w-4" /> Approve & set contract terms
+                            <SlidersHorizontal className="h-4 w-4" /> {sourceDeal ? 'Set final terms' : 'Approve & set contract terms'}
                           </Button>
                           <Button
                             size="sm"
@@ -141,7 +158,8 @@ export function DJRequestsPage() {
                         <p className="text-sm text-support-400">Complete. The DJ can download the licensed track.</p>
                       ) : null}
                     </article>
-                  ))}
+                    )
+                  })}
                 </div>
               </section>
             )
@@ -154,6 +172,7 @@ export function DJRequestsPage() {
           requestId={offerModal.requestId}
           mode={offerModal.mode}
           previousOffer={offerModal.previousOffer}
+          sourceDeal={offerModal.sourceDeal}
           onClose={() => setOfferModal(null)}
         />
       ) : null}

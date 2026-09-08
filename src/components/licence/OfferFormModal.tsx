@@ -4,6 +4,7 @@ import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
 import { counterOffer, sendOffer, type OfferTermsInput } from '@/services/licenceService'
 import type { LicenceOfferDoc } from '@/types/licence'
+import type { DjDealDoc } from '@/types/deal'
 
 const EMPTY: OfferTermsInput = {
   priceMinor: 0,
@@ -20,6 +21,37 @@ const EMPTY: OfferTermsInput = {
   resaleAllowed: false,
   remixAllowed: false,
   additionalTerms: '',
+  offerExpiresAt: null,
+}
+
+/**
+ * A DJ requesting a "starting from"/"negotiable"/"custom quote" deal still
+ * requested *that specific deal* — the artist finalising terms should start
+ * from what they already published, not retype it from a blank form (which
+ * defeats the point of a reusable deal and risks accidentally granting
+ * different terms than the deal actually promised).
+ */
+function fromDeal(deal: DjDealDoc): OfferTermsInput {
+  const today = new Date().toISOString().slice(0, 10)
+  const expiryDate = deal.durationDays
+    ? new Date(new Date(`${today}T00:00:00.000Z`).getTime() + deal.durationDays * 86_400_000).toISOString().slice(0, 10)
+    : null
+  return {
+    priceMinor: deal.priceMinor ?? 0,
+    currency: deal.currency,
+    permittedUse: deal.permittedUse,
+    territory: deal.territory,
+    startDate: today,
+    expiryDate,
+    recordingPermission: deal.recordingPermission,
+    streamingPermission: deal.streamingPermission,
+    promotionalMixPermission: deal.promotionalMixPermission,
+    attributionRequirements: deal.attributionRequirements,
+    redistributionAllowed: deal.redistributionAllowed,
+    resaleAllowed: deal.resaleAllowed,
+    remixAllowed: deal.remixAllowed,
+    additionalTerms: deal.venueRestrictions ? `Venue restrictions: ${deal.venueRestrictions}${deal.additionalTerms ? `\n${deal.additionalTerms}` : ''}` : deal.additionalTerms,
+  }
 }
 
 function fromOffer(offer: LicenceOfferDoc): OfferTermsInput {
@@ -45,15 +77,19 @@ export function OfferFormModal({
   requestId,
   mode,
   previousOffer,
+  sourceDeal = null,
   onClose,
 }: {
   requestId: string
   mode: 'send' | 'counter'
   previousOffer: LicenceOfferDoc | null
+  /** The artist's published deal this request was made against, if any — pre-fills the form instead of starting blank. */
+  sourceDeal?: DjDealDoc | null
   onClose: () => void
 }) {
-  const [terms, setTerms] = useState<OfferTermsInput>(previousOffer ? fromOffer(previousOffer) : EMPTY)
-  const [price, setPrice] = useState(previousOffer ? String(previousOffer.priceMinor / 100) : '0')
+  const initial = previousOffer ? fromOffer(previousOffer) : sourceDeal ? fromDeal(sourceDeal) : EMPTY
+  const [terms, setTerms] = useState<OfferTermsInput>(initial)
+  const [price, setPrice] = useState(String(initial.priceMinor / 100))
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -75,6 +111,11 @@ export function OfferFormModal({
   return (
     <Modal title={mode === 'send' ? 'Send offer' : 'Send counter-offer'} onClose={onClose}>
       <div className="flex flex-col gap-3 text-sm">
+        {sourceDeal && !previousOffer ? (
+          <p className="rounded-lg border border-brand-400/25 bg-brand-500/5 px-3 py-2 text-xs text-ink-1">
+            Pre-filled from your "{sourceDeal.name}" deal — review and adjust before sending.
+          </p>
+        ) : null}
         <div>
           <Label>Permitted use</Label>
           <Input value={terms.permittedUse} onChange={(e) => setTerms((t) => ({ ...t, permittedUse: e.target.value }))} placeholder="e.g. Non-commercial DJ sets" />
@@ -109,6 +150,17 @@ export function OfferFormModal({
               </select>
             </div>
           </div>
+        </div>
+        <div>
+          <Label>Offer expires (optional)</Label>
+          <Input
+            type="date"
+            value={terms.offerExpiresAt ?? ''}
+            onChange={(e) => setTerms((t) => ({ ...t, offerExpiresAt: e.target.value || null }))}
+          />
+          <p className="mt-1 text-xs text-ink-3">
+            If the other party hasn't accepted by this date, the offer expires automatically and can't be accepted — you can then send a fresh one.
+          </p>
         </div>
         <div>
           <Label>Attribution requirements</Label>

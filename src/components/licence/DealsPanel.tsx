@@ -4,6 +4,15 @@ import { formatCurrency } from '@/utils/format'
 import type { DjDealDoc } from '@/types/deal'
 import type { TrackDjDealSettings } from '@/types/deal'
 
+function restrictionSummary(deal: DjDealDoc): string[] {
+  const notes: string[] = []
+  if (!deal.redistributionAllowed) notes.push('No redistribution')
+  if (!deal.resaleAllowed) notes.push('No resale')
+  if (!deal.remixAllowed) notes.push('No remix')
+  if (!deal.recordingPermission) notes.push('No recording')
+  return notes
+}
+
 function priceLabel(deal: DjDealDoc): string {
   switch (deal.priceType) {
     case 'free':
@@ -62,6 +71,9 @@ export function DealsPanel({
                 .filter(Boolean)
                 .join(' · ')}
             </p>
+            {restrictionSummary(deal).length > 0 ? (
+              <p className="text-xs text-ink-3">{restrictionSummary(deal).join(' · ')}</p>
+            ) : null}
           </button>
         ))}
         <button
