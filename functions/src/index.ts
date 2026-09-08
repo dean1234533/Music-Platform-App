@@ -29,7 +29,6 @@ export { promotePendingBalances } from './payouts/promoteBalances.js'
 export { submitVerificationRequest, reviewVerificationRequest } from './admin/verification.js'
 export { submitCopyrightClaim, reviewCopyrightClaim, submitArtistResponse, submitCounterNotice, getCopyrightEvidenceUrls } from './admin/copyright.js'
 export { adminSetUserSuspension, adminSetTrackTakedown, adminDeleteStory } from './admin/moderation.js'
-export { blockSuspendedSignIn } from './admin/enforceSuspension.js'
 export { submitReport, adminResolveReport } from './admin/reports.js'
 export { adminUpsertSubscriptionPlan, adminUpdatePlatformSettings } from './admin/settings.js'
 

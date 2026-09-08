@@ -3,12 +3,21 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { AuthLayout } from './AuthLayout'
 import { Input, Label } from '@/components/common/Input'
 import { Button } from '@/components/common/Button'
-import { signInWithEmail, signInWithGoogle } from '@/services/authService'
+import { signInWithEmail, signInWithGoogle, signOut } from '@/services/authService'
 import { friendlyAuthError } from '@/utils/authErrors'
 import { getUserProfile } from '@/services/userService'
 
+const SUSPENDED_MESSAGE = 'This account has been suspended. Contact support if you believe this is a mistake.'
+
+/** Thrown to short-circuit sign-in for a suspended account before it ever reaches a protected route. */
+class SuspendedAccountError extends Error {}
+
 async function dashboardAfterSignIn(uid: string): Promise<string> {
   const profile = await getUserProfile(uid)
+  if (profile?.suspended) {
+    await signOut()
+    throw new SuspendedAccountError(SUSPENDED_MESSAGE)
+  }
   if (!profile?.onboardingComplete) return '/onboarding'
   if (profile.roles.includes('admin')) return '/admin/users'
   if (profile.roles.includes('artist')) return '/dashboard/artist'
@@ -36,7 +45,7 @@ export function SignInPage() {
       const credential = await signInWithEmail(email, password)
       navigate(redirectTo ?? (await dashboardAfterSignIn(credential.user.uid)))
     } catch (err) {
-      setError(friendlyAuthError(err))
+      setError(err instanceof SuspendedAccountError ? err.message : friendlyAuthError(err))
     } finally {
       setLoading(false)
     }
@@ -49,7 +58,7 @@ export function SignInPage() {
       const credential = await signInWithGoogle()
       navigate(redirectTo ?? (await dashboardAfterSignIn(credential.user.uid)))
     } catch (err) {
-      setError(friendlyAuthError(err))
+      setError(err instanceof SuspendedAccountError ? err.message : friendlyAuthError(err))
     } finally {
       setGoogleLoading(false)
     }
