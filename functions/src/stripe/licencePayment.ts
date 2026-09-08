@@ -31,7 +31,11 @@ export const createLicencePaymentSession = onCall({ secrets: [stripeSecretKey] }
   }
 
   const trackSnap = await db.collection('tracks').doc(agreement.trackId).get()
-  const trackTitle = trackSnap.data()?.title ?? 'Track licence'
+  const track = trackSnap.data()
+  if (track && (track.takenDown === true || (track.restrictedCapabilities ?? []).includes('dj_licensing'))) {
+    throw new HttpsError('failed-precondition', 'This track is under a copyright review — payment is temporarily unavailable.')
+  }
+  const trackTitle = track?.title ?? 'Track licence'
   const settings = await getPlatformSettings()
   const platformFeeMinor = Math.round(agreement.licenceFeeMinor * (settings.djServiceFeePercent / 100))
   const artistNetMinor = agreement.licenceFeeMinor - platformFeeMinor

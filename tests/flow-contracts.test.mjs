@@ -185,6 +185,60 @@ test('playback and track deletion are server-authorised', () => {
   assert.match(storage, /match \/artists\/\{artistId\}\/previews\/\{fileName\}[\s\S]*?allow read: if isOwner\(artistId\)/)
 })
 
+test('copyright-restricted tracks are gated out of new DJ requests, contracts, payments, and downloads', () => {
+  const requests = read('functions/src/licensing/requests.ts')
+  const offers = read('functions/src/licensing/offers.ts')
+  const payment = read('functions/src/stripe/licencePayment.ts')
+  const downloads = read('functions/src/licensing/downloads.ts')
+  assert.match(requests, /dj_licensing/)
+  assert.match(offers, /dj_licensing/)
+  assert.match(payment, /dj_licensing/)
+  assert.match(downloads, /dj_licensing/)
+  assert.match(requests, /not available for new DJ requests/)
+  assert.match(offers, /no new contract can be generated/)
+  assert.match(payment, /payment is temporarily unavailable/)
+  assert.match(downloads, /downloads are temporarily unavailable/)
+  // A restricted/removed track's existing signed history is never deleted by this gating.
+  assert.doesNotMatch(downloads, /\.delete\(\)/)
+})
+
+test('reporting an agreement problem never rewrites the contract and reaches an audited admin action', () => {
+  const contract = read('src/pages/agreements/ContractPage.tsx')
+  const reports = read('functions/src/admin/reports.ts')
+  const adminReportsPage = read('src/pages/admin/AdminReportsPage.tsx')
+  const moderationTypes = read('src/types/moderation.ts')
+  assert.match(contract, /Report a problem with this agreement/)
+  assert.match(contract, /targetType: 'agreement'/)
+  const reportModalBody = contract.slice(contract.indexOf('function ReportAgreementModal'))
+  assert.doesNotMatch(reportModalBody, /signAgreement|voidAgreement|acceptOffer/)
+  assert.match(reports, /'agreement'/)
+  assert.match(moderationTypes, /'agreement'/)
+  assert.match(adminReportsPage, /Place legal hold/)
+  assert.match(adminReportsPage, /adminSetLegalHold/)
+  assert.match(read('functions/src/admin/retentionSettings.ts'), /writeAuditLog\(adminId, 'set_legal_hold'/)
+})
+
+test('the DJ<->artist request timeline replaces chat with a real backend-event activity feed', () => {
+  const app = read('src/App.tsx')
+  const page = read('src/pages/agreements/RequestTimelinePage.tsx')
+  assert.match(app, /path="\/dj-requests\/:requestId"/)
+  assert.match(page, /subscribeOffersForRequest/)
+  assert.match(page, /buildTimelineEvents/)
+  assert.match(page, /NextActionBanner/)
+  assert.match(page, /Your action required/)
+  assert.match(page, /Waiting for the/)
+  assert.doesNotMatch(page, /<textarea|sendMessage|conversationId/)
+  assert.match(read('src/services/licenceService.ts'), /subscribeOffersForRequest/)
+  assert.match(read('src/pages/dj/DJRequestsPage.tsx'), /\/dj-requests\/\$\{request\.requestId\}/)
+  assert.match(read('src/pages/artist/dashboard/DJRequestsPage.tsx'), /\/dj-requests\/\$\{request\.requestId\}/)
+})
+
+test('the contract page states the DJ receives only the listed rights, not ownership', () => {
+  const contract = read('src/pages/agreements/ContractPage.tsx')
+  assert.match(contract, /no ownership, resale,\s*\n\s*redistribution, remix, synchronisation, publishing, or master-recording rights/)
+  assert.match(contract, /REQUIRES QUALIFIED MUSIC\/IP LEGAL\s*\n\s*REVIEW BEFORE PRODUCTION/)
+})
+
 test('player clears user-bound state on logout or account switch', () => {
   const player = read('src/contexts/PlayerContext.tsx')
   assert.match(player, /previousUserId && previousUserId !== nextUserId/)

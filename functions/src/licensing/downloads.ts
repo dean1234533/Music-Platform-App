@@ -60,6 +60,9 @@ export const getSecureDownloadUrl = onCall(async (request) => {
   if (track.artistId !== agreement.artistId) {
     throw new HttpsError('failed-precondition', 'Track/artist mismatch on this agreement.')
   }
+  if (track.takenDown === true || (track.restrictedCapabilities ?? []).includes('dj_licensing')) {
+    throw new HttpsError('permission-denied', 'This track is under a copyright review — downloads are temporarily unavailable. Your signed agreement record is preserved.')
+  }
 
   const bucket = getStorage().bucket()
   const file = bucket.file(track.originalAudioPath as string)

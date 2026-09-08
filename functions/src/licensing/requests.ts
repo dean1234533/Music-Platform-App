@@ -49,6 +49,9 @@ export const submitLicenceRequest = onCall(async (request) => {
   const trackSnap = await db.collection('tracks').doc(trackId).get()
   if (!trackSnap.exists) throw new HttpsError('not-found', 'Track not found.')
   const track = trackSnap.data()!
+  if (track.takenDown === true || (track.restrictedCapabilities ?? []).includes('dj_licensing')) {
+    throw new HttpsError('failed-precondition', 'This track is under a copyright review and is not available for new DJ requests.')
+  }
   const dealSettings = track.djDealSettings as
     | { acceptDjRequests: boolean; allowedDealIds: string[]; verifiedDjsOnly: boolean }
     | undefined

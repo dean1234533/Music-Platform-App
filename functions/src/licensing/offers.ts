@@ -179,6 +179,12 @@ export const acceptOffer = onCall(async (request) => {
   if (offer.status !== 'pending') throw new HttpsError('failed-precondition', 'This offer is no longer pending.')
   if (offer.createdBy === uid) throw new HttpsError('failed-precondition', 'You cannot accept your own offer.')
 
+  const trackSnap = await db.collection('tracks').doc(licenceRequest.trackId).get()
+  const track = trackSnap.data()
+  if (track && (track.takenDown === true || (track.restrictedCapabilities ?? []).includes('dj_licensing'))) {
+    throw new HttpsError('failed-precondition', 'This track is under a copyright review — no new contract can be generated for it right now.')
+  }
+
   const terms: AgreementTerms = {
     permittedUse: offer.permittedUse,
     territory: offer.territory,
