@@ -237,6 +237,34 @@ test('the DJ<->artist request timeline replaces chat with a real backend-event a
   assert.match(read('src/pages/artist/dashboard/DJRequestsPage.tsx'), /\/dj-requests\/\$\{request\.requestId\}/)
 })
 
+test('offers may carry an optional acceptance deadline: cannot accept once expired, artist may reissue', () => {
+  const offersFn = read('functions/src/licensing/offers.ts')
+  const offerType = read('src/types/licence.ts')
+  const form = read('src/components/licence/OfferFormModal.tsx')
+  const card = read('src/components/licence/OfferCard.tsx')
+  assert.match(offerType, /offerExpiresAt: Timestamp \| null/)
+  assert.match(offersFn, /offerExpiresAt\?: string \| null/)
+  // acceptOffer must reject an expired offer instead of generating a contract from stale terms.
+  assert.match(offersFn, /acceptOfferExpiresAt[\s\S]*?This offer has expired and can no longer be accepted/)
+  // counterOffer must reject countering an already-expired offer.
+  assert.match(offersFn, /previousExpiresAt[\s\S]*?This offer has expired and can no longer be countered/)
+  // sendOffer's "one offer at a time" guard must relax specifically when the existing offer expired unaccepted.
+  assert.match(offersFn, /existingExpired/)
+  assert.match(offersFn, /use counterOffer instead/)
+  assert.match(form, /Offer expires \(optional\)/)
+  assert.match(card, /Offer Expired/)
+  assert.match(card, /onSendNew/)
+})
+
+test('an active contract past its own licence expiryDate transitions to expired and notifies both parties', () => {
+  const cleanup = read('functions/src/retention/cleanup.ts')
+  const index = read('functions/src/index.ts')
+  assert.match(cleanup, /export const expireActiveContracts = onSchedule/)
+  assert.match(cleanup, /status: 'expired'/)
+  assert.match(cleanup, /type: 'contract_expired'/)
+  assert.match(index, /expireActiveContracts/)
+})
+
 test('the contract page states the DJ receives only the listed rights, not ownership', () => {
   const contract = read('src/pages/agreements/ContractPage.tsx')
   assert.match(contract, /no ownership, resale,\s*\n\s*redistribution, remix, synchronisation, publishing, or master-recording rights/)

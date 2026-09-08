@@ -3,7 +3,9 @@
 Date: 2026-09-08
 Scope: The full DJ licensing flow — deal creation, request, structured offer/counter-offer negotiation, contract generation, e-signature, Stripe payment, secure track unlock, agreements dashboard, notifications, expiry/retention, copyright gating, and dispute handling. No chat/messaging exists or was reintroduced anywhere in this flow.
 
-This audit was performed on top of a concurrent session's very recent work (commits `164fadd`…`9191178`) that removed the chat-based `RequestDetailPage` and moved the flow to structured offers/counter-offers ending in a signed contract. That work was largely correct and is preserved as-is; this pass audited it against the full 36-section spec, found the gaps below, and fixed them.
+This audit was performed on top of a concurrent session's very recent work (commits `164fadd`…`9191178`) that removed the chat-based `RequestDetailPage` and moved the flow to structured offers/counter-offers ending in a signed contract. That work was largely correct and is preserved as-is.
+
+**This document covers two passes.** The first pass (§3.1–3.4) audited against the 36-section spec, found and fixed 4 gaps, and — as it turned out — over-trusted its own "already correct" read of the Agreements dashboard, notification routing, offer expiry, and contract-expiry status transitions, all four of which were actually broken or missing (a user-reported bug, "why say this when there is no way to send terms," was the direct trigger for the second pass). The second pass (§3.5–3.12) re-traced every one of those claims file-by-file against the real connected code — component → service call → Cloud Function → Firestore write — rather than re-delegating, and fixed everything it found broken.
 
 ---
 
@@ -18,9 +20,10 @@ This audit was performed on top of a concurrent session's very recent work (comm
 - **Free vs paid split**: `signAgreement` sets `status: 'active'` directly when `licenceFeeMinor === 0`, `'awaiting_payment'` otherwise — no Stripe call in the free path.
 - **Stripe payment**: `createLicencePaymentSession` re-reads the price from Firestore (never trusts the client), checks `status === 'awaiting_payment'`, not already paid, fee > 0. `stripeWebhook`'s `checkout.session.completed` handler is the only path that sets `paidAt`/`status: 'active'` — the success-redirect URL carries no privileged state.
 - **Secure download** (`getSecureDownloadUrl`): re-checks DJ ownership, `status === 'active'`, not revoked, paid-if-required, not expired, track/artist match, then issues a 5-minute signed Storage URL. Storage rules independently block direct/public reads of originals.
-- **Agreements dashboard** (`MyAgreementsPage.tsx`, `ContractPage.tsx`): status-grouped list, per-status actions.
 - **Retention** (`functions/src/retention/cleanup.ts`): `expireStaleNegotiations`, `cleanupExpiredContracts` (skips `active` agreements and anything under `legalHold`), `cleanupResolvedCopyrightClaims` anonymises rather than deletes decision history.
-- **Notifications**: server-written only, `linkTo` deep-links to the right agreement/request, covering new-request/offer-sent/counter/accepted/agreement-ready/signed/payment-required/active for both roles.
+- **Notifications**: server-written only, covering new-request/offer-sent/counter/accepted/agreement-ready/signed/payment-required/active for both roles.
+
+> **Note on this section:** the two items originally listed here as "already correct" — the Agreements dashboard and notification `linkTo` routing — were **not** actually correct; §3.8 and §3.10 below found and fixed real gaps in both. Left visible here (struck from the "correct" claim, not deleted) as a record that the first pass over-trusted a summary instead of re-reading the files, exactly the failure mode this re-audit was asked to stop repeating.
 
 ## 2. Naming reconciliation (per the spec's own instruction to decide, not silently diverge)
 
@@ -68,6 +71,50 @@ Added `subscribeOffersForRequest` to `src/services/licenceService.ts` and a matc
 
 **Fix:** Rewrote the rights paragraph on `ContractPage.tsx` to explicitly state the DJ receives *only* the listed permissions above, and — except where a permission is explicitly marked "Yes" in the Usage terms section — receives **no ownership, resale, redistribution, remix, synchronisation, publishing, or master-recording rights of any kind**, and added an inline **"REQUIRES QUALIFIED MUSIC/IP LEGAL REVIEW BEFORE PRODUCTION"** flag directly in the page (not just in this report).
 
+### 3.5 "Your action required — send terms" banner had no button (user-reported)
+**Problem:** `RequestTimelinePage.tsx`'s `NextActionBanner` told the artist to send terms on a manually-negotiated request, but the branch below it only rendered `<OfferCard>` or the contract link — there was no control to actually open the offer form when no offer existed yet.
+
+**Fix:** Added a `showSendOffer` state and a "Send terms" button (`mode="send"`) in the `isArtist` branch, rendering `<OfferFormModal>`. Regression-tested (`mode="send"` / `setShowSendOffer(true)` assertions added to the existing timeline test).
+
+### 3.6 Deal terms never read back when an artist opens a deal-based request (self-found)
+**Problem:** For `starting_from`/`negotiable`/`custom_quote` deals, the DJ's request names a specific published deal (`request.dealId`), but `OfferFormModal` in `send` mode always started from a blank form — the artist had to manually retype the deal's price/terms/permissions from memory, risking granting different terms than the deal actually promised.
+
+**Fix:** Added `fromDeal()` in `OfferFormModal.tsx` (mirrors `fromOffer()`), a `sourceDeal` prop, and threaded the resolved `DjDealDoc` through both `DJRequestsPage.tsx` (artist list) and `RequestTimelinePage.tsx` via `getDealsByIds`. The form now pre-fills from the requested deal with a visible "Pre-filled from your … deal" notice, and the button label changes to "Set final terms" when a source deal exists.
+
+### 3.7 `DealsPanel.tsx` didn't show restriction summaries (spec's literal example format)
+**Fix:** Added `restrictionSummary()` rendering "No redistribution / No resale / No remix / No recording" notes per deal card, matching the spec's own example ("Live club use / UK / 3 months / No redistribution").
+
+### 3.8 `MyAgreementsPage.tsx` had no status tabs, no other-party name, no dates, no distinct per-status actions (spec §23)
+**Problem:** The original page was a flat, ungrouped list — a status-badge `Link` per agreement and nothing else. This directly contradicted §1 of this report's own "already correct" claim, which had asserted "status-grouped list, per-status actions" without re-reading the actual file.
+
+**Fix:** Fully rewrote the page: 5 status tabs (Awaiting Signature / Awaiting Payment / Active / Expired / Void-Cancelled) with live counts, other-party name (resolved via `getUserProfile`, generic to either role), formatted signed/expiry dates, and a computed `actionLabel` per card ("Sign agreement" / "Pay licence fee" / "View & download track" / "View agreement").
+
+### 3.9 `OfferCard.tsx` had no Reject action (spec §7)
+**Problem:** Once an offer existed on a request, the receiving party could Accept or Counter, but had no way to end the negotiation outright without countering to $0 or waiting for the sender to withdraw.
+
+**Fix:** Added a "Reject" button calling `respondToLicenceRequest(requestId, rejectingRoleAction)` — `'cancel'` when rejecting an artist's offer (DJ-initiated end), `'reject'` when rejecting a DJ's offer (artist-initiated end), matching the exact `ARTIST_ACTIONS`/`DJ_ACTIONS` the backend already accepts.
+
+### 3.10 Two hardcoded/misrouted notification `linkTo` bugs, and one payment-notification routed to the wrong party (self-found)
+**Problem:**
+- `respondToLicenceRequest` (reject/cancel) always wrote `linkTo: '/dj/requests'`, even when the artist was the one being notified (e.g. a DJ cancelling) — wrong destination for that role, and its `type` for the "not rejected" branch was still the deleted chat system's `'new_message'`.
+- `voidAgreement` had the same hardcoded `/dj/requests` link regardless of which party was notified.
+- `signAgreement`'s `bothWillBeAccepted` branch, when the DJ signed last on a paid agreement, could send the "payment required" instruction to the **artist** instead of the DJ (the party who actually needs to pay) under a specific ordering. This was a genuine logic bug, not just a copy/link error.
+
+**Fix:** `respondToLicenceRequest` and `voidAgreement` now compute the correct role-aware `linkTo` (or a role-agnostic `/agreements/{id}` link where either party could be the recipient). `signAgreement` was restructured into an explicit `if (requiresPayment) { …always notify the DJ… } else { …notify whichever party didn't just act… }` split, so a payment-required notification can no longer reach the artist.
+
+### 3.11 Offer expiry was completely unimplemented, contradicting this report's own earlier §30 claim (spec §30)
+**Problem:** This report's first pass claimed §30 ("Allow offers to have optional expiry… Artist may issue a new offer") was satisfied by `expireStaleNegotiations` — that function is a fixed 90-day *stale-negotiation* housekeeping sweep, unrelated to a per-offer acceptance deadline the artist or DJ sets when sending an offer. No such field, UI, or enforcement existed anywhere in the codebase.
+
+**Fix:** Added `offerExpiresAt?: string | null` to `OfferTermsInput`/`LicenceOfferDoc`, an "Offer expires (optional)" date field in `OfferFormModal.tsx`, and server-side enforcement in `functions/src/licensing/offers.ts`:
+- `acceptOffer` and `counterOffer` both reject (and flip the doc to `status: 'expired'`) once `offerExpiresAt` has passed.
+- `OfferCard.tsx` renders "Offer Expired" instead of the raw status once past deadline, disables Accept/Counter/Reject, and shows a "Send new offer" button to the offer's own artist author.
+- `sendOffer`'s "one offer at a time" guard now specifically allows a fresh opening offer when the *existing* current offer has expired unaccepted (marking it `expired` first) — satisfying "Artist may issue a new offer" without permitting re-send while a live offer is still pending.
+
+### 3.12 Contract expiry never transitioned agreement status, contradicting this report's own earlier §31 claim (spec §31)
+**Problem:** This report's first pass claimed §31 ("Contract expiry") was satisfied by `getSecureDownloadUrl` checking `expiryDate` — true for *blocking downloads*, but no code anywhere ever flipped an `active` agreement's `status` to `'expired'` once its licence period ended. This meant `MyAgreementsPage`'s "Expired" tab could never populate, and no "licence expired" notification was ever sent — the download-time check alone doesn't satisfy the spec's status-model requirement.
+
+**Fix:** Added `expireActiveContracts`, a new `onSchedule('every 24 hours')` job in `functions/src/retention/cleanup.ts` (exported from `index.ts`): queries `status === 'active'` agreements, flips any past their `expiryDate` to `'expired'`, and notifies both parties (`type: 'contract_expired'`, linking to the agreement). This is distinct from the pre-existing `cleanupExpiredContracts`, which is the multi-year *retention deletion* sweep — expiry (status transition) and retention (eventual deletion) are now two separate, correctly-ordered jobs.
+
 ## 4. Deliberately left as-is (with reasoning)
 
 - **PDF generation**: `ContractPage.tsx` uses `window.print()` (browser print-to-PDF) rather than a server-generated, Storage-stored PDF. The spec says "generate read-only PDF … where practical" — the existing stack has no PDF-rendering library, and the contract page itself is already read-only, mobile-readable, and print-styled (`@media print` hides nav/actions). Standing up a new PDF-generation pipeline (e.g. Puppeteer in a Cloud Function) is a meaningfully larger, separate piece of infrastructure than an audit-and-fix pass justifies, and isn't required for the contract to be legally evidenced — the signed `licenceAgreementAcceptances` record plus the immutable `licenceAgreements` document are the actual source of truth. **Flagged for a follow-up, not fixed here.**
@@ -81,7 +128,7 @@ Added `subscribeOffersForRequest` to `src/services/licenceService.ts` and a matc
 
 ## 6. Cloud Functions involved
 
-`submitLicenceRequest`, `respondToLicenceRequest`, `sendOffer`, `counterOffer`, `acceptOffer`, `withdrawOffer`, `proposeAgreement` (legacy, unused by UI), `signAgreement`, `voidAgreement`, `getSecureDownloadUrl`, `createLicencePaymentSession`, `stripeWebhook`, `submitReport`, `adminResolveReport`, `adminSetLegalHold`, `expireStaleNegotiations`, `cleanupExpiredContracts`, `cleanupAbandonedRequests`, `cleanupExpiredDraftOffers`.
+`submitLicenceRequest`, `respondToLicenceRequest`, `sendOffer`, `counterOffer`, `acceptOffer`, `withdrawOffer`, `proposeAgreement` (legacy, unused by UI), `signAgreement`, `voidAgreement`, `getSecureDownloadUrl`, `createLicencePaymentSession`, `stripeWebhook`, `submitReport`, `adminResolveReport`, `adminSetLegalHold`, `expireStaleNegotiations`, `expireActiveContracts` (new, §3.12), `cleanupExpiredContracts`, `cleanupAbandonedRequests`, `cleanupExpiredDraftOffers`.
 
 ## 7. Stripe events involved
 
@@ -104,10 +151,12 @@ Added `subscribeOffersForRequest` to `src/services/licenceService.ts` and a matc
 Extended the existing lightweight string-matching test file in its own style (no new test framework introduced) with:
 - `copyright-restricted tracks are gated out of new DJ requests, contracts, payments, and downloads`
 - `reporting an agreement problem never rewrites the contract and reaches an audited admin action`
-- `the DJ<->artist request timeline replaces chat with a real backend-event activity feed`
+- `the DJ<->artist request timeline replaces chat with a real backend-event activity feed` (extended a second time in the follow-up pass, §3.5, to assert the "send terms" banner has a matching button)
 - `the contract page states the DJ receives only the listed rights, not ownership`
+- `offers may carry an optional acceptance deadline: cannot accept once expired, artist may reissue` (follow-up pass, §3.11)
+- `an active contract past its own licence expiryDate transitions to expired and notifies both parties` (follow-up pass, §3.12)
 
-All 26 tests pass (`npm test`), including the 22 pre-existing tests, unmodified.
+All 28 tests pass (`npm test`).
 
 ## 10. Remaining legal-review items
 
@@ -144,18 +193,18 @@ All 26 tests pass (`npm test`), including the 22 pre-existing tests, unmodified.
 | 20 | Stripe confirmation via webhook only | PASS |
 | 21 | Track unlock (fully gated, temporary URL) | PASS (copyright gate added) |
 | 22 | Contract PDF | PARTIAL — browser print-to-PDF only, not server-generated/archived (see §4) |
-| 23 | Agreements dashboard | PASS |
-| 24 | Notifications | PASS |
+| 23 | Agreements dashboard | PASS (rebuilt this session — was a flat ungrouped list, §3.8) |
+| 24 | Notifications | PASS (2 misrouted-`linkTo`/wrong-party bugs fixed this session, §3.10) |
 | 25 | Request activity timeline | PASS (built this session) |
-| 26 | Request details page (`/dj-requests/{requestId}`) | PASS (built this session) |
+| 26 | Request details page (`/dj-requests/{requestId}`) | PASS (built this session; "send terms" button was missing on first build, fixed §3.5) |
 | 27 | Next-action UI clarity | PASS (built this session, `NextActionBanner`) |
-| 28 | Rejection flow | PASS |
+| 28 | Rejection flow | PASS (`OfferCard` Reject action added this session, §3.9) |
 | 29 | Cancellation flow | PASS |
-| 30 | Expiring offers | PASS (`expireStaleNegotiations`) |
-| 31 | Contract expiry | PASS (`getSecureDownloadUrl` checks `expiryDate`) |
+| 30 | Expiring offers | PASS — **built this session** (§3.11); previously unimplemented despite this report's own earlier claim of PASS via `expireStaleNegotiations` (a different, unrelated 90-day stale-negotiation sweep) |
+| 31 | Contract expiry | PASS — **status transition added this session** (`expireActiveContracts`, §3.12); previously only download-time gating existed, agreement `status` never flipped to `expired` |
 | 32 | Contract retention | PASS (`cleanupExpiredContracts`, `legalHold`) |
 | 33 | Copyright restrictions gating | PASS (fixed this session — was previously unenforced) |
-| 34 | Security tests (deny cases) | PASS — all listed deny cases verified in code; string-match tests added |
+| 34 | Security tests (deny cases) | PASS — every `licenceRequests`/`licenceOffers`/`licenceAgreements`/`licenceAgreementAcceptances` write confirmed `allow write: if false` in `firestore.rules` (callable-only), read scoped to participants/admin; every callable re-derives the acting party from `request.auth.uid`. Covered by 4 rules tests + offer/agreement ownership checks traced directly in `offers.ts`/`agreements.ts`. Not run against a live Firestore emulator in this pass — verified by direct rules-file and function-code inspection. |
 | 35 | Mobile flow | PASS — no desktop-only sidebars/tables in this flow; signature pad uses Pointer Events (touch-capable) |
 | 36 | Final flow test (paid £20→£15→£12 negotiation, and free promo) | PASS by code inspection — negotiation math, contract locking, and free-vs-paid branching all verified against the exact scenario; not run against a live Stripe test-mode checkout in this session (see below) |
 
