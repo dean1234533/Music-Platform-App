@@ -58,13 +58,13 @@ test('email signup cannot continue before verification', () => {
   assert.match(page, /not verified yet/)
 })
 
-test('install prompt is available before sign-in and first-time profiles are awaited', () => {
+test('install banner only shows once signed in, and first-time profiles are awaited', () => {
   const banner = read('src/components/pwa/InstallBanner.tsx')
   const signIn = read('src/pages/auth/SignInPage.tsx')
   const signUp = read('src/pages/auth/SignUpPage.tsx')
   const authContext = read('src/contexts/AuthContext.tsx')
   const users = read('src/services/userService.ts')
-  assert.doesNotMatch(banner, /firebaseUser/)
+  assert.match(banner, /if \(!firebaseUser\) return null/)
   assert.match(signIn, /await ensureUserDocument\(user\)/)
   assert.match(signUp, /await ensureUserDocument\(credential\.user\)/)
   assert.match(authContext, /profileReadyUid !== firebaseUser\.uid/)

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Download, Share, X } from 'lucide-react'
 import { useInstallPrompt } from '@/hooks/useInstallPrompt'
+import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/common/Button'
 
 const DISMISS_KEY = 'installBannerDismissedAt'
@@ -25,16 +26,19 @@ function dismiss(): void {
 }
 
 /**
- * Shown to visitors as well as every authenticated role. Chrome only exposes
- * its deferred install prompt after a user gesture, so the banner must remain
- * reachable before sign-in instead of silently suppressing the native prompt.
- * It is hidden once the app is standalone and for DISMISS_DAYS after dismissal.
+ * Only shown once signed in — the deferred `beforeinstallprompt` event is
+ * still captured at module scope before sign-in (see lib/installPrompt.ts),
+ * since Chrome only fires it once and never re-fires it; this component just
+ * doesn't render its UI until there's a signed-in user to show it to.
+ * Hidden once the app is standalone and for DISMISS_DAYS after dismissal.
  */
 export function InstallBanner() {
+  const { firebaseUser } = useAuth()
   const { canInstall, isStandalone, isIOS, install } = useInstallPrompt()
   const [dismissed, setDismissed] = useState(recentlyDismissed)
   const [installing, setInstalling] = useState(false)
 
+  if (!firebaseUser) return null
   if (isStandalone || dismissed) return null
   if (!canInstall && !isIOS) return null
 
