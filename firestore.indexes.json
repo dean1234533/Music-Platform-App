@@ -299,6 +299,14 @@
       ]
     },
     {
+      "collectionGroup": "licenceOffers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "requestId", "order": "ASCENDING" },
+        { "fieldPath": "version", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "copyrightClaims",
       "queryScope": "COLLECTION",
       "fields": [

@@ -100,6 +100,10 @@ export function DJRequestsPage() {
                         ) : null}
                       </div>
 
+                      <Link to={`/dj-requests/${request.requestId}`} className="w-fit text-xs font-medium text-brand-400 hover:text-brand-300">
+                        View request details & activity
+                      </Link>
+
                       {request.currentAgreementId ? (
                         <Link
                           to={`/agreements/${request.currentAgreementId}`}

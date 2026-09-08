@@ -372,6 +372,9 @@ function RequestRow({
         </span>
         <span className="rounded-full bg-surface-3 px-2.5 py-1 text-xs text-ink-1">{STATUS_LABEL[request.status] ?? request.status}</span>
       </div>
+      <Link to={`/dj-requests/${request.requestId}`} className="w-fit text-xs font-medium text-dj-400 hover:text-dj-300">
+        View request details & activity
+      </Link>
       {request.currentAgreementId ? (
         <Link
           to={`/agreements/${request.currentAgreementId}`}

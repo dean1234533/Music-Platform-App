@@ -69,6 +69,7 @@ const DJAnalyticsPage = lazy(() => import('@/pages/dj/DJAnalyticsPage').then((m)
 const TrackPage = lazy(() => import('@/pages/track/TrackPage').then((m) => ({ default: m.TrackPage })))
 const MyAgreementsPage = lazy(() => import('@/pages/agreements/MyAgreementsPage').then((m) => ({ default: m.MyAgreementsPage })))
 const ContractPage = lazy(() => import('@/pages/agreements/ContractPage').then((m) => ({ default: m.ContractPage })))
+const RequestTimelinePage = lazy(() => import('@/pages/agreements/RequestTimelinePage').then((m) => ({ default: m.RequestTimelinePage })))
 
 const AdminDashboardLayout = lazy(() => import('@/pages/admin/AdminDashboardLayout').then((m) => ({ default: m.AdminDashboardLayout })))
 const AdminUsersPage = lazy(() => import('@/pages/admin/AdminUsersPage').then((m) => ({ default: m.AdminUsersPage })))
@@ -139,6 +140,14 @@ function App() {
             <Route path="/artist/:slug/track/:trackId" element={<TrackPage />} />
             <Route path="/track/:trackId" element={<TrackPage />} />
             <Route path="/requests/:requestId" element={<Navigate to="/agreements" replace />} />
+            <Route
+              path="/dj-requests/:requestId"
+              element={
+                <ProtectedRoute>
+                  <RequestTimelinePage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/agreements"
               element={

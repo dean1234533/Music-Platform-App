@@ -162,6 +162,23 @@ export async function uploadDrawnSignature(agreementId: string, uid: string, blo
   return getDownloadURL(snap.ref)
 }
 
+/** Full offer/counter-offer history for a request, oldest first — the backbone of the request activity timeline. Never mutated, only appended to. */
+export function subscribeOffersForRequest(
+  requestId: string,
+  onChange: (offers: LicenceOfferDoc[]) => void,
+  onError?: (error: Error) => void,
+) {
+  const q = query(collection(db, 'licenceOffers'), where('requestId', '==', requestId), orderBy('version', 'asc'))
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map((d) => d.data() as LicenceOfferDoc)),
+    (error) => {
+      console.error('[subscribeOffersForRequest] listener error:', error)
+      onError?.(error)
+    },
+  )
+}
+
 export function subscribeOffer(
   offerId: string,
   onChange: (offer: LicenceOfferDoc | null) => void,
