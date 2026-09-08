@@ -153,7 +153,7 @@ export function ArtistPublicProfilePage() {
   return (
     <div className="min-h-svh overflow-hidden bg-surface-0 pb-24 text-ink-0">
       <header className="relative z-30 mx-auto flex h-20 max-w-[1440px] items-center justify-between px-5 sm:px-8 lg:px-12">
-        <Link to="/" aria-label="Wavelength home"><BrandMark /></Link>
+        <Link to="/" aria-label="BackTheVibes home"><BrandMark /></Link>
         <Link to="/app/discover" className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-ink-1 transition hover:border-white/20 hover:text-white">
           <ArrowLeft className="h-4 w-4" /> Discover
         </Link>
@@ -223,7 +223,7 @@ export function ArtistPublicProfilePage() {
             <ShareButton
               url={artistShareUrl(artist.slug)}
               title={artist.name}
-              text={`Check out ${artist.name} on Wavelength`}
+              text={`Check out ${artist.name} on BackTheVibes`}
             />
           </div>
           </div>
@@ -276,7 +276,7 @@ export function ArtistPublicProfilePage() {
           <aside className="space-y-4">
             <div className="rounded-[1.5rem] border border-white/[0.08] bg-white/[0.025] p-6">
               <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-ink-3">About</p>
-              <p className="mt-4 text-base leading-7 text-ink-1">{artist.bio || `${artist.name} is building their Wavelength profile. Follow along for new music and artist updates.`}</p>
+              <p className="mt-4 text-base leading-7 text-ink-1">{artist.bio || `${artist.name} is building their BackTheVibes profile. Follow along for new music and artist updates.`}</p>
             </div>
             <div className="rounded-[1.5rem] border border-brand-400/15 bg-brand-400/[0.055] p-6">
               <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-brand-400">Direct support</p>

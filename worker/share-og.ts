@@ -95,7 +95,7 @@ function renderMetaHtml(opts: { title: string; description: string; image: strin
 <meta name="description" content="${safeDescription}" />
 <link rel="canonical" href="${escapeHtml(url)}" />
 <meta property="og:type" content="profile" />
-<meta property="og:site_name" content="Wavelength" />
+<meta property="og:site_name" content="BackTheVibes" />
 <meta property="og:title" content="${safeTitle}" />
 <meta property="og:description" content="${safeDescription}" />
 <meta property="og:url" content="${escapeHtml(url)}" />
@@ -122,8 +122,8 @@ async function buildArtistCard(projectId: string, slug: string, url: string): Pr
   if (!artist) return null
 
   const html = renderMetaHtml({
-    title: `${artist.name as string} on Wavelength`,
-    description: (artist.bio as string) || `Listen to ${artist.name as string} on Wavelength — independent music, direct support.`,
+    title: `${artist.name as string} on BackTheVibes`,
+    description: (artist.bio as string) || `Listen to ${artist.name as string} on BackTheVibes — independent music, direct support.`,
     image: (artist.coverURL as string | null) ?? (artist.photoURL as string | null) ?? null,
     url,
   })
@@ -146,7 +146,7 @@ async function buildTrackCard(projectId: string, slug: string, trackId: string, 
 
   const html = renderMetaHtml({
     title: `${track.title as string} — ${artistName}`,
-    description: `Listen to "${track.title as string}" by ${artistName} on Wavelength.`,
+    description: `Listen to "${track.title as string}" by ${artistName} on BackTheVibes.`,
     image: (track.artworkURL as string | null) ?? (artist?.photoURL as string | null) ?? null,
     url,
   })
@@ -185,8 +185,8 @@ export default {
         if (track && artistId) {
           const artist = await fetchFirestoreDoc(projectId, `artistProfiles/${artistId}`)
           const html = renderMetaHtml({
-            title: `${track.title as string} — ${(artist?.name as string) ?? 'Wavelength'}`,
-            description: `Listen to "${track.title as string}" on Wavelength.`,
+            title: `${track.title as string} — ${(artist?.name as string) ?? 'BackTheVibes'}`,
+            description: `Listen to "${track.title as string}" on BackTheVibes.`,
             image: (track.artworkURL as string | null) ?? null,
             url: requestUrl.toString(),
           })

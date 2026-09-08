@@ -66,17 +66,17 @@ export function InstallBanner() {
   return (
     <div
       role="region"
-      aria-label="Install Wavelength"
+      aria-label="Install BackTheVibes"
       className="fixed inset-x-0 bottom-0 z-40 mx-auto flex max-w-lg items-start gap-3 rounded-t-2xl border border-surface-border bg-surface-1 p-4 shadow-2xl sm:bottom-4 sm:rounded-2xl"
     >
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-500/15 text-brand-400">
         <Download className="h-5 w-5" />
       </div>
       <div className="flex-1">
-        <p className="text-sm font-semibold text-ink-0">Install Wavelength</p>
+        <p className="text-sm font-semibold text-ink-0">Install BackTheVibes</p>
         {canInstall ? (
           <p className="mt-0.5 text-xs text-ink-2">
-            Add Wavelength to your device for faster access, music notifications, and a better app experience.
+            Add BackTheVibes to your device for faster access, music notifications, and a better app experience.
           </p>
         ) : (
           <p className="mt-0.5 text-xs text-ink-2">

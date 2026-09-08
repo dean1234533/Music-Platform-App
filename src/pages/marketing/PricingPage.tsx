@@ -79,7 +79,7 @@ export function PricingPage() {
             <PriceCard index={0} featured title="Artist Membership" price="£29.99" suffix="/year" description="About £2.50 a month, billed once yearly. Publish music, build direct fan support, and manage your earnings." features={['Up to 10 stored tracks', 'Releases, analytics and supporter offers', 'DJ outreach, licensing and earnings tools']} cta={firebaseUser && hasRole('artist') ? 'Open artist dashboard' : 'Create artist profile'} to={firebaseUser ? (hasRole('artist') ? '/dashboard/artist' : '/onboarding/add-role?role=artist') : '/sign-up?role=artist'} />
             <PriceCard index={1} title="DJ" price="Free" description="Discover releases and agree track licences directly with artists." features={['Direct artist-approved licence requests', 'Filters, crates, notes and analytics', 'Verification and secure downloads']} cta={firebaseUser && hasRole('dj') ? 'Open DJ workspace' : 'Create DJ profile'} to={firebaseUser ? (hasRole('dj') ? '/dj/discover' : '/onboarding/add-role?role=dj') : '/sign-up?role=dj'} />
           </div>
-          <p className="mt-6 text-center text-xs leading-5 text-ink-3">DJ licence prices are agreed with each artist. Wavelength takes 15% of net transaction revenue; the artist receives 85%.</p>
+          <p className="mt-6 text-center text-xs leading-5 text-ink-3">DJ licence prices are agreed with each artist. BackTheVibes takes 15% of net transaction revenue; the artist receives 85%.</p>
           <p className="mt-2 text-center text-xs leading-5 text-ink-3">Artist earnings clear after 7 days. Artists can request a payout whenever their available balance reaches £25.</p>
         </section>
 

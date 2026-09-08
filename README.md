@@ -1,8 +1,8 @@
-# Wavelength — independent music platform
+# BackTheVibes — independent music platform
 
 React + TypeScript + Tailwind CSS frontend, Firebase backend (Auth, Firestore,
 Storage, Cloud Functions), Stripe + Stripe Connect for payments, deployed to
-Cloudflare Pages. "Wavelength" is a placeholder brand name — rename freely
+Cloudflare Pages. "BackTheVibes" is the current brand name and can be renamed
 (search/replace in `index.html`, `src/components/layout/Sidebar.tsx`,
 `src/components/layout/TopBar.tsx`, `src/pages/marketing/LandingPage.tsx`,
 `src/pages/auth/AuthLayout.tsx`, and `vite.config.ts`'s PWA manifest).

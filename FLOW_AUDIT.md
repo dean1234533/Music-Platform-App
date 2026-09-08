@@ -1,4 +1,4 @@
-# Wavelength Product Flow Audit
+# BackTheVibes Product Flow Audit
 
 Audit date: 2026-09-07. Scope: the existing React/Firebase/Stripe application. This is an audit of implemented behaviour, not a redesign. “PASS” means verified by code inspection and the automated/static checks described below. “NEEDS MANUAL TEST” means the code path exists but requires a real browser, email, Firebase Auth identity, Stripe account, push-capable device, or two human roles. “FAIL” is an honest remaining product gap.
 

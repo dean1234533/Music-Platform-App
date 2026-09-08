@@ -25,7 +25,7 @@ const sections: [string, string][] = [
   ],
   [
     'Counter-notices',
-    'An artist whose track has been restricted or removed can submit a statement disputing the claim. This is a starting point for dispute review inside Wavelength, not a substitute for a formal legal counter-notice process in your jurisdiction.',
+    'An artist whose track has been restricted or removed can submit a statement disputing the claim. This is a starting point for dispute review inside BackTheVibes, not a substitute for a formal legal counter-notice process in your jurisdiction.',
   ],
   [
     'Repeat infringement',

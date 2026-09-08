@@ -82,7 +82,7 @@ export function TrackPage() {
               <ShareButton
                 url={trackShareUrl(artist.slug, track.trackId)}
                 title={track.title}
-                text={`Listen to "${track.title}" by ${artist.name} on Wavelength`}
+                text={`Listen to "${track.title}" by ${artist.name} on BackTheVibes`}
               />
             ) : null}
             {track.djPromotion ? (

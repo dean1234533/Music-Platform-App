@@ -1,7 +1,7 @@
 # Security incident response
 
 This is an internal, technical response workflow for the team operating
-Wavelength. It tells you what to do in the first hours of a suspected
+BackTheVibes. It tells you what to do in the first hours of a suspected
 security incident. It is not a substitute for legal advice — the
 notification-obligation steps below explicitly require legal/DPO input
 before any external notification happens.

@@ -38,7 +38,7 @@ export function LandingPage() {
             <a href="#how-it-works" className="hidden rounded-full px-3 py-2.5 text-sm font-medium text-ink-2 transition hover:text-white md:block">How it works</a>
             <a href="#pricing" className="hidden rounded-full px-3 py-2.5 text-sm font-medium text-ink-2 transition hover:text-white md:block">Pricing</a>
             <Link to="/sign-in" className="hidden rounded-full px-4 py-2.5 text-sm font-medium text-ink-1 transition hover:text-white md:block">Sign in</Link>
-            <Link to="/sign-up" className="rounded-full bg-brand-500 px-5 py-2.5 text-sm font-semibold text-[#090b06] transition hover:bg-brand-400">Join Wavelength</Link>
+            <Link to="/sign-up" className="rounded-full bg-brand-500 px-5 py-2.5 text-sm font-semibold text-[#090b06] transition hover:bg-brand-400"><span className="sm:hidden">Join</span><span className="hidden sm:inline">Join BackTheVibes</span></Link>
             <button
               type="button"
               onClick={() => setMenuOpen((open) => !open)}
@@ -129,7 +129,7 @@ export function LandingPage() {
             <div><p className="eyebrow">One ecosystem</p><h2 className="mt-3 text-3xl font-medium tracking-[-0.04em] sm:text-4xl">Built around the people who move music.</h2></div>
             <p className="max-w-sm text-sm leading-6 text-ink-2">From first play to fair payment, every part of the relationship stays connected.</p>
           </div>
-          <div className="audience-slider grid gap-3 xl:grid-cols-3" role="region" aria-label="Ways to join Wavelength">
+          <div className="audience-slider grid gap-3 xl:grid-cols-3" role="region" aria-label="Ways to join BackTheVibes">
             {roles.map((role, index) => (
               <Link key={role.label} to={role.to} className="group premium-panel relative min-h-72 overflow-hidden rounded-[1.5rem] p-7 transition duration-300 hover:-translate-y-1 hover:border-white/20">
                 <div className="flex items-start justify-between"><role.icon className="h-6 w-6 text-brand-400" /><span className="text-xs tabular-nums text-ink-3">0{index + 1}</span></div>
@@ -208,7 +208,7 @@ export function LandingPage() {
             <img src="/wavelength-cta-instruments.jpg" alt="A cobalt guitar, microphone, amplifier and drum kit ready on stage" loading="lazy" className="absolute inset-0 h-full w-full object-cover object-center" />
             <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/20 to-transparent" />
             <div className="relative z-10"><p className="eyebrow">Your music, better connected</p><h2 className="mt-3 text-3xl font-medium tracking-[-0.04em] text-white sm:text-4xl">Ready to tune in?</h2></div>
-            <Link to="/sign-up" className="group relative z-10 inline-flex items-center gap-3 rounded-full bg-brand-500 px-6 py-3.5 text-sm font-semibold text-surface-0 transition hover:bg-brand-400">Join Wavelength <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" /></Link>
+            <Link to="/sign-up" className="group relative z-10 inline-flex items-center gap-3 rounded-full bg-brand-500 px-6 py-3.5 text-sm font-semibold text-surface-0 transition hover:bg-brand-400">Join BackTheVibes <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" /></Link>
           </div>
         </section>
       </main>
@@ -219,7 +219,7 @@ export function LandingPage() {
           <FooterGroup title="Join" links={[['For listeners', '/sign-up?role=fan'], ['For artists', '/sign-up?role=artist'], ['For DJs', '/sign-up?role=dj']]} />
           <FooterGroup title="Legal" links={[['Terms & conditions', '/terms'], ['Privacy policy', '/privacy']]} />
         </div>
-        <div className="mx-auto flex max-w-[1440px] flex-col gap-2 border-t border-white/[0.07] px-5 py-6 text-xs text-ink-3 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-12"><p>© {new Date().getFullYear()} Wavelength.</p><p>Independent by design.</p></div>
+        <div className="mx-auto flex max-w-[1440px] flex-col gap-2 border-t border-white/[0.07] px-5 py-6 text-xs text-ink-3 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-12"><p>© {new Date().getFullYear()} BackTheVibes.</p><p>Independent by design.</p></div>
       </footer>
       </div>
     </>

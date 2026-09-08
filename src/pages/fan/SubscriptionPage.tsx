@@ -115,7 +115,7 @@ export function SubscriptionPage() {
                   {plan.recommended ? (
                     <span className="mb-5 flex w-fit items-center gap-1.5 rounded-full bg-brand-500 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.13em] text-[#090b06]"><MusicGlyph className="h-3.5 w-3.5" /> Recommended</span>
                   ) : (
-                    <span className="mb-5 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-ink-3">Wavelength plan</span>
+                    <span className="mb-5 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-ink-3">BackTheVibes plan</span>
                   )}
                   <h2 className="text-xl font-semibold tracking-[-0.02em] text-ink-0">{plan.name}</h2>
                   <p className="mt-4 text-4xl font-medium tracking-[-0.05em] text-ink-0">

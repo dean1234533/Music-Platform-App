@@ -1,4 +1,4 @@
-# Wavelength Product Flow
+# BackTheVibes Product Flow
 
 This document describes behaviour that exists in the current codebase after the 2026-09-07 flow audit. It does not describe planned functionality.
 

@@ -26,8 +26,8 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
       manifest: {
-        name: 'Wavelength — Independent Music Platform',
-        short_name: 'Wavelength',
+        name: 'BackTheVibes — Independent Music Platform',
+        short_name: 'BackTheVibes',
         description: 'Support the artists you actually listen to.',
         start_url: '/',
         scope: '/',
@@ -36,10 +36,10 @@ export default defineConfig({
         theme_color: '#050607',
         orientation: 'portrait-primary',
         icons: [
-          { src: '/icons/wavelength-app-icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
-          { src: '/icons/wavelength-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: '/icons/wavelength-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-          { src: '/icons/wavelength-icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: '/icons/backthevibes-app-icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+          { src: '/icons/backthevibes-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/icons/backthevibes-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/icons/backthevibes-icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       // Runtime image caching + Firebase Messaging background handling both

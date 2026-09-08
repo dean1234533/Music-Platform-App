@@ -104,7 +104,7 @@ export function CopyrightClaimPage() {
         <h1 className="mt-4 text-4xl font-medium tracking-[-0.04em]">Report copyright infringement</h1>
         <p className="mt-4 text-sm leading-6 text-ink-2">
           Use this form if you are the rights holder (or an authorised representative) and believe a track on
-          Wavelength infringes your copyright. This is different from a general content report — filing here starts a
+          BackTheVibes infringes your copyright. This is different from a general content report — filing here starts a
           formal review that can result in the track being restricted or removed and its artist's payouts held. See
           our <Link to="/copyright" className="text-brand-400 hover:underline">copyright policy</Link> for details.
         </p>
