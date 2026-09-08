@@ -159,7 +159,7 @@ export function ArtistPublicProfilePage() {
         </Link>
       </header>
 
-      <div className="relative h-64 w-full overflow-hidden border-y border-white/[0.06] bg-surface-2 sm:h-80 lg:h-[23rem]">
+      <div className="relative h-44 w-full overflow-hidden border-y border-white/[0.06] bg-surface-2 sm:h-52 lg:h-56">
         {artist.coverURL ? (
           <img src={artist.coverURL} alt="" className="h-full w-full object-cover" />
         ) : (
@@ -172,7 +172,7 @@ export function ArtistPublicProfilePage() {
         <div className="absolute inset-0 bg-gradient-to-t from-surface-0 via-surface-0/10 to-transparent" />
       </div>
 
-      <main className="relative z-10 mx-auto -mt-20 max-w-6xl px-5 sm:-mt-24 sm:px-8 lg:px-10">
+      <main className="relative z-10 mx-auto -mt-12 max-w-6xl px-5 sm:-mt-14 sm:px-8 lg:-mt-16 lg:px-10">
         <section className="premium-panel rounded-[2rem] p-5 sm:p-7 lg:p-9">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-end">
           <button
