@@ -101,6 +101,17 @@ test('fan offers include platform-wide offers and preserve relationship access',
   assert.match(service, /where\('audience', '==', 'everyone'\)/)
 })
 
+test('DJ requests page exposes the request flow instead of becoming a dead end', () => {
+  const page = read('src/pages/dj/DJRequestsPage.tsx')
+  assert.match(page, /My requests/)
+  assert.match(page, /listArtistsSeekingDJExposure\(6, \{\}, true, true\)/)
+  assert.match(page, /Tracks accepting requests/)
+  assert.match(page, /Request DJ access/)
+  assert.match(page, /to="\/dj\/discover"/)
+  assert.match(page, /Requests could not be loaded/)
+  assert.match(page, /getTrack\(request\.trackId\)/)
+})
+
 test('notifications use Firestore IDs and navigate their deep links', () => {
   assert.match(read('src/services/notificationService.ts'), /notificationId: d\.id/)
   const page = read('src/pages/fan/NotificationsPage.tsx')
