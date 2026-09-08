@@ -193,6 +193,14 @@ export async function updateTrackDealSettings(trackId: string, settings: TrackDj
   await updateDoc(trackRef(trackId), { djDealSettings: settings, updatedAt: serverTimestamp() })
 }
 
+/** The core DJ-access toggle — set at upload time, but also editable afterwards from Music. */
+export async function updateTrackDjAccess(
+  trackId: string,
+  settings: { djPromotion: boolean; djLicenceMode: LicenceMode; djFixedPrice: number | null },
+): Promise<void> {
+  await updateDoc(trackRef(trackId), { ...settings, updatedAt: serverTimestamp() })
+}
+
 export async function getPreviewPlaybackURL(track: TrackDoc): Promise<string> {
   const fn = httpsCallable<{ trackId: string; kind: 'preview' }, { url: string }>(functions, 'getTrackPlaybackUrl')
   return (await fn({ trackId: track.trackId, kind: 'preview' })).data.url
