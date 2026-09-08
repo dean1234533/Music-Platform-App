@@ -1,5 +1,5 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
-import { FieldValue } from 'firebase-admin/firestore'
+import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 import type { DocumentData } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
 import { requireActiveUser } from '../roles.js'
@@ -21,6 +21,8 @@ interface OfferTermsInput {
   resaleAllowed: boolean
   remixAllowed: boolean
   additionalTerms: string
+  /** Optional — how long this specific offer stays open for acceptance, distinct from the licence's own startDate/expiryDate. ISO date string or null. */
+  offerExpiresAt?: string | null
 }
 
 function validateTerms(input: OfferTermsInput | undefined): asserts input is OfferTermsInput {
@@ -82,8 +84,19 @@ export const sendOffer = onCall(async (request) => {
 
   const { requestRef, licenceRequest, isArtist } = await loadNegotiableRequest(requestId, uid)
   if (!isArtist) throw new HttpsError('permission-denied', 'Only the artist can send the opening offer.')
+  let reissueVersion = 1
   if (licenceRequest.currentOfferId) {
-    throw new HttpsError('failed-precondition', 'An offer already exists on this request — use counterOffer instead.')
+    const existingSnap = await db.collection('licenceOffers').doc(licenceRequest.currentOfferId).get()
+    const existing = existingSnap.data()
+    const existingExpiresAt = existing?.offerExpiresAt as Timestamp | null | undefined
+    const existingExpired =
+      existing?.status === 'pending' && existingExpiresAt != null && existingExpiresAt.toMillis() < Date.now()
+    if (!existingExpired) {
+      throw new HttpsError('failed-precondition', 'An offer already exists on this request — use counterOffer instead.')
+    }
+    // The old offer expired unaccepted — the artist can replace it with a fresh one instead of countering it.
+    await existingSnap.ref.update({ status: 'expired' })
+    reissueVersion = (existing!.version as number) + 1
   }
   await enforceTrackDealSettings(licenceRequest.trackId, terms.priceMinor, true, licenceRequest.status)
 
@@ -93,7 +106,7 @@ export const sendOffer = onCall(async (request) => {
     : null
   const batch = db.batch()
 
-  batch.set(offerRef, buildOfferDoc(offerRef.id, requestId, licenceRequest, uid, 'artist', terms, 1, null))
+  batch.set(offerRef, buildOfferDoc(offerRef.id, requestId, licenceRequest, uid, 'artist', terms, reissueVersion, null))
   batch.update(requestRef, { status: 'offer_sent', currentOfferId: offerRef.id, updatedAt: FieldValue.serverTimestamp() })
   if (conversationRef) writeSystemMessage(batch, conversationRef, uid, 'offer_card', 'Artist sent an offer.', { offerId: offerRef.id })
   batch.set(db.collection('notifications').doc(), {
@@ -126,6 +139,11 @@ export const counterOffer = onCall(async (request) => {
   if (!previousSnap.exists) throw new HttpsError('not-found', 'Current offer not found.')
   const previous = previousSnap.data()!
   if (previous.status !== 'pending') throw new HttpsError('failed-precondition', 'This offer is no longer pending.')
+  const previousExpiresAt = previous.offerExpiresAt as Timestamp | null | undefined
+  if (previousExpiresAt != null && previousExpiresAt.toMillis() < Date.now()) {
+    await previousRef.update({ status: 'expired' })
+    throw new HttpsError('failed-precondition', 'This offer has expired and can no longer be countered.')
+  }
   if (previous.createdBy === uid) throw new HttpsError('failed-precondition', 'You cannot counter your own offer.')
   await enforceTrackDealSettings(licenceRequest.trackId, terms.priceMinor, false, licenceRequest.status)
 
@@ -177,6 +195,11 @@ export const acceptOffer = onCall(async (request) => {
   if (!offerSnap.exists) throw new HttpsError('not-found', 'Offer not found.')
   const offer = offerSnap.data()!
   if (offer.status !== 'pending') throw new HttpsError('failed-precondition', 'This offer is no longer pending.')
+  const acceptOfferExpiresAt = offer.offerExpiresAt as Timestamp | null | undefined
+  if (acceptOfferExpiresAt != null && acceptOfferExpiresAt.toMillis() < Date.now()) {
+    await offerRef.update({ status: 'expired' })
+    throw new HttpsError('failed-precondition', 'This offer has expired and can no longer be accepted.')
+  }
   if (offer.createdBy === uid) throw new HttpsError('failed-precondition', 'You cannot accept your own offer.')
 
   const trackSnap = await db.collection('tracks').doc(licenceRequest.trackId).get()
@@ -291,6 +314,7 @@ function buildOfferDoc(
     resaleAllowed: terms.resaleAllowed,
     remixAllowed: terms.remixAllowed,
     additionalTerms: terms.additionalTerms,
+    offerExpiresAt: terms.offerExpiresAt ? Timestamp.fromDate(new Date(`${terms.offerExpiresAt}T23:59:59.999Z`)) : null,
     createdBy,
     createdByRole,
     createdAt: FieldValue.serverTimestamp(),

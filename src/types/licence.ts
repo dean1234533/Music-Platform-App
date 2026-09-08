@@ -74,6 +74,8 @@ export interface LicenceOfferDoc {
   resaleAllowed: boolean
   remixAllowed: boolean
   additionalTerms: string
+  /** Optional deadline for accepting this specific offer (distinct from the licence's own expiryDate). Null = never expires. */
+  offerExpiresAt: Timestamp | null
   createdBy: string
   createdByRole: 'artist' | 'dj'
   createdAt: Timestamp | null

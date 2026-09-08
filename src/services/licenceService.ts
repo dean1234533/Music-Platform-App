@@ -148,6 +148,8 @@ export interface OfferTermsInput {
   resaleAllowed: boolean
   remixAllowed: boolean
   additionalTerms: string
+  /** Optional deadline for accepting this offer — distinct from expiryDate (the licence's own duration). ISO date or null. */
+  offerExpiresAt?: string | null
 }
 
 export const sendOffer = callable<{ requestId: string } & OfferTermsInput, { offerId: string }>('sendOffer')
