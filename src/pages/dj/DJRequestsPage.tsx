@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Handshake, MessageSquare, Radar } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { subscribeRequestsForDj } from '@/services/licenceService'
+import { submitLicenceRequest, subscribeRequestsForDj } from '@/services/licenceService'
 import { listArtistsSeekingDJExposure } from '@/services/discoveryService'
 import { getTrack } from '@/services/trackService'
 import { getDealsByIds } from '@/services/dealService'
 import { subscribeDJProfile, updateDJProfile } from '@/services/djService'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
+import { useToast } from '@/contexts/ToastContext'
 import { TrackCard } from '@/components/music/TrackCard'
 import { RequestDjAccessModal } from '@/components/track/RequestDjAccessModal'
 import { Button } from '@/components/common/Button'
@@ -24,7 +25,6 @@ interface DealOpportunity {
 
 interface RequestTarget {
   trackId: string
-  dealId?: string
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -44,6 +44,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function DJRequestsPage() {
   const { firebaseUser } = useAuth()
+  const { notify } = useToast()
   const [requests, setRequests] = useState<LicenceRequestDoc[] | null>(null)
   const [requestError, setRequestError] = useState(false)
   const [openTracks, setOpenTracks] = useState<TrackDoc[] | null>(null)
@@ -51,6 +52,7 @@ export function DJRequestsPage() {
   const [promoOptIn, setPromoOptIn] = useState<boolean | null>(null)
   const [enablingPromos, setEnablingPromos] = useState(false)
   const [requestTarget, setRequestTarget] = useState<RequestTarget | null>(null)
+  const [acceptingDealId, setAcceptingDealId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!firebaseUser) return
@@ -74,6 +76,26 @@ export function DJRequestsPage() {
       setPromoOptIn(true)
     } finally {
       setEnablingPromos(false)
+    }
+  }
+
+  async function acceptArtistDeal(deal: DjDealDoc, track: TrackDoc) {
+    setAcceptingDealId(deal.dealId)
+    try {
+      await submitLicenceRequest({
+        trackId: track.trackId,
+        dealId: deal.dealId,
+        intendedUse: 'dj_set',
+        territory: deal.territory,
+        expectedDate: '',
+        venue: '',
+        message: `Accepted “${deal.name}”.`,
+      })
+      notify('Deal accepted. The artist has been notified.', 'success')
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Could not accept this deal.', 'error')
+    } finally {
+      setAcceptingDealId(null)
     }
   }
 
@@ -176,7 +198,9 @@ export function DJRequestsPage() {
                 key={`${track.trackId}-${deal.dealId}`}
                 deal={deal}
                 track={track}
-                onRequest={() => setRequestTarget({ trackId: track.trackId, dealId: deal.dealId })}
+                accepted={Boolean(requests?.some((request) => request.dealId === deal.dealId && request.trackId === track.trackId))}
+                accepting={acceptingDealId === deal.dealId}
+                onAccept={() => void acceptArtistDeal(deal, track)}
               />
             ))}
           </div>
@@ -220,7 +244,6 @@ export function DJRequestsPage() {
       {requestTarget ? (
         <RequestDjAccessModal
           trackId={requestTarget.trackId}
-          dealId={requestTarget.dealId}
           onClose={() => setRequestTarget(null)}
         />
       ) : null}
@@ -236,12 +259,24 @@ function dealPriceLabel(deal: DjDealDoc): string {
   return 'Custom quote'
 }
 
-function DealOpportunityCard({ deal, track, onRequest }: { deal: DjDealDoc; track: TrackDoc; onRequest: () => void }) {
+function DealOpportunityCard({
+  deal,
+  track,
+  accepted,
+  accepting,
+  onAccept,
+}: {
+  deal: DjDealDoc
+  track: TrackDoc
+  accepted: boolean
+  accepting: boolean
+  onAccept: () => void
+}) {
   const artist = useArtistSummary(track.artistId)
 
   return (
     <div className="flex min-w-0 flex-col gap-4 rounded-2xl border border-surface-border bg-surface-1 p-4 transition hover:border-dj-500/40">
-      <Link to={`/track/${track.trackId}`} className="group flex min-w-0 items-center gap-4">
+      <div className="flex min-w-0 items-center gap-4">
         <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface-3">
           {track.artworkURL ? <img src={track.artworkURL} alt="" className="h-full w-full object-cover" /> : null}
         </div>
@@ -253,9 +288,10 @@ function DealOpportunityCard({ deal, track, onRequest }: { deal: DjDealDoc; trac
           <p className="mt-1 truncate text-xs text-ink-1">{track.title} · {artist?.name ?? 'Artist'}</p>
           <p className="mt-1 line-clamp-1 text-xs text-ink-3">{deal.description || deal.permittedUse}</p>
         </div>
-        <ArrowRight className="h-4 w-4 shrink-0 text-ink-3 transition group-hover:translate-x-0.5 group-hover:text-dj-400" />
-      </Link>
-      <Button size="sm" onClick={onRequest} className="w-full">Request this deal</Button>
+      </div>
+      <Button size="sm" onClick={onAccept} loading={accepting} disabled={accepted} className="w-full">
+        {accepted ? 'Deal accepted' : 'Accept deal'}
+      </Button>
     </div>
   )
 }
