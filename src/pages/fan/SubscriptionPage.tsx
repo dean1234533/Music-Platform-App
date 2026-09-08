@@ -227,10 +227,12 @@ function AllocationEditor({ fanId, planCapMinor, currency }: { fanId: string; pl
 
   return (
     <div>
-      <h2 className="mb-1 text-lg font-semibold text-ink-0">Your artist support this month</h2>
-      <p className="mb-4 text-sm text-ink-2">
-        Split the artist share of your subscription across the artists you follow. The amounts below
-        are what artists receive; unallocated funds remain with the platform this cycle.
+      <h2 className="mb-1 text-lg font-semibold text-ink-0">Your artist support</h2>
+      <p className="mb-4 text-sm leading-6 text-ink-2">
+        {formatCurrency(planCapMinor, currency)} of your subscription — 80% of what you pay, after fees — is yours to
+        direct to artists you follow. Split it however you like below; whatever you don't allocate stays with the
+        platform. Once saved, this repeats automatically every billing cycle until you change it — no need to
+        re-enter it each month.
       </p>
 
       {artists.length === 0 ? (
@@ -258,7 +260,12 @@ function AllocationEditor({ fanId, planCapMinor, currency }: { fanId: string; pl
 
       <div className="mt-3 flex items-center justify-between text-sm">
         <span className={overCap ? 'text-danger-500' : 'text-ink-2'}>
-          Total: {formatCurrency(totalMinor, currency)} / {formatCurrency(planCapMinor, currency)}
+          Allocated: {formatCurrency(totalMinor, currency)} of {formatCurrency(planCapMinor, currency)}
+        </span>
+        <span className={overCap ? 'text-danger-500' : 'text-ink-3'}>
+          {overCap
+            ? `${formatCurrency(totalMinor - planCapMinor, currency)} over budget`
+            : `${formatCurrency(planCapMinor - totalMinor, currency)} remaining`}
         </span>
       </div>
 
