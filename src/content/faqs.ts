@@ -13,7 +13,8 @@ export const DJ_FAQS: [string, string][] = [
 ]
 
 export const ARTIST_FAQS: [string, string][] = [
-  ['What does it cost to publish?', 'A flat £29.99 a year for an artist profile — not a percentage of what you earn, and not a recurring cut of every stream.'],
+  ['What does it cost to publish?', 'A flat £29.99 a year for an artist profile — not a percentage of what you earn, and not a recurring cut of every stream. New artists get a 14-day free trial before the first charge.'],
+  ['Is there a free trial?', 'Yes — a 14-day free trial on Artist Membership, available once per artist. You can publish and use everything during the trial; cancel any time before it ends and you won\'t be charged.'],
   ['How much do I keep from fan support?', 'Artists receive 80% of net revenue from fan memberships directed to them, after payment processing and tax.'],
   ['How much do I keep from DJ licensing?', 'Artists keep 85% of net revenue from a DJ licence, once it\'s paid. You set the terms — permitted use, territory, duration and price — for every track you open to DJ use.'],
   ['Do I have to allow DJ licensing?', 'No — it\'s entirely optional per track. Leave it off and the track stays streaming-only.'],

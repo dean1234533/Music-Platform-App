@@ -7,7 +7,7 @@
 - Listening, following artists, and building a library is free for fans.
 - An optional Supporter membership (from £4.99/month) lets a fan direct monthly support to the independent artists they follow. Artists receive 80% of net supporter revenue directed to them, after payment processing and tax.
 - Joining as a DJ is free. DJs pay only for the licences they agree to, on terms the artist sets per track.
-- Artists publish for a flat £29.99/year — not a percentage of earnings. Artists keep 85% of net DJ licensing revenue.
+- Artists publish for a flat £29.99/year — not a percentage of earnings — with a 14-day free trial for new artists. Artists keep 85% of net DJ licensing revenue.
 - Every DJ licence is a dated, e-signed agreement between the artist and the DJ, specifying permitted use, territory, duration, and price. The full-quality track only unlocks once the agreement is signed.
 - Payments are processed by Stripe. BackTheVibes does not store full card details.
 

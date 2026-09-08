@@ -267,10 +267,10 @@ export default {
           renderContentHtml({
             title: 'Pricing — BackTheVibes',
             description:
-              'Listeners and DJs join free. Artists publish for £29.99/year — no revenue percentage. Fans keep 80% of support going straight to artists; DJs pay only for the licences they agree to.',
+              'Listeners and DJs join free. Artists publish for £29.99/year (14 days free) — no revenue percentage. Fans keep 80% of support going straight to artists; DJs pay only for the licences they agree to.',
             url,
             bodyHtml:
-              '<p>Listening, following artists, and building a library is free. An optional Supporter membership from £4.99/month lets a fan direct monthly support to artists they follow — artists receive 80% of net supporter revenue directed to them.</p><p>Joining as a DJ is free. DJs pay only for the licences they agree to, on terms the artist sets per track.</p><p>Artists publish for a flat £29.99/year — not a percentage of earnings — and keep 85% of net DJ licensing revenue.</p>',
+              '<p>Listening, following artists, and building a library is free. An optional Supporter membership from £4.99/month lets a fan direct monthly support to artists they follow — artists receive 80% of net supporter revenue directed to them.</p><p>Joining as a DJ is free. DJs pay only for the licences they agree to, on terms the artist sets per track.</p><p>Artists publish for a flat £29.99/year — 14 days free, not a percentage of earnings — and keep 85% of net DJ licensing revenue.</p>',
           }),
         )
       }
@@ -303,9 +303,9 @@ export default {
           renderContentHtml({
             title: 'Get Paid Directly by Fans and DJs — No Label Needed — BackTheVibes',
             description:
-              'Publish your music, keep 80–85% of what fans and DJs pay you directly, and set your own terms for DJ licensing. £29.99/year, no revenue percentage.',
+              'Publish your music, keep 80–85% of what fans and DJs pay you directly, and set your own terms for DJ licensing. 14-day free trial, then £29.99/year, no revenue percentage.',
             url,
-            bodyHtml: `<p>No label, no percentage of every stream. Publish for a flat £29.99 a year, keep 80% of direct fan support and 85% of DJ licensing revenue — on terms you set.</p>${renderFaqs(ARTIST_FAQS)}`,
+            bodyHtml: `<p>No label, no percentage of every stream. Try it free for 14 days, then a flat £29.99 a year — keep 80% of direct fan support and 85% of DJ licensing revenue, on terms you set.</p>${renderFaqs(ARTIST_FAQS)}`,
             jsonLd: {
               '@context': 'https://schema.org',
               '@type': 'FAQPage',

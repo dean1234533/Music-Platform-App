@@ -203,7 +203,7 @@ export function LandingPage() {
               </div>
               <p className="mt-5 max-w-xl text-sm leading-6 text-ink-2">One account gives you the complete foundation. Listen as a fan, create an artist profile, work as a DJ—or add more than one role.</p>
               <div className="mt-7 grid gap-3 sm:grid-cols-3">
-                {[['Listen', 'Discover, follow and build playlists.'], ['Create', 'Build a profile; artist publishing is £29.99/year.'], ['DJ', 'Discover, negotiate and license.']].map(([title, copy]) => (
+                {[['Listen', 'Discover, follow and build playlists.'], ['Create', 'Build a profile; artist publishing is £29.99/year, 14 days free.'], ['DJ', 'Discover, negotiate and license.']].map(([title, copy]) => (
                   <div key={title} className="border-t border-white/10 pt-3"><p className="text-sm font-semibold text-ink-0">{title}</p><p className="mt-1 text-xs leading-5 text-ink-3">{copy}</p></div>
                 ))}
               </div>

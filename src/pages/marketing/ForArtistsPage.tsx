@@ -7,7 +7,7 @@ import { ARTIST_FAQS as FAQS } from '@/content/faqs'
 export function ForArtistsPage() {
   useSeo({
     title: 'Get Paid Directly by Fans and DJs — No Label Needed',
-    description: 'Publish your music, keep 80–85% of what fans and DJs pay you directly, and set your own terms for DJ licensing. £29.99/year, no revenue percentage.',
+    description: 'Publish your music, keep 80–85% of what fans and DJs pay you directly, and set your own terms for DJ licensing. 14-day free trial, then £29.99/year, no revenue percentage.',
     path: '/for-artists',
     jsonLd: {
       '@context': 'https://schema.org',
@@ -31,19 +31,19 @@ export function ForArtistsPage() {
         <p className="eyebrow">For artists</p>
         <h1 className="mt-4 max-w-3xl text-5xl font-medium leading-[1.02] tracking-[-0.05em] sm:text-6xl">Get paid directly by the fans and DJs who actually want your music.</h1>
         <p className="mt-6 max-w-xl text-base leading-7 text-ink-2">
-          No label, no percentage of every stream. Publish for a flat £29.99 a year, keep 80% of direct fan support
-          and 85% of DJ licensing revenue — on terms you set.
+          No label, no percentage of every stream. Try it free for 14 days, then a flat £29.99 a year — keep 80% of
+          direct fan support and 85% of DJ licensing revenue, on terms you set.
         </p>
         <div className="mt-9 flex flex-wrap items-center gap-4">
           <Link to="/sign-up?role=artist" className="group inline-flex items-center gap-3 rounded-full bg-brand-500 px-6 py-3.5 text-sm font-semibold text-surface-0 transition hover:bg-brand-400">
-            Create your artist profile <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            Start your free trial <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Link>
           <Link to="/blog/how-independent-artists-get-paid" className="text-sm font-medium text-ink-1 transition hover:text-white">See how the numbers work →</Link>
         </div>
 
         <div className="mt-16 grid gap-3 sm:grid-cols-3">
           {[
-            ['Flat annual fee', "£29.99 a year, not a cut of every stream — you know the cost up front."],
+            ['14-day free trial', "Try publishing and everything else free for 14 days before you're charged."],
             ['80–85% revenue share', 'Keep 80% of fan support and 85% of DJ licensing revenue, after tax and processing fees.'],
             ['You set DJ terms', 'Permitted use, territory, duration, and price for every track you open to DJ licensing — entirely optional.'],
           ].map(([title, copy]) => (

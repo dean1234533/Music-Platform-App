@@ -45,13 +45,22 @@ export const createCheckoutSession = onCall({ secrets: [stripeSecretKey] }, asyn
     await userRef.update({ stripeCustomerId: customerId })
   }
 
+  // Artist Membership gets a one-time 14-day free trial — only on a
+  // customer's first-ever Artist Membership subscription, so cancelling and
+  // resubscribing through the app doesn't grant a fresh trial each time.
+  const isFirstArtistSubscription =
+    role === 'artist' && !(await db.collection('subscriptions').doc(`${uid}_artist`).get()).exists
+
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     customer: customerId,
     line_items: [{ price: plan.stripePriceId, quantity: 1 }],
     success_url: successUrl,
     cancel_url: cancelUrl,
-    subscription_data: { metadata: { firebaseUid: uid, planId, role } },
+    subscription_data: {
+      metadata: { firebaseUid: uid, planId, role },
+      ...(isFirstArtistSubscription ? { trial_period_days: 14 } : {}),
+    },
     metadata: { firebaseUid: uid, planId, role },
   })
 

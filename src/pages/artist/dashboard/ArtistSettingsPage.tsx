@@ -298,7 +298,9 @@ function MembershipSection({ uid }: { uid: string }) {
   if (isActive) {
     return (
       <div className="flex items-center justify-between rounded-xl border border-support-500/30 bg-support-500/5 px-4 py-3 text-sm">
-        <span className="text-ink-1">Artist Membership — active (£29.99/year)</span>
+        <span className="text-ink-1">
+          {membership?.status === 'trialing' ? 'Artist Membership — free trial (£29.99/year after)' : 'Artist Membership — active (£29.99/year)'}
+        </span>
         <Button variant="secondary" size="sm" onClick={openBillingPortal}>
           Manage billing
         </Button>
@@ -311,11 +313,11 @@ function MembershipSection({ uid }: { uid: string }) {
       <p>
         {membership?.status === 'past_due'
           ? 'Your last Artist Membership payment failed — publishing is paused until it’s resolved.'
-          : 'No active Artist Membership. Publishing new tracks requires membership — £29.99/year.'}
+          : 'No active Artist Membership. Publishing new tracks requires membership — 14 days free, then £29.99/year.'}
       </p>
       {error ? <p className="mt-2 text-danger-500">{error}</p> : null}
       <Button className="mt-3" size="sm" loading={checkoutLoading} onClick={membership?.status === 'past_due' ? openBillingPortal : handleSubscribe}>
-        {membership?.status === 'past_due' ? 'Update payment' : 'Subscribe — £29.99/year'}
+        {membership?.status === 'past_due' ? 'Update payment' : 'Start 14-day free trial'}
       </Button>
     </div>
   )

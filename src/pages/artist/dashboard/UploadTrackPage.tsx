@@ -274,11 +274,11 @@ export function UploadTrackPage() {
         <div className="mt-5 rounded-xl border border-warning-500/25 bg-warning-500/[0.06] px-4 py-4 text-sm leading-6 text-ink-1">
           <p className="font-medium text-ink-0">Artist Membership required to publish</p>
           <p className="mt-1 text-ink-2">
-            Your dashboard stays open, but publishing a track needs an active Artist Membership — £29.99/year.
+            Your dashboard stays open, but publishing a track needs an active Artist Membership — 14 days free, then £29.99/year.
           </p>
           {membershipError ? <p className="mt-2 text-danger-500">{membershipError}</p> : null}
           <Button className="mt-3" size="sm" loading={membershipCheckoutLoading} onClick={handleSubscribeToMembership}>
-            Subscribe — £29.99/year
+            Start 14-day free trial
           </Button>
         </div>
       ) : null}
