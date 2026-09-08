@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Headphones, Menu, Mic2, Radio, X } from 'lucide-react'
+import { ArrowRight, Headphones, Menu, Mic2, Radio, ShieldCheck, X } from 'lucide-react'
 import { BrandMark } from '@/components/common/BrandMark'
 import { MusicGlyph } from '@/components/common/MusicGlyph'
 import { listActiveSubscriptionPlansForRole } from '@/services/platformSettingsService'
@@ -191,6 +191,13 @@ export function LandingPage() {
             </div>
           </div>
           <p className="mx-auto mt-6 max-w-2xl text-center text-xs leading-5 text-ink-3">Artist membership is £29.99 per year. Licensing fees are agreed directly between artists and DJs. Applicable platform fees are shown before payment or payout.</p>
+          <div className="mt-6 flex justify-center">
+            <div className="inline-flex items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.035] px-4 py-2.5 shadow-[0_12px_35px_rgba(0,0,0,.18)]" aria-label="Payments securely handled by Stripe">
+              <ShieldCheck className="h-4 w-4 text-brand-400" aria-hidden="true" />
+              <span className="text-xs font-medium text-ink-2">Payments securely handled by</span>
+              <span className="text-sm font-bold tracking-[-0.03em] text-[#8f88ff]">stripe</span>
+            </div>
+          </div>
           <p className="mt-4 text-center">
             <Link to="/pricing" className="text-sm font-medium text-brand-400 transition hover:text-brand-300">See all pricing →</Link>
           </p>
