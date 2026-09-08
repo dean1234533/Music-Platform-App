@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ListMusic, Plus } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { createPlaylist, subscribeOwnPlaylists } from '@/services/playlistService'
+import { getTrack } from '@/services/trackService'
 import { Button } from '@/components/common/Button'
 import { Input } from '@/components/common/Input'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
@@ -60,22 +61,41 @@ export function PlaylistsPage() {
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
           {playlists.map((playlist) => (
-            <Link
-              key={playlist.playlistId}
-              to={`/app/playlists/${playlist.playlistId}`}
-              className="flex flex-col gap-3 rounded-xl border border-surface-border bg-surface-1 p-4 hover:bg-surface-2"
-            >
-              <div className="flex aspect-square items-center justify-center rounded-lg bg-surface-3">
-                <ListMusic className="h-8 w-8 text-ink-3" />
-              </div>
-              <div>
-                <p className="truncate text-sm font-medium text-ink-0">{playlist.title}</p>
-                <p className="text-xs text-ink-2">{playlist.trackIds.length} tracks</p>
-              </div>
-            </Link>
+            <PlaylistCard key={playlist.playlistId} playlist={playlist} />
           ))}
         </div>
       )}
     </div>
+  )
+}
+
+function PlaylistCard({ playlist }: { playlist: PlaylistDoc }) {
+  const [artworkURL, setArtworkURL] = useState<string | null>(null)
+
+  useEffect(() => {
+    const firstTrackId = playlist.trackIds[0]
+    if (!firstTrackId) return
+    let cancelled = false
+    void getTrack(firstTrackId).then((track) => {
+      if (!cancelled) setArtworkURL(track?.artworkURL ?? null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [playlist.trackIds])
+
+  return (
+    <Link
+      to={`/app/playlists/${playlist.playlistId}`}
+      className="flex flex-col gap-3 rounded-xl border border-surface-border bg-surface-1 p-4 hover:bg-surface-2"
+    >
+      <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-surface-3">
+        {artworkURL ? <img src={artworkURL} alt="" className="h-full w-full object-cover" /> : <ListMusic className="h-8 w-8 text-ink-3" />}
+      </div>
+      <div>
+        <p className="truncate text-sm font-medium text-ink-0">{playlist.title}</p>
+        <p className="text-xs text-ink-2">{playlist.trackIds.length} tracks</p>
+      </div>
+    </Link>
   )
 }
