@@ -177,7 +177,7 @@ export function RequestDetailPage() {
   const canOffer = ['submitted', 'negotiating', 'offer_sent', 'counter_offer', 'agreement_ready'].includes(request.status)
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
+    <div className="mx-auto flex min-h-svh max-w-5xl flex-col gap-5 px-4 py-5 sm:px-6 sm:py-8">
       <button onClick={() => navigate(-1)} className="flex w-fit items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0">
         <ArrowLeft className="h-4 w-4" /> Back
       </button>
@@ -321,9 +321,12 @@ export function RequestDetailPage() {
         </div>
       ) : null}
 
-      <div>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-3">Messages</h2>
-        <div ref={scrollRef} className="flex max-h-96 flex-col gap-2 overflow-y-auto rounded-xl border border-surface-border bg-surface-1 p-4">
+      <section className="flex min-h-[32rem] flex-1 flex-col overflow-hidden rounded-2xl border border-surface-border bg-surface-1 shadow-[0_24px_70px_rgba(0,0,0,.24)] sm:min-h-[36rem]">
+        <div className="border-b border-surface-border px-4 py-3 sm:px-5">
+          <h2 className="text-sm font-semibold text-ink-0">Messages</h2>
+          <p className="mt-0.5 text-xs text-ink-3">Your conversation with {artist?.name ?? 'the other party'}</p>
+        </div>
+        <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-5 sm:px-5">
           {messages.length === 0 ? (
             <p className="text-sm text-ink-2">No messages yet.</p>
           ) : (
@@ -350,8 +353,10 @@ export function RequestDetailPage() {
               return (
                 <div
                   key={m.messageId}
-                  className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
-                    m.senderId === firebaseUser.uid ? 'self-end bg-brand-500 text-white' : 'self-start bg-surface-3 text-ink-0'
+                  className={`max-w-[85%] rounded-2xl border px-4 py-2.5 text-base leading-relaxed sm:max-w-[75%] sm:text-sm ${
+                    m.senderId === firebaseUser.uid
+                      ? 'self-end border-brand-400/25 bg-brand-500/[0.10] text-ink-0'
+                      : 'self-start border-white/[0.06] bg-surface-3 text-ink-0'
                   }`}
                 >
                   {m.text}
@@ -360,19 +365,19 @@ export function RequestDetailPage() {
             })
           )}
         </div>
-        <div className="mt-2 flex gap-2">
+        <div className="flex items-end gap-2 border-t border-surface-border bg-surface-0/45 p-3 sm:p-4">
           <input
             value={messageText}
             onChange={(e) => setMessageText(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Write a message…"
-            className="flex-1 rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink-0 outline-none focus:border-brand-500"
+            className="min-w-0 flex-1 rounded-xl border border-white/10 bg-surface-2 px-4 py-3 text-base text-ink-0 caret-brand-400 outline-none placeholder:text-ink-3 focus:border-brand-400/60 focus:ring-2 focus:ring-brand-500/10 sm:text-sm"
           />
-          <Button size="sm" onClick={handleSend} disabled={!messageText.trim()}>
+          <Button size="sm" onClick={handleSend} disabled={!messageText.trim()} className="h-12 w-12 shrink-0 rounded-xl px-0">
             <Send className="h-4 w-4" />
           </Button>
         </div>
-      </div>
+      </section>
 
       {offerModal ? (
         <OfferFormModal

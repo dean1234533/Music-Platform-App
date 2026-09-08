@@ -147,6 +147,16 @@ test('notifications use Firestore IDs and navigate their deep links', () => {
   assert.doesNotMatch(read('functions/src/messaging/messages.ts'), /\/messages\/\$\{conversationId\}/)
 })
 
+test('licence conversations use a full-size, high-contrast chat surface', () => {
+  const page = read('src/pages/requests/RequestDetailPage.tsx')
+  assert.match(page, /min-h-\[32rem\]/)
+  assert.match(page, /flex min-h-0 flex-1 flex-col/)
+  assert.match(page, /bg-brand-500\/\[0\.10\] text-ink-0/)
+  assert.match(page, /bg-surface-2[\s\S]*?caret-brand-400/)
+  assert.doesNotMatch(page, /max-h-96/)
+  assert.doesNotMatch(page, /bg-brand-500 text-white/)
+})
+
 test('account deletion cancels billing and removes supporter state', () => {
   const source = read('functions/src/account/deleteAccount.ts')
   assert.match(source, /subscriptions\.cancel/)
