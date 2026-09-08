@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { adminResolveReport, listCopyrightClaims, listOpenReports, reviewCopyrightClaim } from '@/services/adminService'
+import { Link } from 'react-router-dom'
+import { adminResolveReport, adminSetLegalHold, listCopyrightClaims, listOpenReports, reviewCopyrightClaim } from '@/services/adminService'
 import { getCopyrightEvidenceUrls } from '@/services/moderationService'
 import { Button } from '@/components/common/Button'
 import { TextArea } from '@/components/common/Input'
@@ -62,6 +63,20 @@ export function AdminReportsPage() {
     try {
       await adminResolveReport({ reportId: id, status })
       setReports((prev) => prev?.filter((r) => r.reportId !== id) ?? null)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  // Reported agreement problems are never auto-fixed here — placing a legal
+  // hold only freezes the record against automatic retention cleanup and
+  // stops voidAgreement from touching it while support investigates; it does
+  // not change any term, signature, or payment status. Every hold is
+  // audit-logged server-side (adminSetLegalHold -> writeAuditLog).
+  async function holdReportedAgreement(id: string, agreementId: string) {
+    setBusyId(id)
+    try {
+      await adminSetLegalHold({ collection: 'licenceAgreements', docId: agreementId, legalHold: true, reason: 'Reported agreement problem under review' })
     } finally {
       setBusyId(null)
     }
@@ -221,8 +236,23 @@ export function AdminReportsPage() {
                     {report.targetType}: {report.reason}
                   </p>
                   <p className="text-xs text-ink-2">{report.description}</p>
+                  {report.targetType === 'agreement' ? (
+                    <Link to={`/agreements/${report.targetId}`} className="text-xs text-brand-400 hover:underline">
+                      View agreement {report.targetId}
+                    </Link>
+                  ) : null}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap justify-end gap-2">
+                  {report.targetType === 'agreement' ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      loading={busyId === report.reportId}
+                      onClick={() => holdReportedAgreement(report.reportId, report.targetId)}
+                    >
+                      Place legal hold
+                    </Button>
+                  ) : null}
                   <Button size="sm" loading={busyId === report.reportId} onClick={() => resolveReport(report.reportId, 'resolved')}>
                     Resolve
                   </Button>

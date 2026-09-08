@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CreditCard, Download, PenLine, Printer } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, CreditCard, Download, PenLine, Printer } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { createLicencePaymentSession, getSecureDownloadUrl, subscribeAgreement } from '@/services/licenceService'
+import { submitReport } from '@/services/moderationService'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { getTrack } from '@/services/trackService'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/StateViews'
 import { Button } from '@/components/common/Button'
+import { TextArea } from '@/components/common/Input'
 import { SignAgreementModal } from '@/components/licence/SignAgreementModal'
 import { formatCurrency } from '@/utils/format'
 import type { LicenceAgreementDoc } from '@/types/licence'
@@ -36,6 +38,7 @@ export function ContractPage() {
   const [showSignModal, setShowSignModal] = useState(false)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [showReportModal, setShowReportModal] = useState(false)
   const artist = useArtistSummary(agreement?.artistId ?? null)
 
   useEffect(() => {
@@ -204,11 +207,26 @@ export function ContractPage() {
         ) : null}
 
         <p className="mt-6 text-xs leading-5 text-ink-3">
-          Access to this file does not transfer copyright ownership. This licence only grants the specific permitted
-          uses set out above, for the stated territory and duration — the artist remains the owner of the underlying
-          recording and composition. This record is a platform-managed statement of agreement between the parties,
-          not a substitute for independent legal advice.
+          <strong className="text-ink-2">Rights granted.</strong> This licence grants the DJ only the specific,
+          listed uses above (permitted use, territory, duration, and any recording/streaming/promotional-mix/remix/
+          redistribution/resale permissions marked "Yes" in Usage terms) — nothing beyond what is explicitly listed.
+          Except where a permission above is explicitly marked "Yes", the DJ receives no ownership, resale,
+          redistribution, remix, synchronisation, publishing, or master-recording rights of any kind. The artist
+          (and/or their label, publisher, or rights-holder) remains the sole owner of the underlying recording and
+          composition throughout and after this licence. This record is a platform-managed statement of agreement
+          between the parties, not a substitute for independent legal advice — REQUIRES QUALIFIED MUSIC/IP LEGAL
+          REVIEW BEFORE PRODUCTION.
         </p>
+
+        <div className="mt-6 border-t border-surface-border pt-4 no-print">
+          <button
+            type="button"
+            onClick={() => setShowReportModal(true)}
+            className="flex items-center gap-1.5 text-xs font-medium text-ink-3 hover:text-danger-500"
+          >
+            <AlertTriangle className="h-3.5 w-3.5" /> Report a problem with this agreement
+          </button>
+        </div>
       </div>
       {showSignModal ? (
         <SignAgreementModal
@@ -218,6 +236,85 @@ export function ContractPage() {
           onSigned={() => setShowSignModal(false)}
         />
       ) : null}
+      {showReportModal ? (
+        <ReportAgreementModal agreementId={agreement.agreementId} onClose={() => setShowReportModal(false)} />
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * Files a support ticket against this agreement — never rewrites terms,
+ * signatures, or payment/status fields itself. An admin reviews it in
+ * AdminReportsPage and, if warranted, places a legal hold or takes a
+ * separate explicit action; nothing here touches the contract automatically.
+ */
+function ReportAgreementModal({ agreementId, onClose }: { agreementId: string; onClose: () => void }) {
+  const [description, setDescription] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [sent, setSent] = useState(false)
+
+  async function submit() {
+    if (!description.trim()) {
+      setError('Please describe the problem.')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      await submitReport({ targetType: 'agreement', targetId: agreementId, reason: 'agreement_dispute', description: description.trim() })
+      setSent(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not send this report.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-md rounded-t-2xl border border-surface-border bg-surface-1 p-6 sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-semibold text-ink-0">Report a problem with this agreement</h2>
+        {sent ? (
+          <>
+            <p className="mt-3 text-sm text-ink-1">
+              Thanks — support will review this. Reporting a problem does not change this contract's terms,
+              signatures, or payment status by itself.
+            </p>
+            <Button size="sm" className="mt-4" onClick={onClose}>
+              Close
+            </Button>
+          </>
+        ) : (
+          <>
+            <p className="mt-2 text-xs text-ink-2">
+              Use this if the other party isn't honouring the agreed terms, or something about this contract needs
+              support's attention. This is not a chat — it goes to BackTheVibes support, not the other party, and
+              will not automatically change the contract.
+            </p>
+            <TextArea
+              rows={4}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe the problem…"
+              className="mt-3"
+            />
+            {error ? <p className="mt-2 text-xs text-danger-500">{error}</p> : null}
+            <div className="mt-4 flex justify-end gap-2">
+              <Button size="sm" variant="secondary" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button size="sm" loading={busy} onClick={() => void submit()}>
+                Send report
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }

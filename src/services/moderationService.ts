@@ -61,6 +61,6 @@ export function subscribeArtistCopyrightClaims(
 }
 
 export const submitReport = callable<
-  { targetType: 'track' | 'artist' | 'dj' | 'user' | 'message' | 'post' | 'story'; targetId: string; reason: string; description: string },
+  { targetType: 'track' | 'artist' | 'dj' | 'user' | 'message' | 'post' | 'story' | 'agreement'; targetId: string; reason: string; description: string },
   { reportId: string }
 >('submitReport')

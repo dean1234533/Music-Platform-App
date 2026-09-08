@@ -4,7 +4,15 @@ import { db } from '../admin.js'
 import { requireActiveUser } from '../roles.js'
 import { requireAdmin, writeAuditLog } from './guard.js'
 
-const TARGET_TYPES = ['track', 'artist', 'dj', 'user', 'message', 'post'] as const
+const TARGET_TYPES = ['track', 'artist', 'dj', 'user', 'message', 'post', 'agreement'] as const
+
+/**
+ * A "Report Agreement Problem" on a licence contract lands here like any
+ * other report — it never touches the agreement doc itself (no auto-void,
+ * no term rewrite). An admin reviews it via AdminReportsPage and, if the
+ * agreement genuinely needs to change, does so through voidAgreement or by
+ * placing a legalHold — both separate, explicit, audited actions.
+ */
 
 export const submitReport = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
