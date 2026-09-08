@@ -51,6 +51,7 @@ import { DJDashboardLayout } from '@/pages/dj/DJDashboardLayout'
 import { DJDiscoverPage } from '@/pages/dj/DJDiscoverPage'
 import { DJRequestsPage } from '@/pages/dj/DJRequestsPage'
 import { DJProfilePage } from '@/pages/dj/DJProfilePage'
+import { DJPublicProfilePage } from '@/pages/dj/DJPublicProfilePage'
 import { DJCratesPage } from '@/pages/dj/DJCratesPage'
 import { DJAnalyticsPage } from '@/pages/dj/DJAnalyticsPage'
 
@@ -119,6 +120,7 @@ function App() {
             />
 
             <Route path="/artist/:slug" element={<ArtistPublicProfilePage />} />
+            <Route path="/djs/:djId" element={<DJPublicProfilePage />} />
             <Route path="/artist/:slug/track/:trackId" element={<TrackPage />} />
             <Route path="/track/:trackId" element={<TrackPage />} />
             <Route
