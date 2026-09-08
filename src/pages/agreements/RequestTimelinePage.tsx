@@ -39,6 +39,7 @@ export function RequestTimelinePage() {
   const [djName, setDjName] = useState<string>('DJ')
   const [loadError, setLoadError] = useState(false)
   const [counterTarget, setCounterTarget] = useState<LicenceOfferDoc | null>(null)
+  const [showSendOffer, setShowSendOffer] = useState(false)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
 
@@ -142,6 +143,12 @@ export function RequestTimelinePage() {
             onCounter={(offer) => setCounterTarget(offer)}
           />
         </section>
+      ) : isArtist ? (
+        <section>
+          <Button size="sm" onClick={() => setShowSendOffer(true)}>
+            Send terms
+          </Button>
+        </section>
       ) : null}
 
       <section>
@@ -193,6 +200,9 @@ export function RequestTimelinePage() {
 
       {counterTarget ? (
         <OfferFormModal requestId={licenceRequest.requestId} mode="counter" previousOffer={counterTarget} onClose={() => setCounterTarget(null)} />
+      ) : null}
+      {showSendOffer ? (
+        <OfferFormModal requestId={licenceRequest.requestId} mode="send" previousOffer={null} onClose={() => setShowSendOffer(false)} />
       ) : null}
     </div>
   )

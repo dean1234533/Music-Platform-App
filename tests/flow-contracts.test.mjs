@@ -228,6 +228,10 @@ test('the DJ<->artist request timeline replaces chat with a real backend-event a
   assert.match(page, /Your action required/)
   assert.match(page, /Waiting for the/)
   assert.doesNotMatch(page, /<textarea|sendMessage|conversationId/)
+  // Every state the NextActionBanner can announce must have a corresponding action on this same
+  // page — otherwise it tells a user to do something with no way to actually do it.
+  assert.match(page, /mode="send"/)
+  assert.match(page, /setShowSendOffer\(true\)/)
   assert.match(read('src/services/licenceService.ts'), /subscribeOffersForRequest/)
   assert.match(read('src/pages/dj/DJRequestsPage.tsx'), /\/dj-requests\/\$\{request\.requestId\}/)
   assert.match(read('src/pages/artist/dashboard/DJRequestsPage.tsx'), /\/dj-requests\/\$\{request\.requestId\}/)
