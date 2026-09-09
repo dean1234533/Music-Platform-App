@@ -48,7 +48,7 @@ export function CommunityPage() {
   }
 
   return (
-    <div className="flex max-w-2xl flex-col gap-8">
+    <div className="mx-auto flex max-w-2xl flex-col gap-8">
       <div>
         <h1 className="text-2xl font-semibold text-ink-0">Community</h1>
         <p className="mt-1 text-sm text-ink-2">
