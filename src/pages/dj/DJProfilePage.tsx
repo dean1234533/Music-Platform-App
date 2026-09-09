@@ -80,7 +80,7 @@ export function DJProfilePage() {
   return (
     <div className="flex max-w-lg flex-col gap-6">
       <div className="flex items-center gap-2">
-        <h1 className="text-2xl font-semibold text-ink-0">DJ profile</h1>
+        <h1 className="text-2xl font-semibold text-ink-0">DJ settings</h1>
         {profile.verificationStatus === 'verified' ? <BadgeCheck className="h-5 w-5 text-brand-400" /> : null}
       </div>
       <p className="-mt-4 text-sm text-ink-2">

@@ -18,7 +18,6 @@ import {
   LineChart,
   ListMusic,
   MessageSquare,
-  Music4,
   Radar,
   Search,
   Settings,
@@ -83,11 +82,11 @@ export const djNavItems: NavItem[] = [
   { label: 'Discover', to: '/dj/discover', icon: Radar, end: true },
   { label: 'Artists', to: '/dj/artists', icon: Users },
   { label: 'Promos & requests', to: '/dj/requests', icon: MessageSquare },
-  { label: 'Notifications', to: '/dj/notifications', icon: Bell },
   { label: 'Sets', to: '/dj/sets', icon: Layers },
   { label: 'Analytics', to: '/dj/analytics', icon: LineChart },
   { label: 'Agreements', to: '/agreements', icon: FileText },
-  { label: 'Profile', to: '/dj/profile', icon: Music4 },
+  { label: 'Notifications', to: '/dj/notifications', icon: Bell },
+  { label: 'Settings', to: '/dj/profile', icon: Settings },
   { label: 'Support', to: '/support', icon: LifeBuoy },
 ]
 
