@@ -29,7 +29,10 @@ export function MyAgreementsPage() {
   const [agreements, setAgreements] = useState<LicenceAgreementDoc[] | null>(null)
   const [trackTitles, setTrackTitles] = useState<Record<string, string>>({})
   const [partyNames, setPartyNames] = useState<Record<string, string>>({})
-  const [activeTab, setActiveTab] = useState(0)
+  // null = "no tab explicitly chosen yet" — land on the first tab that actually has
+  // something in it (e.g. Active once a request is complete) instead of always opening on
+  // Awaiting Signature even when it's empty. Once the DJ/artist clicks a tab, it sticks.
+  const [activeTab, setActiveTab] = useState<number | null>(null)
 
   useEffect(() => {
     if (!firebaseUser) return
@@ -75,6 +78,8 @@ export function MyAgreementsPage() {
     ...tab,
     items: (agreements ?? []).filter((a) => tab.statuses.includes(a.status)),
   }))
+  const defaultTab = grouped.findIndex((tab) => tab.items.length > 0)
+  const effectiveTab = activeTab ?? (defaultTab === -1 ? 0 : defaultTab)
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
@@ -96,7 +101,7 @@ export function MyAgreementsPage() {
                 type="button"
                 onClick={() => setActiveTab(i)}
                 className={`shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
-                  activeTab === i ? 'bg-surface-3 text-ink-0' : 'text-ink-2 hover:text-ink-0'
+                  effectiveTab === i ? 'bg-surface-3 text-ink-0' : 'text-ink-2 hover:text-ink-0'
                 }`}
               >
                 {tab.label} ({tab.items.length})
@@ -104,11 +109,11 @@ export function MyAgreementsPage() {
             ))}
           </div>
 
-          {grouped[activeTab]!.items.length === 0 ? (
-            <EmptyState title={`Nothing in ${grouped[activeTab]!.label}`} />
+          {grouped[effectiveTab]!.items.length === 0 ? (
+            <EmptyState title={`Nothing in ${grouped[effectiveTab]!.label}`} />
           ) : (
             <div className="flex flex-col gap-3">
-              {grouped[activeTab]!.items.map((agreement) => {
+              {grouped[effectiveTab]!.items.map((agreement) => {
                 const isDj = agreement.djId === firebaseUser?.uid
                 const otherPartyId = isDj ? agreement.artistId : agreement.djId
                 const bothSigned = Boolean(agreement.artistAcceptedAt && agreement.djAcceptedAt)

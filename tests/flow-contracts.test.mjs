@@ -397,6 +397,14 @@ test('the artist-side DJ requests page can also filter and delete closed request
   assert.match(page, /dismissLicenceRequest\(\{ requestId \}\)/)
 })
 
+test('My Agreements opens on the first tab that actually has something in it, not always Awaiting Signature (user-reported)', () => {
+  const page = read('src/pages/agreements/MyAgreementsPage.tsx')
+  assert.match(page, /useState<number \| null>\(null\)/)
+  assert.match(page, /const defaultTab = grouped\.findIndex\(\(tab\) => tab\.items\.length > 0\)/)
+  assert.match(page, /const effectiveTab = activeTab \?\? \(defaultTab === -1 \? 0 : defaultTab\)/)
+  assert.doesNotMatch(page, /useState\(0\)/)
+})
+
 test('the persistent player can be fully dismissed', () => {
   const player = read('src/contexts/PlayerContext.tsx')
   const bar = read('src/components/player/PlayerBar.tsx')
