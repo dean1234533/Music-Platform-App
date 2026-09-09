@@ -12,13 +12,13 @@ export const SEED_PLANS: PlanDoc[] = [
   },
   {
     planId: 'fan_supporter', name: 'Supporter', role: 'fan', tier: 'mid', priceMinor: 499,
-    currency: 'gbp', interval: 'month', stripePriceId: 'price_1UDHcsF82zwiwbNndswJySme', active: true, isDefaultFree: false,
+    currency: 'gbp', interval: 'month', stripePriceId: 'price_1UDe2bF82zwiwbNnTIgM5mzF', active: true, isDefaultFree: false,
     features: { supporterContent: true, earlyAccess: true, polls: true, artistDefinedPerks: true },
     limits: {}, displayOrder: 1, recommended: true,
   },
   {
     planId: 'artist_membership', name: 'Artist Membership', role: 'artist', tier: 'mid', priceMinor: 2999,
-    currency: 'gbp', interval: 'year', stripePriceId: 'price_1UDHdQF82zwiwbNn32d3qwhL', active: true, isDefaultFree: false,
+    currency: 'gbp', interval: 'year', stripePriceId: 'price_1UDe4DF82zwiwbNndVjL9sLP', active: true, isDefaultFree: false,
     features: {}, limits: {}, displayOrder: 0, recommended: true,
   },
 ]
