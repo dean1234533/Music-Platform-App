@@ -54,9 +54,9 @@ export function RequestTimelinePage() {
   }, [requestId])
 
   useEffect(() => {
-    if (!requestId) return
-    return subscribeOffersForRequest(requestId, setOffers)
-  }, [requestId])
+    if (!requestId || !firebaseUser) return
+    return subscribeOffersForRequest(requestId, firebaseUser.uid, setOffers)
+  }, [requestId, firebaseUser])
 
   useEffect(() => {
     if (!licenceRequest?.currentAgreementId) {

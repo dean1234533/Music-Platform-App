@@ -280,6 +280,21 @@ test('negotiation and contract forms stack to one column on phone widths instead
   }
 })
 
+test('the offer-history query is self-restricting so Firestore does not reject it as a list rule violation', () => {
+  // Firestore evaluates a list query's security rule against the QUERY SHAPE, not just each
+  // returned document — a bare where('requestId','==',id) with no uid-matching clause is
+  // rejected outright (permission-denied) even when every real matching doc would individually
+  // satisfy djId==uid || artistId==uid. The query itself must encode that restriction.
+  const service = read('src/services/licenceService.ts')
+  const page = read('src/pages/agreements/RequestTimelinePage.tsx')
+  assert.match(service, /and\(where\('requestId', '==', requestId\), or\(where\('djId', '==', uid\), where\('artistId', '==', uid\)\)\)/)
+  assert.match(page, /subscribeOffersForRequest\(requestId, firebaseUser\.uid, setOffers\)/)
+  const indexes = JSON.parse(read('firestore.indexes.json'))
+  const offerIndexes = indexes.indexes.filter((i) => i.collectionGroup === 'licenceOffers')
+  assert.ok(offerIndexes.some((i) => i.fields.some((f) => f.fieldPath === 'djId')), 'missing requestId+djId+version index')
+  assert.ok(offerIndexes.some((i) => i.fields.some((f) => f.fieldPath === 'artistId')), 'missing requestId+artistId+version index')
+})
+
 test('the contract page states the DJ receives only the listed rights, not ownership', () => {
   const contract = read('src/pages/agreements/ContractPage.tsx')
   assert.match(contract, /no ownership, resale,\s*\n\s*redistribution, remix, synchronisation, publishing, or master-recording rights/)

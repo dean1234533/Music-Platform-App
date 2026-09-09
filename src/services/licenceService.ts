@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore'
+import { and, collection, doc, getDocs, onSnapshot, or, orderBy, query, where } from 'firebase/firestore'
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { db, storage } from '@/lib/firebase'
 import { callable } from '@/lib/callable'
@@ -165,12 +165,25 @@ export async function uploadDrawnSignature(agreementId: string, uid: string, blo
 }
 
 /** Full offer/counter-offer history for a request, oldest first — the backbone of the request activity timeline. Never mutated, only appended to. */
+/**
+ * The query must itself restrict to documents the caller is allowed to read
+ * (djId == uid OR artistId == uid) — Firestore evaluates a `list` query's
+ * security rule against the query shape, not just against each returned
+ * document, so a bare `where('requestId', '==', requestId)` with no
+ * uid-matching clause is rejected outright (permission-denied) even though
+ * every actual matching offer document would individually satisfy the rule.
+ */
 export function subscribeOffersForRequest(
   requestId: string,
+  uid: string,
   onChange: (offers: LicenceOfferDoc[]) => void,
   onError?: (error: Error) => void,
 ) {
-  const q = query(collection(db, 'licenceOffers'), where('requestId', '==', requestId), orderBy('version', 'asc'))
+  const q = query(
+    collection(db, 'licenceOffers'),
+    and(where('requestId', '==', requestId), or(where('djId', '==', uid), where('artistId', '==', uid))),
+    orderBy('version', 'asc'),
+  )
   return onSnapshot(
     q,
     (snap) => onChange(snap.docs.map((d) => d.data() as LicenceOfferDoc)),
