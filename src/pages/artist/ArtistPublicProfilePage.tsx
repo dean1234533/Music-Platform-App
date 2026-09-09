@@ -27,6 +27,7 @@ import { clsx } from 'clsx'
 import { FanOfferCard } from '@/components/music/FanOfferCard'
 import { claimFanOffer, removeFanOfferClaim, subscribeOwnFanOfferClaims, subscribeVisibleFanOffers } from '@/services/fanOfferService'
 import { useToast } from '@/contexts/ToastContext'
+import { describeTrackAccess } from '@/utils/trackAccess'
 import type { FanOfferClaimDoc, FanOfferDoc } from '@/types/fanOffer'
 
 export function ArtistPublicProfilePage() {
@@ -141,6 +142,9 @@ export function ArtistPublicProfilePage() {
   if (!artist) return <LoadingState label="Loading artist…" />
 
   const publicTracks = tracks
+  const hasLockedTracks = publicTracks.some(
+    (track) => !describeTrackAccess(track, { isOwner: firebaseUser?.uid === artist.artistId, isAdmin: hasRole('admin'), isFollowing, isSupporting }).fullAccess,
+  )
   const activeStories = Object.values(activeStoriesByTier)
     .flat()
     .sort((a, b) => (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0))
@@ -285,7 +289,11 @@ export function ArtistPublicProfilePage() {
         <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1.6fr)_minmax(17rem,.7fr)]">
           <div>
             <div className="mb-4 flex items-end justify-between border-b border-white/[0.08] pb-4">
-              <div><p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-ink-3">Catalogue</p><h2 className="mt-1 text-2xl font-medium tracking-[-0.03em] text-ink-0">Tracks</h2></div>
+              <div>
+                <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-ink-3">Catalogue</p>
+                <h2 className="mt-1 text-2xl font-medium tracking-[-0.03em] text-ink-0">Tracks</h2>
+                {hasLockedTracks ? <p className="mt-1 text-xs text-ink-3">Follow to unlock full tracks — supporter-only releases unlock with support.</p> : null}
+              </div>
               <span className="text-sm tabular-nums text-ink-3">{publicTracks.length.toString().padStart(2, '0')} releases</span>
             </div>
             {publicTracks.length === 0 ? (
@@ -299,7 +307,19 @@ export function ArtistPublicProfilePage() {
             ) : (
               <div className="flex flex-wrap gap-4">
                 {publicTracks.map((track) => (
-                  <TrackCard key={track.trackId} track={track} queue={publicTracks} />
+                  <TrackCard
+                    key={track.trackId}
+                    track={track}
+                    queue={publicTracks}
+                    locked={
+                      !describeTrackAccess(track, {
+                        isOwner: firebaseUser?.uid === artist.artistId,
+                        isAdmin: hasRole('admin'),
+                        isFollowing,
+                        isSupporting,
+                      }).fullAccess
+                    }
+                  />
                 ))}
               </div>
             )}

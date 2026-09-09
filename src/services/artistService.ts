@@ -175,6 +175,14 @@ export function subscribeArtistTracks(
  * unconstrained query that *could* match a private track fails outright
  * under Firestore rules, it doesn't just omit that doc).
  */
+/**
+ * Every track a visitor is meant to see listed on the public profile —
+ * including followers/supporters/early_access tiers, which the profile
+ * shows locked with a Follow/Support CTA rather than hiding outright. Safe
+ * for any visitor: firestore.rules already makes these tiers' metadata
+ * (never audio) readable by anyone; dj_only and private stay excluded here
+ * since they're not part of the fan acquisition funnel this page drives.
+ */
 export function subscribePublicArtistTracks(
   artistId: string,
   onChange: (tracks: TrackDoc[]) => void,
@@ -183,7 +191,7 @@ export function subscribePublicArtistTracks(
   const q = query(
     collection(db, 'tracks'),
     where('artistId', '==', artistId),
-    where('visibility', '==', 'public'),
+    where('visibility', 'in', ['public', 'followers', 'supporters', 'early_access']),
     orderBy('createdAt', 'desc'),
   )
   return onSnapshot(

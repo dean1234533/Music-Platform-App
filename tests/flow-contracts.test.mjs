@@ -861,3 +861,29 @@ test('music access ladder: everyone can hear the preview regardless of a track\'
   assert.match(storage, /match \/artists\/\{artistId\}\/streaming\/\{fileName\} \{[\s\S]*?allow read: if isOwner\(artistId\);/)
   assert.match(storage, /match \/artists\/\{artistId\}\/originals\/\{fileName\} \{[\s\S]*?allow read: if isOwner\(artistId\);/)
 })
+
+test('the public artist profile shows locked followers/supporters/early-access tracks with a lock + CTA instead of hiding them, and the track page shows accurate play-button/access copy per viewer', () => {
+  const artistService = read('src/services/artistService.ts')
+  assert.match(artistService, /where\('visibility', 'in', \['public', 'followers', 'supporters', 'early_access'\]\)/)
+
+  const access = read('src/utils/trackAccess.ts')
+  assert.match(access, /export const TRACK_ACCESS_LABEL: Record<TrackVisibility, string> = \{/)
+  assert.match(access, /export function describeTrackAccess/)
+  assert.match(access, /viewer\.isFollowing/)
+  assert.match(access, /viewer\.isSupporting/)
+
+  const card = read('src/components/music/TrackCard.tsx')
+  assert.match(card, /locked\?: boolean/)
+  assert.match(card, /TRACK_ACCESS_LABEL\[track\.visibility\]/)
+  assert.match(card, /<Lock className="h-3 w-3" \/>/)
+
+  const trackPage = read('src/pages/track/TrackPage.tsx')
+  assert.match(trackPage, /const access = describeTrackAccess\(track, \{/)
+  assert.match(trackPage, /access\.lockedMessage \? <p/)
+  assert.match(trackPage, /subscribeIsFollowing\(firebaseUser\.uid, track\.artistId, setIsFollowing\)/)
+  assert.match(trackPage, /subscribeIsSupporting\(firebaseUser\.uid, track\.artistId, setIsSupporting\)/)
+
+  const profile = read('src/pages/artist/ArtistPublicProfilePage.tsx')
+  assert.match(profile, /const hasLockedTracks = publicTracks\.some/)
+  assert.match(profile, /locked=\{/)
+})

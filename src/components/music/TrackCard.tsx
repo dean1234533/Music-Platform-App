@@ -1,11 +1,13 @@
-import { Play } from 'lucide-react'
+import { Lock, Play } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { usePlayer } from '@/contexts/PlayerContext'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { TrackActions } from '@/components/music/TrackActions'
+import { TRACK_ACCESS_LABEL } from '@/utils/trackAccess'
 import type { TrackDoc } from '@/types/track'
 
-export function TrackCard({ track, queue }: { track: TrackDoc; queue?: TrackDoc[] }) {
+/** locked is opt-in — only a caller that actually knows this viewer's follow/support status for this track's artist (e.g. the artist profile page) should pass it; everywhere else the tier badge shows on its own with no lock state. */
+export function TrackCard({ track, queue, locked }: { track: TrackDoc; queue?: TrackDoc[]; locked?: boolean }) {
   const { playTrack, currentTrack, isPlaying } = usePlayer()
   const artist = useArtistSummary(track.artistId)
   const isCurrent = currentTrack?.trackId === track.trackId
@@ -24,6 +26,16 @@ export function TrackCard({ track, queue }: { track: TrackDoc; queue?: TrackDoc[
             <Play className="h-8 w-8" />
           </div>
         )}
+        {track.visibility !== 'public' ? (
+          <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white backdrop-blur-sm">
+            {TRACK_ACCESS_LABEL[track.visibility]}
+          </span>
+        ) : null}
+        {locked ? (
+          <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm">
+            <Lock className="h-3 w-3" />
+          </span>
+        ) : null}
         <div className="absolute inset-0 flex items-end justify-end bg-gradient-to-t from-black/65 via-transparent to-transparent p-4 opacity-0 transition-opacity group-hover:opacity-100">
           <span
             className={`flex h-12 w-12 items-center justify-center rounded-full bg-brand-500 text-surface-0 shadow-xl transition-transform hover:scale-105 ${
