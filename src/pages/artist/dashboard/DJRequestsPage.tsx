@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FileSignature, SlidersHorizontal } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { acceptExistingDeal, respondToLicenceRequest, subscribeRequestsForArtist } from '@/services/licenceService'
+import { acceptExistingDeal, dismissLicenceRequest, respondToLicenceRequest, subscribeRequestsForArtist } from '@/services/licenceService'
 import { getTrack } from '@/services/trackService'
 import { getDealsByIds } from '@/services/dealService'
 import { Button } from '@/components/common/Button'
@@ -12,18 +12,20 @@ import { OfferFormModal } from '@/components/licence/OfferFormModal'
 import type { LicenceOfferDoc, LicenceRequestDoc, LicenceRequestStatus } from '@/types/licence'
 import type { DjDealDoc } from '@/types/deal'
 
+const CLOSED_STATUSES: LicenceRequestStatus[] = ['rejected', 'expired', 'cancelled']
+
 const GROUPS: { status: LicenceRequestStatus[]; label: string }[] = [
   { status: ['submitted', 'artist_review', 'negotiating'], label: 'Needs your review' },
   { status: ['offer_sent', 'counter_offer'], label: 'Terms sent' },
   { status: ['agreement_ready', 'awaiting_signatures'], label: 'Needs signatures' },
   { status: ['awaiting_payment'], label: 'Waiting for DJ payment' },
   { status: ['approved'], label: 'Active' },
-  { status: ['rejected', 'expired', 'cancelled'], label: 'Closed' },
+  { status: CLOSED_STATUSES, label: 'Closed' },
 ]
 
 export function DJRequestsPage() {
   const { firebaseUser } = useAuth()
-  const [requests, setRequests] = useState<LicenceRequestDoc[] | null>(null)
+  const [allRequests, setRequests] = useState<LicenceRequestDoc[] | null>(null)
   const [trackTitles, setTrackTitles] = useState<Record<string, string>>({})
   const [deals, setDeals] = useState<Record<string, DjDealDoc>>({})
   const [offerModal, setOfferModal] = useState<{
@@ -34,6 +36,9 @@ export function DJRequestsPage() {
   } | null>(null)
   const [busyRequestId, setBusyRequestId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showClosed, setShowClosed] = useState(false)
+
+  const requests = allRequests?.filter((r) => !r.dismissedBy?.includes(firebaseUser?.uid ?? '')) ?? null
 
   useEffect(() => {
     if (!firebaseUser) return
@@ -84,6 +89,18 @@ export function DJRequestsPage() {
     }
   }
 
+  async function deleteRequest(requestId: string) {
+    setBusyRequestId(requestId)
+    setError(null)
+    try {
+      await dismissLicenceRequest({ requestId })
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not remove this request.')
+    } finally {
+      setBusyRequestId(null)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -98,7 +115,21 @@ export function DJRequestsPage() {
         <EmptyState title="No DJ requests yet" description="Requests and accepted artist deals will appear here." />
       ) : (
         <div className="flex flex-col gap-8">
+          {(() => {
+            const closedCount = requests.filter((r) => CLOSED_STATUSES.includes(r.status)).length
+            return closedCount > 0 ? (
+              <button
+                type="button"
+                onClick={() => setShowClosed((v) => !v)}
+                className="w-fit rounded-full border border-surface-border bg-surface-1 px-3.5 py-1.5 text-xs font-medium text-ink-2 transition hover:text-ink-0"
+              >
+                {showClosed ? 'Hide' : 'Show'} closed requests ({closedCount})
+              </button>
+            ) : null
+          })()}
           {GROUPS.map((group) => {
+            const isClosedGroup = group.label === 'Closed'
+            if (isClosedGroup && !showClosed) return null
             const items = requests.filter((request) => group.status.includes(request.status))
             if (items.length === 0) return null
             return (
@@ -175,6 +206,17 @@ export function DJRequestsPage() {
                         <p className="text-sm text-ink-2">Both parties signed. The DJ must pay before the track download unlocks.</p>
                       ) : request.status === 'approved' ? (
                         <p className="text-sm text-support-400">Complete. The DJ can download the licensed track.</p>
+                      ) : null}
+                      {CLOSED_STATUSES.includes(request.status) ? (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          loading={busyRequestId === request.requestId}
+                          onClick={() => void deleteRequest(request.requestId)}
+                          className="w-fit"
+                        >
+                          Delete
+                        </Button>
                       ) : null}
                     </article>
                     )

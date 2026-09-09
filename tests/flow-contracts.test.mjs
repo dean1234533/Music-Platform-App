@@ -388,6 +388,15 @@ test('a DJ can delete a closed request from their own list without erasing the a
   assert.match(read('functions/src/index.ts'), /dismissLicenceRequest/)
 })
 
+test('the artist-side DJ requests page can also filter and delete closed requests (user-reported)', () => {
+  const page = read('src/pages/artist/dashboard/DJRequestsPage.tsx')
+  assert.match(page, /showClosed \? 'Hide' : 'Show'/)
+  assert.match(page, /isClosedGroup && !showClosed/)
+  assert.match(page, /dismissedBy\?\.includes\(firebaseUser\?\.uid/)
+  assert.match(page, /void deleteRequest\(request\.requestId\)/)
+  assert.match(page, /dismissLicenceRequest\(\{ requestId \}\)/)
+})
+
 test('the persistent player can be fully dismissed', () => {
   const player = read('src/contexts/PlayerContext.tsx')
   const bar = read('src/components/player/PlayerBar.tsx')
