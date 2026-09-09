@@ -46,6 +46,7 @@ export function ContractPage() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [showReportModal, setShowReportModal] = useState(false)
   const [signatureImages, setSignatureImages] = useState<Record<'artist' | 'dj', string | null>>({ artist: null, dj: null })
+  const [signaturesReady, setSignaturesReady] = useState(false)
   const artist = useArtistSummary(agreement?.artistId ?? null)
 
   useEffect(() => {
@@ -60,12 +61,15 @@ export function ContractPage() {
 
   useEffect(() => {
     if (!agreementId || !(agreement?.artistAcceptedAt || agreement?.djAcceptedAt)) return
-    void getSignatureImageUrls({ agreementId }).then(({ signatures }) => {
-      setSignatureImages({
-        artist: signatures.find((s) => s.role === 'artist')?.url ?? null,
-        dj: signatures.find((s) => s.role === 'dj')?.url ?? null,
+    setSignaturesReady(false)
+    void getSignatureImageUrls({ agreementId })
+      .then(({ signatures }) => {
+        setSignatureImages({
+          artist: signatures.find((s) => s.role === 'artist')?.url ?? null,
+          dj: signatures.find((s) => s.role === 'dj')?.url ?? null,
+        })
       })
-    })
+      .finally(() => setSignaturesReady(true))
   }, [agreementId, agreement?.artistAcceptedAt, agreement?.djAcceptedAt])
 
   if (agreement === undefined && loadError) {
@@ -85,6 +89,10 @@ export function ContractPage() {
   const isDj = actingRole === 'dj'
   const hasSigned = isDj ? Boolean(agreement.djAcceptedAt) : Boolean(agreement.artistAcceptedAt)
   const isSignable = ['pending', 'ready_for_signature', 'artist_signed', 'dj_signed'].includes(agreement.status)
+  // "Download PDF" triggers window.print() synchronously — if a signature image's src hasn't
+  // even been set on the <img> yet, the printed page renders with no signature there at all
+  // (a real risk: this is a legal contract). Disabled until the fetch that sets it settles.
+  const awaitingSignatureImages = Boolean((agreement.artistAcceptedAt || agreement.djAcceptedAt) && !signaturesReady)
 
   async function handlePay() {
     setBusy(true)
@@ -134,7 +142,13 @@ export function ContractPage() {
             My Agreements
           </Link>
         </div>
-        <Button size="sm" variant="secondary" onClick={() => window.print()}>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={awaitingSignatureImages}
+          loading={awaitingSignatureImages}
+          onClick={() => window.print()}
+        >
           <Printer className="h-4 w-4" />
           Download PDF
         </Button>

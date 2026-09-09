@@ -431,6 +431,16 @@ test('drawn signatures export on an opaque white background and degrade graceful
   assert.match(contract, /e\.currentTarget\.style\.display = 'none'/)
 })
 
+test('Download PDF waits for signature images to be ready before printing (user-reported)', () => {
+  // window.print() fires synchronously on click; if the signature <img> src hasn't even been
+  // assigned yet (the getSignatureImageUrls fetch is still pending), the printed contract has
+  // no signature there at all — a real problem for what is meant to be the legal document.
+  const contract = read('src/pages/agreements/ContractPage.tsx')
+  assert.match(contract, /const awaitingSignatureImages = Boolean\(\(agreement\.artistAcceptedAt \|\| agreement\.djAcceptedAt\) && !signaturesReady\)/)
+  assert.match(contract, /disabled=\{awaitingSignatureImages\}/)
+  assert.match(contract, /\.finally\(\(\) => setSignaturesReady\(true\)\)/)
+})
+
 test('the persistent player can be fully dismissed', () => {
   const player = read('src/contexts/PlayerContext.tsx')
   const bar = read('src/components/player/PlayerBar.tsx')
