@@ -9,8 +9,14 @@ export interface AudioDerivative {
 export interface AudioProcessingResult {
   streaming: AudioDerivative
   preview: AudioDerivative
-  /** True if ffmpeg.wasm couldn't run and the master was used as a stand-in for both derivatives. */
+  djPreview: AudioDerivative | null
+  /** Kept for upload progress compatibility. Secure processing never falls back to the master. */
   degraded: boolean
+}
+
+export interface AudioMetadata {
+  durationSeconds: number
+  durationFormatted: string
 }
 
 // The wasm core is fetched from a CDN at runtime (the standard ffmpeg.wasm
@@ -57,30 +63,55 @@ function extOf(name: string): string {
   return parts.length > 1 ? `.${parts[parts.length - 1]}` : '.mp3'
 }
 
-function degradedFallback(master: File): AudioProcessingResult {
-  return {
-    streaming: { file: master, sizeBytes: master.size },
-    preview: { file: master, sizeBytes: master.size },
-    degraded: true,
+export async function readAudioMetadata(file: File): Promise<AudioMetadata> {
+  const url = URL.createObjectURL(file)
+  try {
+    const duration = await new Promise<number>((resolve, reject) => {
+      const audio = new Audio()
+      const cleanup = () => {
+        audio.removeAttribute('src')
+        audio.load()
+      }
+      audio.preload = 'metadata'
+      audio.onloadedmetadata = () => {
+        const value = audio.duration
+        cleanup()
+        if (!Number.isFinite(value) || value <= 0) reject(new Error('The audio duration could not be read.'))
+        else resolve(value)
+      }
+      audio.onerror = () => {
+        cleanup()
+        reject(new Error('The selected file does not contain readable audio metadata.'))
+      }
+      audio.src = url
+    })
+    const durationSeconds = Math.max(1, Math.floor(duration))
+    const minutes = Math.floor(durationSeconds / 60)
+    const seconds = durationSeconds % 60
+    return { durationSeconds, durationFormatted: `${minutes}:${String(seconds).padStart(2, '0')}` }
+  } finally {
+    URL.revokeObjectURL(url)
   }
 }
 
 /**
  * Derives a full-length "streaming" re-encode and a trimmed "preview" clip
- * from one uploaded master, entirely client-side. Falls back to using the
- * untrimmed master as a stand-in for both derivatives — clearly flagged via
- * `degraded: true`, never silently — if ffmpeg.wasm fails to load or the
- * device looks memory-constrained.
+ * from one uploaded master, entirely client-side. Processing fails closed:
+ * the full master is never substituted for a preview or normal stream.
  */
 export async function deriveAudioAssets(
   master: File,
   opts: {
     previewStartSec: number
     previewDurationSec: number
+    djPreviewStartSec?: number
+    djPreviewDurationSec?: number
     onProgress?: (stage: 'streaming' | 'preview', ratio: number) => void
   },
 ): Promise<AudioProcessingResult> {
-  if (looksMemoryConstrained()) return degradedFallback(master)
+  if (looksMemoryConstrained()) {
+    throw new Error('This device does not have enough memory to process the audio safely. Try again on a computer.')
+  }
 
   try {
     const ffmpeg = await loadFFmpeg()
@@ -110,18 +141,65 @@ export async function deriveAudioAssets(
     const previewData = await ffmpeg.readFile('preview.m4a')
     const previewFile = new File([previewData as Uint8Array<ArrayBuffer>], 'preview.m4a', { type: 'audio/mp4' })
 
+    let djPreview: AudioDerivative | null = null
+    if (opts.djPreviewDurationSec) {
+      currentStage = 'preview'
+      await ffmpeg.exec([
+        '-ss', String(opts.djPreviewStartSec ?? 0),
+        '-i', inputName,
+        '-t', String(opts.djPreviewDurationSec),
+        '-b:a', `${PREVIEW_AUDIO_BITRATE_KBPS}k`,
+        '-vn',
+        'dj-preview.m4a',
+      ])
+      const djPreviewData = await ffmpeg.readFile('dj-preview.m4a')
+      const file = new File([djPreviewData as Uint8Array<ArrayBuffer>], 'dj-preview.m4a', { type: 'audio/mp4' })
+      djPreview = { file, sizeBytes: file.size }
+    }
+
     ffmpeg.off('progress', onProgressHandler)
 
     return {
       streaming: { file: streamingFile, sizeBytes: streamingFile.size },
       preview: { file: previewFile, sizeBytes: previewFile.size },
+      djPreview,
       degraded: false,
     }
   } catch (err) {
     // Swallowing this entirely made a real bug (a blocked CSP fetch, say)
     // indistinguishable from an actual low-memory device — surface it so
     // it's diagnosable from the console instead of just "degraded: true".
-    console.warn('Client-side audio compression failed, uploading the original file instead:', err)
-    return degradedFallback(master)
+    console.warn('Client-side audio processing failed:', err)
+    throw new Error('Audio processing failed. Nothing was published and the full track was not used as a preview.')
+  }
+}
+
+/** Rebuilds only the short derivative when an artist edits preview timing. */
+export async function derivePreviewAsset(
+  master: File,
+  opts: { previewStartSec: number; previewDurationSec: number },
+): Promise<AudioDerivative> {
+  if (looksMemoryConstrained()) {
+    throw new Error('This device does not have enough memory to rebuild the preview safely. Try again on a computer.')
+  }
+  try {
+    const ffmpeg = await loadFFmpeg()
+    const { fetchFile } = await import('@ffmpeg/util')
+    const inputName = `preview-input${extOf(master.name)}`
+    await ffmpeg.writeFile(inputName, await fetchFile(master))
+    await ffmpeg.exec([
+      '-ss', String(opts.previewStartSec),
+      '-i', inputName,
+      '-t', String(opts.previewDurationSec),
+      '-b:a', `${PREVIEW_AUDIO_BITRATE_KBPS}k`,
+      '-vn',
+      'preview-edit.m4a',
+    ])
+    const data = await ffmpeg.readFile('preview-edit.m4a')
+    const file = new File([data as Uint8Array<ArrayBuffer>], 'preview.m4a', { type: 'audio/mp4' })
+    return { file, sizeBytes: file.size }
+  } catch (err) {
+    console.warn('Preview regeneration failed:', err)
+    throw new Error('The new preview could not be generated. Your existing preview and settings were kept.')
   }
 }

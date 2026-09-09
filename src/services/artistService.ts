@@ -197,7 +197,11 @@ export function subscribePublicArtistTracks(
   return onSnapshot(
     q,
     (snap) => {
-      onChange(snap.docs.map((d) => d.data() as TrackDoc))
+      onChange(
+        snap.docs
+          .map((d) => d.data() as TrackDoc)
+          .filter((track) => track.takenDown !== true && (track.status === undefined || track.status === 'published') && !track.restrictedCapabilities?.includes('discovery')),
+      )
     },
     (error) => {
       console.error('[subscribePublicArtistTracks] listener error:', error)

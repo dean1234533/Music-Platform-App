@@ -20,11 +20,12 @@ import type { RestrictedCapability } from '@/types/track'
 
 type ReportSubject = { label: string; href: string } | null
 
-const RESTRICTABLE_CAPABILITIES: RestrictedCapability[] = ['dj_licensing', 'discovery', 'streaming']
+const RESTRICTABLE_CAPABILITIES: RestrictedCapability[] = ['dj_licensing', 'discovery', 'streaming', 'sharing']
 const CAPABILITY_LABEL: Record<RestrictedCapability, string> = {
   dj_licensing: 'DJ licensing',
   discovery: 'Discovery placement',
   streaming: 'Full-length streaming',
+  sharing: 'Sharing',
 }
 
 interface ClaimDraft {

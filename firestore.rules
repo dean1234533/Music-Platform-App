@@ -25,6 +25,13 @@ service cloud.firestore {
       return hasRole('admin');
     }
 
+    function hasActiveSupportFor(artistId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/supportRelationships/$(request.auth.uid + '_' + artistId))
+        && exists(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_fan'))
+        && get(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_fan')).data.status in ['active', 'trialing'];
+    }
+
     // ---------------------------------------------------------------------
     // users/{userId} — private account document. Owner can read/update it,
     // but can never touch roles beyond fan/artist/dj, never grant themselves
@@ -110,16 +117,25 @@ service cloud.firestore {
       // real gate is entirely in getTrackPlaybackUrl + storage.rules: this
       // doc never contains playable audio, only Storage paths that are
       // owner-only at the Storage layer regardless of who can read this doc.
-      allow read: if resource.data.visibility == 'public'
+      allow read: if ((resource.data.get('status', 'published') == 'published') && (
+           resource.data.visibility == 'public'
         || resource.data.visibility == 'followers'
         || resource.data.visibility == 'supporters'
         || resource.data.visibility == 'early_access'
-        || (resource.data.visibility == 'dj_only' && hasRole('dj'))
+        || (resource.data.visibility == 'dj_only' && hasRole('dj'))))
         || (isSignedIn() && resource.data.artistId == request.auth.uid)
         || isAdmin();
 
       allow create: if isSignedIn()
         && request.resource.data.artistId == request.auth.uid
+        && request.resource.data.originalAudioPath.matches('artists/' + request.auth.uid + '/originals/' + trackId + '.+')
+        && request.resource.data.streamAudioPath.matches('artists/' + request.auth.uid + '/streaming/' + trackId + '.+')
+        && request.resource.data.previewAudioPath.matches('artists/' + request.auth.uid + '/previews/' + trackId + '.+')
+        && (request.resource.data.djPromotion == false || (
+            request.resource.data.djPreviewAudioPath.matches('artists/' + request.auth.uid + '/dj-previews/' + trackId + '.+')
+            && request.resource.data.djPreviewStartSec >= 0
+            && request.resource.data.djPreviewDurationSec >= 5
+            && request.resource.data.djPreviewStartSec + request.resource.data.djPreviewDurationSec <= request.resource.data.durationSeconds))
         && hasRole('artist')
         // Keep this finite storage allowance in sync with platformLimits.ts.
         && exists(/databases/$(database)/documents/artistProfiles/$(request.auth.uid))
@@ -128,15 +144,49 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_artist'))
         && get(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_artist')).data.status in ['active', 'trialing']
         && request.resource.data.rightsConfirmed == true
+        && request.resource.data.durationSeconds is number
+        && request.resource.data.durationSeconds > 0
+        && request.resource.data.durationFormatted is string
+        && request.resource.data.previewEnabled is bool
+        && request.resource.data.previewStartSec is number
+        && request.resource.data.previewStartSec >= 0
+        && request.resource.data.previewDurationSec is number
+        && request.resource.data.previewDurationSec >= 5
+        && request.resource.data.previewDurationSec <= 90
+        && (request.resource.data.previewEnabled == false
+            || request.resource.data.previewStartSec + request.resource.data.previewDurationSec <= request.resource.data.durationSeconds)
+        && request.resource.data.status == 'published'
         && request.resource.data.playCount == 0;
 
       allow update: if isSignedIn()
         && resource.data.artistId == request.auth.uid
         && request.resource.data.artistId == resource.data.artistId
+        && request.resource.data.originalAudioPath == resource.data.originalAudioPath
+        && request.resource.data.streamAudioPath == resource.data.streamAudioPath
+        && request.resource.data.previewAudioPath == resource.data.previewAudioPath
+        && request.resource.data.get('djPreviewAudioPath', null) == resource.data.get('djPreviewAudioPath', null)
         && request.resource.data.playCount == resource.data.playCount
         && request.resource.data.get('fullPlayCount', 0) == resource.data.get('fullPlayCount', 0)
         && request.resource.data.get('supporterPlayCount', 0) == resource.data.get('supporterPlayCount', 0)
         && request.resource.data.get('djPreviewCount', 0) == resource.data.get('djPreviewCount', 0)
+        && request.resource.data.get('djPreviewPlays', 0) == resource.data.get('djPreviewPlays', 0)
+        && request.resource.data.get('previewStarts', 0) == resource.data.get('previewStarts', 0)
+        && request.resource.data.get('previewCompletions', 0) == resource.data.get('previewCompletions', 0)
+        && request.resource.data.get('fullTrackStarts', 0) == resource.data.get('fullTrackStarts', 0)
+        && request.resource.data.get('fullTrackCompletions', 0) == resource.data.get('fullTrackCompletions', 0)
+        && request.resource.data.get('followerFullPlays', 0) == resource.data.get('followerFullPlays', 0)
+        && request.resource.data.get('publicFullPlays', 0) == resource.data.get('publicFullPlays', 0)
+        && request.resource.data.get('supporterFullPlays', 0) == resource.data.get('supporterFullPlays', 0)
+        && request.resource.data.get('status', 'published') == resource.data.get('status', 'published')
+        && request.resource.data.get('durationSeconds', 0) == resource.data.get('durationSeconds', 0)
+        && request.resource.data.get('durationFormatted', '') == resource.data.get('durationFormatted', '')
+        && request.resource.data.get('previewEnabled', true) is bool
+        && request.resource.data.previewStartSec >= 0
+        && request.resource.data.previewDurationSec >= 5
+        && request.resource.data.previewDurationSec <= 90
+        && (request.resource.data.get('previewEnabled', true) == false
+            || resource.data.get('durationSeconds', 0) == 0
+            || request.resource.data.previewStartSec + request.resource.data.previewDurationSec <= resource.data.durationSeconds)
         && request.resource.data.get('takenDown', false) == resource.data.get('takenDown', false)
         && request.resource.data.get('fileHash', null) == resource.data.get('fileHash', null)
         && request.resource.data.get('fileSize', null) == resource.data.get('fileSize', null)
@@ -221,10 +271,10 @@ service cloud.firestore {
     match /artistPosts/{postId} {
       allow read: if resource.data.visibility == 'everyone'
         || (isSignedIn() && resource.data.artistId == request.auth.uid)
-        || (resource.data.visibility == 'followers' && isSignedIn() &&
-            exists(/databases/$(database)/documents/follows/$(request.auth.uid + '_' + resource.data.artistId)))
-        || (resource.data.visibility == 'supporters' && isSignedIn() &&
-            exists(/databases/$(database)/documents/supportRelationships/$(request.auth.uid + '_' + resource.data.artistId)));
+        || (resource.data.visibility == 'followers' && isSignedIn() && (
+            exists(/databases/$(database)/documents/follows/$(request.auth.uid + '_' + resource.data.artistId))
+            || hasActiveSupportFor(resource.data.artistId)))
+        || (resource.data.visibility == 'supporters' && hasActiveSupportFor(resource.data.artistId));
       allow create: if isSignedIn() && request.resource.data.artistId == request.auth.uid;
       allow update, delete: if isSignedIn() && resource.data.artistId == request.auth.uid;
     }
@@ -237,8 +287,7 @@ service cloud.firestore {
         || (isSignedIn() && resource.data.artistId == request.auth.uid)
         || (resource.data.audience == 'followers' && isSignedIn() &&
             exists(/databases/$(database)/documents/follows/$(request.auth.uid + '_' + resource.data.artistId)))
-        || (resource.data.audience == 'supporters' && isSignedIn() &&
-            exists(/databases/$(database)/documents/supportRelationships/$(request.auth.uid + '_' + resource.data.artistId)));
+        || (resource.data.audience == 'supporters' && hasActiveSupportFor(resource.data.artistId));
       allow create: if isSignedIn()
         && hasRole('artist')
         && request.resource.data.artistId == request.auth.uid
@@ -261,7 +310,7 @@ service cloud.firestore {
           || (get(/databases/$(database)/documents/fanOffers/$(request.resource.data.offerId)).data.audience == 'followers'
               && exists(/databases/$(database)/documents/follows/$(request.auth.uid + '_' + request.resource.data.artistId)))
           || (get(/databases/$(database)/documents/fanOffers/$(request.resource.data.offerId)).data.audience == 'supporters'
-              && exists(/databases/$(database)/documents/supportRelationships/$(request.auth.uid + '_' + request.resource.data.artistId)))
+              && hasActiveSupportFor(request.resource.data.artistId))
         );
       allow update: if false;
       allow delete: if isSignedIn() && resource.data.fanId == request.auth.uid;
@@ -278,10 +327,10 @@ service cloud.firestore {
     match /stories/{storyId} {
       allow read: if resource.data.visibility == 'public'
         || (isSignedIn() && resource.data.artistId == request.auth.uid)
-        || (resource.data.visibility == 'followers' && isSignedIn() &&
-            exists(/databases/$(database)/documents/follows/$(request.auth.uid + '_' + resource.data.artistId)))
-        || (resource.data.visibility == 'supporters' && isSignedIn() &&
-            exists(/databases/$(database)/documents/supportRelationships/$(request.auth.uid + '_' + resource.data.artistId)))
+        || (resource.data.visibility == 'followers' && isSignedIn() && (
+            exists(/databases/$(database)/documents/follows/$(request.auth.uid + '_' + resource.data.artistId))
+            || hasActiveSupportFor(resource.data.artistId)))
+        || (resource.data.visibility == 'supporters' && hasActiveSupportFor(resource.data.artistId))
         || (resource.data.visibility == 'dj' && hasRole('dj') &&
             get(/databases/$(database)/documents/artistProfiles/$(resource.data.artistId)).data.get('storiesDjEnabled', false) == true)
         || isAdmin();

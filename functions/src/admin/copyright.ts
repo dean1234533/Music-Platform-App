@@ -17,7 +17,7 @@ const CLAIM_STATUSES = [
   'restored',
 ] as const
 
-const RESTRICTABLE_CAPABILITIES = ['dj_licensing', 'discovery', 'streaming'] as const
+const RESTRICTABLE_CAPABILITIES = ['dj_licensing', 'discovery', 'streaming', 'sharing'] as const
 
 /**
  * Anyone can file a claim — uploading a track never makes an artist a

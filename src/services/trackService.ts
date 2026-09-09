@@ -20,6 +20,7 @@ import { db, functions, storage } from '@/lib/firebase'
 import type { LicenceMode, TrackCredits, TrackDoc, TrackVisibility } from '@/types/track'
 import type { TrackDjDealSettings } from '@/types/deal'
 import { slugify } from '@/utils/slug'
+import { derivePreviewAsset } from '@/services/audioProcessing'
 
 function trackRef(trackId: string) {
   return doc(db, 'tracks', trackId)
@@ -44,6 +45,7 @@ export interface UploadedTrackAssets {
   previewAudioPath: string
   streamAudioPath: string
   originalAudioPath: string
+  djPreviewAudioPath: string | null
   artworkURL: string | null
 }
 
@@ -58,18 +60,22 @@ export interface UploadedTrackAssets {
 export async function uploadTrackAssets(
   artistId: string,
   trackId: string,
-  files: { master: File; streaming: File; preview: File; artwork: File | null },
+  files: { master: File; streaming: File; preview: File; djPreview: File | null; artwork: File | null },
   onProgress?: (percent: number) => void,
 ): Promise<UploadedTrackAssets> {
   const originalPath = `artists/${artistId}/originals/${trackId}.${extOf(files.master)}`
   const streamingPath = `artists/${artistId}/streaming/${trackId}.${extOf(files.streaming)}`
   const previewPath = `artists/${artistId}/previews/${trackId}.${extOf(files.preview)}`
+  const djPreviewPath = files.djPreview ? `artists/${artistId}/dj-previews/${trackId}.${extOf(files.djPreview)}` : null
 
   const uploads: { task: ReturnType<typeof uploadBytesResumable>; total: number }[] = [
     { task: uploadBytesResumable(ref(storage, originalPath), files.master), total: files.master.size },
     { task: uploadBytesResumable(ref(storage, streamingPath), files.streaming), total: files.streaming.size },
     { task: uploadBytesResumable(ref(storage, previewPath), files.preview), total: files.preview.size },
   ]
+  if (files.djPreview && djPreviewPath) {
+    uploads.push({ task: uploadBytesResumable(ref(storage, djPreviewPath), files.djPreview), total: files.djPreview.size })
+  }
   const totalBytes = uploads.reduce((sum, u) => sum + u.total, 0)
   const transferred = new Array(uploads.length).fill(0)
 
@@ -99,7 +105,7 @@ export async function uploadTrackAssets(
     artworkURL = await getDownloadURL(artworkSnap.ref)
   }
 
-  return { previewAudioPath: previewPath, streamAudioPath: streamingPath, originalAudioPath: originalPath, artworkURL }
+  return { previewAudioPath: previewPath, streamAudioPath: streamingPath, originalAudioPath: originalPath, djPreviewAudioPath: djPreviewPath, artworkURL }
 }
 
 function extOf(file: File): string {
@@ -121,6 +127,11 @@ export interface CreateTrackInput {
   albumId: string | null
   credits: TrackCredits
   visibility: TrackVisibility
+  durationSeconds: number
+  durationFormatted: string
+  previewEnabled: boolean
+  djPreviewStartSec: number | null
+  djPreviewDurationSec: number | null
   previewDurationSec: number
   previewStartSec: number
   djPromotion: boolean
@@ -182,9 +193,15 @@ export async function createTrack(
     description: input.description,
     explicit: input.explicit,
     credits: input.credits,
+    durationSeconds: input.durationSeconds,
+    durationFormatted: input.durationFormatted,
+    previewEnabled: input.previewEnabled,
     previewAudioPath: assets.previewAudioPath,
     previewDurationSec: input.previewDurationSec,
     previewStartSec: input.previewStartSec,
+    djPreviewAudioPath: assets.djPreviewAudioPath,
+    djPreviewStartSec: input.djPreviewStartSec,
+    djPreviewDurationSec: input.djPreviewDurationSec,
     originalAudioPath: assets.originalAudioPath,
     streamAudioPath: assets.streamAudioPath,
     artworkURL: assets.artworkURL,
@@ -200,6 +217,7 @@ export async function createTrack(
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     rightsConfirmed: true,
+    status: 'published',
     rightsMetadata: input.rightsMetadata,
   }
   await setDoc(trackRef(trackId), track)
@@ -233,6 +251,7 @@ export async function updateTrackDealSettings(trackId: string, settings: TrackDj
 
 export interface TrackAccessSettingsInput {
   visibility: TrackVisibility
+  previewEnabled: boolean
   previewStartSec: number
   previewDurationSec: number
   /** Only meaningful when visibility === 'early_access'. */
@@ -250,11 +269,31 @@ export interface TrackAccessSettingsInput {
 export async function updateTrackAccessSettings(trackId: string, input: TrackAccessSettingsInput): Promise<void> {
   await updateDoc(trackRef(trackId), {
     visibility: input.visibility,
+    previewEnabled: input.previewEnabled,
     previewStartSec: input.previewStartSec,
     previewDurationSec: input.previewDurationSec,
     followerReleaseAt: input.followerReleaseAt ? Timestamp.fromDate(input.followerReleaseAt) : null,
     publicReleaseAt: input.publicReleaseAt ? Timestamp.fromDate(input.publicReleaseAt) : null,
     updatedAt: serverTimestamp(),
+  })
+}
+
+/** Rebuilds the real short preview before its timing metadata is changed. */
+export async function regenerateTrackPreview(
+  track: TrackDoc,
+  previewStartSec: number,
+  previewDurationSec: number,
+): Promise<void> {
+  const originalUrl = await getDownloadURL(ref(storage, track.originalAudioPath))
+  const response = await fetch(originalUrl)
+  if (!response.ok) throw new Error('The original audio could not be opened to rebuild the preview.')
+  const blob = await response.blob()
+  const extension = track.originalAudioPath.split('.').pop() || 'mp3'
+  const master = new File([blob], `master.${extension}`, { type: blob.type || track.mimeType || 'audio/mpeg' })
+  const derivative = await derivePreviewAsset(master, { previewStartSec, previewDurationSec })
+  await new Promise<void>((resolve, reject) => {
+    const task = uploadBytesResumable(ref(storage, track.previewAudioPath), derivative.file)
+    task.on('state_changed', undefined, reject, () => resolve())
   })
 }
 
@@ -271,6 +310,11 @@ export async function getPreviewPlaybackURL(track: TrackDoc): Promise<string> {
   return (await fn({ trackId: track.trackId, kind: 'preview' })).data.url
 }
 
+export async function getDjPreviewPlaybackURL(track: TrackDoc): Promise<string> {
+  const fn = httpsCallable<{ trackId: string; kind: 'dj_preview' }, { url: string }>(functions, 'getTrackPlaybackUrl')
+  return (await fn({ trackId: track.trackId, kind: 'dj_preview' })).data.url
+}
+
 /** Full-length optimised playback for entitled listeners — visibility-gated the same as the track itself. */
 export async function getStreamPlaybackURL(track: TrackDoc): Promise<string> {
   const fn = httpsCallable<{ trackId: string; kind: 'stream' }, { url: string }>(functions, 'getTrackPlaybackUrl')
@@ -285,12 +329,14 @@ export async function deleteTrack(trackId: string): Promise<void> {
 export async function listNewReleases(count = 20): Promise<TrackDoc[]> {
   const q = query(
     collection(db, 'tracks'),
-    where('visibility', '==', 'public'),
+    where('visibility', 'in', ['public', 'followers', 'supporters', 'early_access']),
     orderBy('createdAt', 'desc'),
     limit(count),
   )
   const snap = await getDocs(q)
-  return snap.docs.map((d) => d.data() as TrackDoc)
+  return snap.docs
+    .map((d) => d.data() as TrackDoc)
+    .filter((track) => track.takenDown !== true && (track.status === undefined || track.status === 'published') && !track.restrictedCapabilities?.includes('discovery'))
 }
 
 export interface DjTrackFilters {
@@ -360,7 +406,11 @@ export async function listDJPromotionTracks(count = 20): Promise<TrackDoc[]> {
 }
 
 /** Server-side play counting keeps play counts out of reach of client tampering. */
-export async function recordTrackPlay(trackId: string, kind: 'preview' | 'stream'): Promise<void> {
+export async function recordTrackPlay(
+  trackId: string,
+  kind: 'preview' | 'dj_preview' | 'stream',
+  event: 'start' | 'completion' = 'start',
+): Promise<void> {
   const fn = httpsCallable(functions, 'recordTrackPlay')
-  await fn({ trackId, kind })
+  await fn({ trackId, kind, event })
 }

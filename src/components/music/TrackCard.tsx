@@ -62,6 +62,11 @@ export function TrackCard({ track, queue, locked }: { track: TrackDoc; queue?: T
         )}
         <TrackActions track={track} />
       </div>
+      {track.durationFormatted ? (
+        <p className="mt-1 text-[11px] tabular-nums text-ink-3">
+          {track.durationFormatted} · {locked ? `${track.previewDurationSec}s Preview` : 'Full Track'}
+        </p>
+      ) : null}
     </div>
   )
 }

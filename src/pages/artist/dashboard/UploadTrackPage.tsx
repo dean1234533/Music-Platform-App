@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { createTrack, newTrackId, uploadTrackAssets } from '@/services/trackService'
 import { getArtistProfile } from '@/services/artistService'
 import { getPlatformSettings } from '@/services/platformSettingsService'
-import { deriveAudioAssets } from '@/services/audioProcessing'
+import { deriveAudioAssets, readAudioMetadata, type AudioMetadata } from '@/services/audioProcessing'
 import { compressImage } from '@/services/imageProcessing'
 import { recordRightsDeclaration } from '@/services/legalService'
 import { subscribeToOwnSubscription, subscribeToPlan } from '@/services/subscriptionService'
@@ -13,7 +13,7 @@ import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
 import { UploadProgress } from '@/components/common/UploadProgress'
 import { formatFileSize, MAX_AUDIO_MB, MAX_IMAGE_MB, validateAudioFile, validateImageFile } from '@/utils/uploadLimits'
-import { PREVIEW_MAX_DURATION_SEC, PREVIEW_MIN_DURATION_SEC, SUGGESTED_PREVIEW_DURATIONS_SEC } from '@/constants/mediaConfig'
+import { PREVIEW_DEFAULT_DURATION_SEC, PREVIEW_MAX_DURATION_SEC, PREVIEW_MIN_DURATION_SEC, SUGGESTED_PREVIEW_DURATIONS_SEC } from '@/constants/mediaConfig'
 import { ACCESS_SUMMARY, VISIBILITY_OPTIONS } from '@/utils/trackAccess'
 import type { LicenceMode, TrackRightsMetadata, TrackVisibility } from '@/types/track'
 import type { SubscriptionDoc } from '@/types/subscription'
@@ -60,10 +60,13 @@ export function UploadTrackPage() {
   const [songwriters, setSongwriters] = useState('')
   const [producers, setProducers] = useState('')
   const [featuredArtists, setFeaturedArtists] = useState('')
-  const [visibility, setVisibility] = useState<TrackVisibility>('public')
+  const [visibility, setVisibility] = useState<TrackVisibility>('followers')
+  const [previewEnabled, setPreviewEnabled] = useState(true)
   const [previewStartSec, setPreviewStartSec] = useState(0)
-  const [previewDurationSec, setPreviewDurationSec] = useState(30)
+  const [previewDurationSec, setPreviewDurationSec] = useState(PREVIEW_DEFAULT_DURATION_SEC)
   const [djPromotion, setDjPromotion] = useState(false)
+  const [djPreviewStartSec, setDjPreviewStartSec] = useState(0)
+  const [djPreviewDurationSec, setDjPreviewDurationSec] = useState(90)
   const [djLicenceMode, setDjLicenceMode] = useState<LicenceMode>('not_available')
   const [djFixedPrice, setDjFixedPrice] = useState('')
   const [embargoDate, setEmbargoDate] = useState('')
@@ -113,6 +116,7 @@ export function UploadTrackPage() {
   }
 
   const [masterFile, setMasterFile] = useState<File | null>(null)
+  const [audioMetadata, setAudioMetadata] = useState<AudioMetadata | null>(null)
   const [artworkFile, setArtworkFile] = useState<File | null>(null)
   const [fileErrors, setFileErrors] = useState<{ master?: string; artwork?: string }>({})
 
@@ -138,11 +142,22 @@ export function UploadTrackPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  function masterFileHandler(e: ChangeEvent<HTMLInputElement>) {
+  async function masterFileHandler(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null
     const validationError = file ? validateAudioFile(file) : null
     setFileErrors((prev) => ({ ...prev, master: validationError ?? undefined }))
     setMasterFile(validationError ? null : file)
+    setAudioMetadata(null)
+    if (file && !validationError) {
+      try {
+        const metadata = await readAudioMetadata(file)
+        setAudioMetadata(metadata)
+        setDjPreviewDurationSec(Math.min(90, metadata.durationSeconds))
+      } catch (err) {
+        setMasterFile(null)
+        setFileErrors((prev) => ({ ...prev, master: err instanceof Error ? err.message : 'Could not read this audio file.' }))
+      }
+    }
   }
 
   function artworkFileHandler(e: ChangeEvent<HTMLInputElement>) {
@@ -174,6 +189,23 @@ export function UploadTrackPage() {
       setError('A master audio file is required.')
       return
     }
+    const metadata = audioMetadata ?? await readAudioMetadata(masterFile)
+    if (!Number.isFinite(previewStartSec) || previewStartSec < 0 || !Number.isFinite(previewDurationSec)
+      || previewDurationSec < PREVIEW_MIN_DURATION_SEC || previewDurationSec > PREVIEW_MAX_DURATION_SEC) {
+      setError(`Preview timing must use a start at or after 0 and a length between ${PREVIEW_MIN_DURATION_SEC} and ${PREVIEW_MAX_DURATION_SEC} seconds.`)
+      return
+    }
+    if (previewEnabled && previewStartSec + previewDurationSec > metadata.durationSeconds) {
+      setError(`The preview must end within the full ${metadata.durationFormatted} track.`)
+      return
+    }
+    if (djPromotion && (!Number.isFinite(djPreviewStartSec) || djPreviewStartSec < 0
+      || !Number.isFinite(djPreviewDurationSec) || djPreviewDurationSec < 5
+      || djPreviewDurationSec > 120
+      || djPreviewStartSec + djPreviewDurationSec > metadata.durationSeconds)) {
+      setError(`The DJ preview must be at least 5 seconds and end within the full ${metadata.durationFormatted} track.`)
+      return
+    }
     if (!rightsConfirmed || !understandsConsequences) {
       setError('You must confirm both rights declaration statements.')
       return
@@ -193,6 +225,8 @@ export function UploadTrackPage() {
       const audio = await deriveAudioAssets(masterFile, {
         previewStartSec,
         previewDurationSec,
+        djPreviewStartSec: djPromotion ? djPreviewStartSec : undefined,
+        djPreviewDurationSec: djPromotion ? djPreviewDurationSec : undefined,
         onProgress: (_stage, ratio) => mediaUpload.setProcessing(Math.round(ratio * 100)),
       })
 
@@ -207,7 +241,7 @@ export function UploadTrackPage() {
       const assets = await uploadTrackAssets(
         firebaseUser.uid,
         trackId,
-        { master: masterFile, streaming: audio.streaming.file, preview: audio.preview.file, artwork: processedArtwork },
+        { master: masterFile, streaming: audio.streaming.file, preview: audio.preview.file, djPreview: audio.djPreview?.file ?? null, artwork: processedArtwork },
         (percent) => mediaUpload.setUploadProgress(percent),
       )
 
@@ -250,6 +284,11 @@ export function UploadTrackPage() {
           featuredArtists: splitList(featuredArtists),
         },
         visibility,
+        durationSeconds: metadata.durationSeconds,
+        durationFormatted: metadata.durationFormatted,
+        previewEnabled,
+        djPreviewStartSec: djPromotion ? djPreviewStartSec : null,
+        djPreviewDurationSec: djPromotion ? djPreviewDurationSec : null,
         previewStartSec,
         previewDurationSec,
         djPromotion,
@@ -394,7 +433,9 @@ export function UploadTrackPage() {
                 className="block w-full text-sm text-ink-2 file:mr-3 file:rounded-lg file:border-0 file:bg-surface-3 file:px-3 file:py-2 file:text-ink-0"
               />
               {masterFile && !fileErrors.master ? (
-                <p className="mt-1 text-xs text-ink-3">{formatFileSize(masterFile.size)}</p>
+                <p className="mt-1 text-xs text-ink-3">
+                  {formatFileSize(masterFile.size)}{audioMetadata ? ` · Full track ${audioMetadata.durationFormatted}` : ' · Reading duration…'}
+                </p>
               ) : null}
               {fileErrors.master ? <p className="mt-1 text-xs text-danger-500">{fileErrors.master}</p> : null}
             </Field>
@@ -408,25 +449,31 @@ export function UploadTrackPage() {
               <p className="mt-1 text-xs text-ink-3">Up to {MAX_IMAGE_MB}MB — resized and compressed automatically.</p>
               {fileErrors.artwork ? <p className="mt-1 text-xs text-danger-500">{fileErrors.artwork}</p> : null}
             </Field>
-            <div className="grid grid-cols-2 gap-4">
+            <label className="flex items-center gap-2 text-sm text-ink-1">
+              <input type="checkbox" checked={previewEnabled} onChange={(e) => setPreviewEnabled(e.target.checked)} className="h-4 w-4 accent-brand-500" />
+              Public preview enabled
+            </label>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Preview start (seconds)">
-                <Input type="number" min={0} value={previewStartSec} onChange={(e) => setPreviewStartSec(Number(e.target.value))} />
+                <Input disabled={!previewEnabled} type="number" min={0} max={audioMetadata ? Math.max(0, audioMetadata.durationSeconds - previewDurationSec) : undefined} value={previewStartSec} onChange={(e) => setPreviewStartSec(Number(e.target.value))} />
               </Field>
               <Field label="Preview duration (seconds)">
                 <Input
                   type="number"
                   min={PREVIEW_MIN_DURATION_SEC}
                   max={PREVIEW_MAX_DURATION_SEC}
+                  disabled={!previewEnabled}
                   value={previewDurationSec}
                   onChange={(e) => setPreviewDurationSec(Number(e.target.value))}
                 />
               </Field>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2" aria-disabled={!previewEnabled}>
               {suggestedPreviewDurations.map((sec) => (
                 <button
                   key={sec}
                   type="button"
+                  disabled={!previewEnabled}
                   onClick={() => setPreviewDurationSec(sec)}
                   className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
                     previewDurationSec === sec
@@ -441,7 +488,7 @@ export function UploadTrackPage() {
           </div>
         </div>
 
-        <Field label="Who can stream this track?">
+        <Field label="Who can hear the full track?">
           <select
             value={visibility}
             onChange={(e) => setVisibility(e.target.value as TrackVisibility)}
@@ -493,6 +540,17 @@ export function UploadTrackPage() {
             />
             Available for DJ promotion — list this track in the DJ discovery feed
           </label>
+          {djPromotion ? (
+            <div className="mb-4 grid grid-cols-1 gap-4 rounded-xl border border-dj-500/20 bg-black/10 p-3 sm:grid-cols-2">
+              <Field label="DJ preview start (seconds)">
+                <Input type="number" min={0} value={djPreviewStartSec} onChange={(e) => setDjPreviewStartSec(Number(e.target.value))} />
+              </Field>
+              <Field label="DJ preview length (seconds)">
+                <Input type="number" min={5} max={120} value={djPreviewDurationSec} onChange={(e) => setDjPreviewDurationSec(Number(e.target.value))} />
+              </Field>
+              <p className="text-xs leading-5 text-ink-2 sm:col-span-2">This creates a separate DJ Preview. It never grants the master or download access.</p>
+            </div>
+          ) : null}
           <div className="grid grid-cols-2 gap-4">
             <Field label="Licence terms">
               <select

@@ -31,7 +31,7 @@ export interface PlatformSettings {
   allowedPreviewDurationsSec: number[]
   maxUploadSizeMB: number
   supportedAudioTypes: string[]
-  /** Falls back to PREVIEW_DEFAULT_DURATION_SEC/'public' in mediaConfig.ts until an admin configures these. */
+  /** Falls back to PREVIEW_DEFAULT_DURATION_SEC/'followers' until an admin configures these. */
   defaultTrackVisibility?: TrackVisibility
   defaultPreviewDurationSec?: number
 }

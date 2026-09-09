@@ -72,7 +72,7 @@ export function AdminSettingsPage() {
   const [feeForm, setFeeForm] = useState({ platformFeePercent: '', artistAllocationPercent: '', djServiceFeePercent: '', minimumPayoutMinor: '' })
   const [savingFees, setSavingFees] = useState(false)
   const [trackDefaultsForm, setTrackDefaultsForm] = useState({
-    defaultTrackVisibility: 'public' as TrackVisibility,
+    defaultTrackVisibility: 'followers' as TrackVisibility,
     defaultPreviewDurationSec: String(PREVIEW_DEFAULT_DURATION_SEC),
     allowedPreviewDurationsSec: SUGGESTED_PREVIEW_DURATIONS_SEC.join(', '),
   })
@@ -106,7 +106,7 @@ export function AdminSettingsPage() {
         minimumPayoutMinor: String(settings.minimumPayoutMinor),
       })
       setTrackDefaultsForm({
-        defaultTrackVisibility: settings.defaultTrackVisibility ?? 'public',
+        defaultTrackVisibility: settings.defaultTrackVisibility ?? 'followers',
         defaultPreviewDurationSec: String(settings.defaultPreviewDurationSec ?? PREVIEW_DEFAULT_DURATION_SEC),
         allowedPreviewDurationsSec: (settings.allowedPreviewDurationsSec ?? SUGGESTED_PREVIEW_DURATIONS_SEC).join(', '),
       })
@@ -436,9 +436,9 @@ export function AdminSettingsPage() {
               onChange={(e) => setTrackDefaultsForm((f) => ({ ...f, defaultTrackVisibility: e.target.value as TrackVisibility }))}
               className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-base sm:text-sm text-ink-0 outline-none focus:border-brand-500"
             >
-              <option value="public">Public stream</option>
-              <option value="followers">Followers only</option>
-              <option value="supporters">Supporters only</option>
+              <option value="public">Everyone</option>
+              <option value="followers">Followers</option>
+              <option value="supporters">Supporters</option>
               <option value="early_access">Early access</option>
               <option value="dj_only">DJ only</option>
               <option value="private">Private</option>

@@ -7,12 +7,12 @@ import { listDJPromotionTracksFiltered, type DjTrackFilters } from './trackServi
 export async function listNewReleaseTracks(count = 20): Promise<TrackDoc[]> {
   const q = query(
     collection(db, 'tracks'),
-    where('visibility', '==', 'public'),
+    where('visibility', 'in', ['public', 'followers', 'supporters', 'early_access']),
     orderBy('createdAt', 'desc'),
     limit(count),
   )
   const snap = await getDocs(q)
-  return snap.docs.map((d) => d.data() as TrackDoc)
+  return snap.docs.map((d) => d.data() as TrackDoc).filter(isFanDiscoverable)
 }
 
 export async function listMostSupportedArtists(count = 12): Promise<ArtistProfile[]> {
@@ -47,11 +47,17 @@ export async function listArtistsSeekingDJExposure(
 export async function listByGenre(genre: string, count = 20): Promise<TrackDoc[]> {
   const q = query(
     collection(db, 'tracks'),
-    where('visibility', '==', 'public'),
+    where('visibility', 'in', ['public', 'followers', 'supporters', 'early_access']),
     where('genre', '==', genre),
     orderBy('createdAt', 'desc'),
     limit(count),
   )
   const snap = await getDocs(q)
-  return snap.docs.map((d) => d.data() as TrackDoc)
+  return snap.docs.map((d) => d.data() as TrackDoc).filter(isFanDiscoverable)
+}
+
+function isFanDiscoverable(track: TrackDoc): boolean {
+  return track.takenDown !== true
+    && (track.status === undefined || track.status === 'published')
+    && !track.restrictedCapabilities?.includes('discovery')
 }

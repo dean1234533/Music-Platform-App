@@ -63,5 +63,10 @@ export async function resolveEffectivePlan(uid: string, role: PlanRole = 'fan'):
 }
 
 export async function canAccessSupporterContent(fanId: string, artistId: string): Promise<boolean> {
-  return (await db.collection('supportRelationships').doc(`${fanId}_${artistId}`).get()).exists
+  const [relationship, subscription] = await Promise.all([
+    db.collection('supportRelationships').doc(`${fanId}_${artistId}`).get(),
+    db.collection('subscriptions').doc(`${fanId}_fan`).get(),
+  ])
+  const status = subscription.data()?.status
+  return relationship.exists && (status === 'active' || status === 'trialing')
 }

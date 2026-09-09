@@ -5,10 +5,11 @@ import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatDuration } from '@/utils/format'
 import { FollowButton } from '@/components/music/FollowButton'
+import { SupportButton } from '@/components/music/SupportButton'
 import { TrackActions } from '@/components/music/TrackActions'
 
 export function PlayerBar() {
-  const { currentTrack, isPlaying, isLoading, progressSec, durationSec, volume, togglePlay, seek, next, previous, closePlayer, setVolume } =
+  const { currentTrack, isPlaying, isLoading, progressSec, durationSec, volume, playbackKind, previewEnded, togglePlay, seek, next, previous, closePlayer, setVolume } =
     usePlayer()
   const artist = useArtistSummary(currentTrack?.artistId ?? null)
   const { firebaseUser } = useAuth()
@@ -118,6 +119,27 @@ export function PlayerBar() {
           <X className="h-5 w-5" />
         </button>
       </div>
+      {previewEnded && playbackKind === 'dj_preview' ? (
+        <div className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-dj-400/20 bg-dj-500/[0.07] px-3 py-2.5">
+          <p className="text-xs text-ink-1">DJ Preview ended. Complete the artist's licence flow to download the full-quality track.</p>
+          <Link to={`/track/${currentTrack.trackId}`} className="shrink-0 text-xs font-semibold text-dj-400 hover:underline">View DJ terms</Link>
+        </div>
+      ) : previewEnded && artist && ['followers', 'supporters', 'early_access'].includes(currentTrack.visibility) ? (
+        <div className="mt-2 flex flex-col gap-2 rounded-xl border border-brand-400/20 bg-brand-500/[0.07] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs leading-5 text-ink-1">
+            {currentTrack.visibility === 'followers'
+              ? `Want to hear the full ${currentTrack.durationFormatted || 'track'}? Follow ${artist.name} for free.`
+              : `Unlock the full ${currentTrack.durationFormatted || 'track'} by supporting ${artist.name}.`}
+          </p>
+          <div className="shrink-0">
+            {currentTrack.visibility === 'followers'
+              ? <FollowButton artistId={artist.artistId} size="sm" />
+              : <SupportButton artistId={artist.artistId} size="sm" />}
+          </div>
+        </div>
+      ) : playbackKind === 'preview' || playbackKind === 'dj_preview' ? (
+        <p className="mt-1 text-center text-[11px] text-ink-3">{playbackKind === 'dj_preview' ? 'DJ Preview' : 'Preview'}</p>
+      ) : null}
     </div>
   )
 }

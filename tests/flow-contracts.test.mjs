@@ -667,7 +667,7 @@ test('a taken-down or streaming-restricted track shows a clear unavailable state
   assert.match(trackPage, /if \(track\.takenDown\) \{/)
   assert.match(trackPage, /This track is no longer available/)
   assert.match(trackPage, /const streamingRestricted = track\.restrictedCapabilities\?\.includes\('streaming'\) \?\? false/)
-  assert.match(trackPage, /disabled=\{streamingRestricted\}/)
+  assert.match(trackPage, /disabled=\{streamingRestricted \|\| previewUnavailable\}/)
   assert.match(trackPage, /Streaming is temporarily restricted while this track is under review\./)
 
   // The "Open for DJ promotion" badge and DJ request flow must agree with
@@ -823,7 +823,7 @@ test('music access ladder: everyone can hear the preview regardless of a track\'
 
   // getTrackPlaybackUrl must route to the matching check per kind — using
   // the same strict check for both would silently re-break the split above.
-  assert.match(fn, /const allowed = kind === 'preview' \? await canPreviewTrack\(uid, track\) : await canStreamFullTrack\(uid, track\)/)
+  assert.match(fn, /kind === 'dj_preview'[\s\S]*?await canPlayDjPreview\(uid, track\)[\s\S]*?await canStreamFullTrack\(uid, track\)/)
 
   // Analytics stay honest: preview and full-stream plays are separate
   // counters, further broken down by DJ-preview and supporter-tier plays —
@@ -831,8 +831,8 @@ test('music access ladder: everyone can hear the preview regardless of a track\'
   assert.match(fn, /export const recordTrackPlay = onCall/)
   assert.match(fn, /update\.playCount = FieldValue\.increment\(1\)/)
   assert.match(fn, /update\.fullPlayCount = FieldValue\.increment\(1\)/)
-  assert.match(fn, /if \(track\.visibility === 'dj_only'\) update\.djPreviewCount = FieldValue\.increment\(1\)/)
-  assert.match(fn, /if \(track\.visibility === 'supporters'\) update\.supporterPlayCount = FieldValue\.increment\(1\)/)
+  assert.match(fn, /update\.djPreviewCount = FieldValue\.increment\(1\)/)
+  assert.match(fn, /update\.supporterPlayCount = FieldValue\.increment\(1\)/)
 
   // The player must actually request the full stream first and only fall
   // back to the preview when the server itself says no — never decide
@@ -953,7 +953,7 @@ test('the default preview length and default track visibility for new uploads ar
 
 test('follow/support conversions are counted from a real per-fan preview signal, not fabricated or assumed from every follow/support', () => {
   const tracksFn = read('functions/src/tracks.ts')
-  assert.match(tracksFn, /if \(kind === 'preview' && uid && uid !== track\.artistId\) \{/)
+  assert.match(tracksFn, /if \(\(kind === 'preview' \|\| kind === 'dj_preview'\) && uid && uid !== track\.artistId\) \{/)
   assert.match(tracksFn, /db\.collection\('previewSessions'\)\.doc\(`\$\{uid\}_\$\{track\.artistId\}`\)\.set\(/)
 
   const followsFn = read('functions/src/follows.ts')
@@ -981,7 +981,7 @@ test('music access ALLOW/DENY matrix — every row of the spec, traced to the co
   const downloads = read('functions/src/licensing/downloads.ts')
 
   // 1. Public user reads public track metadata -> ALLOW.
-  assert.match(rules, /allow read: if resource\.data\.visibility == 'public'/)
+  assert.match(rules, /resource\.data\.visibility == 'public'/)
 
   // 2. Public user (signed out, uid === null) accesses the preview -> ALLOW.
   //    canPreviewTrack's base case (public/followers/supporters/early_access)
@@ -998,7 +998,7 @@ test('music access ALLOW/DENY matrix — every row of the spec, traced to the co
   assert.match(tracksFn, /if \(!uid\) return false/)
 
   // 4. A real follower accesses that eligible full stream -> ALLOW (a genuine follows/{uid_artistId} doc exists).
-  assert.match(tracksFn, /if \(track\.visibility === 'followers'\) \{\s*return \(await db\.collection\('follows'\)\.doc\(`\$\{uid\}_\$\{track\.artistId\}`\)\.get\(\)\)\.exists/)
+  assert.match(tracksFn, /if \(track\.visibility === 'followers'\) \{\s*const follow = await db\.collection\('follows'\)\.doc\(`\$\{uid\}_\$\{track\.artistId\}`\)\.get\(\)\s*return follow\.exists \|\| isActiveSupporter/)
 
   // 5. That same follower (no supportRelationships doc) accesses a supporters-only full stream -> DENY.
   //    isActiveSupporter returns false immediately when the relationship doc doesn't exist.
@@ -1021,7 +1021,7 @@ test('music access ALLOW/DENY matrix — every row of the spec, traced to the co
   // anything else fan-facing) ever touches originalAudioPath.
   assert.match(storage, /match \/artists\/\{artistId\}\/originals\/\{fileName\} \{\s*allow read: if isOwner\(artistId\);/)
   // getTrackPlaybackUrl only ever signs previewAudioPath or streamAudioPath — never originalAudioPath.
-  assert.match(tracksFn, /const path = kind === 'preview' \? track\.previewAudioPath : track\.streamAudioPath/)
+  assert.match(tracksFn, /const path = kind === 'preview' \? track\.previewAudioPath : kind === 'dj_preview' \? track\.djPreviewAudioPath : track\.streamAudioPath/)
 
   // 11. A DJ with no signed licence agreement for this track -> DENY —
   // downloadLicensedTrack requires an active, non-revoked, non-legal-held
@@ -1033,4 +1033,43 @@ test('music access ALLOW/DENY matrix — every row of the spec, traced to the co
   // 12. An approved DJ with a valid agreement -> ALLOW, through the signed,
   // short-lived download URL flow (never a permanent Storage URL).
   assert.match(downloads, /resolveLicencePartyRole\(agreement, djId,/)
+})
+
+test('music derivatives fail closed and use real audio metadata', () => {
+  const processing = read('src/services/audioProcessing.ts')
+  const upload = read('src/pages/artist/dashboard/UploadTrackPage.tsx')
+  const trackType = read('src/types/track.ts')
+  assert.match(processing, /export async function readAudioMetadata/)
+  assert.match(processing, /throw new Error\('Audio processing failed\. Nothing was published and the full track was not used as a preview\.'\)/)
+  assert.doesNotMatch(processing, /preview: \{ file: master/)
+  assert.match(upload, /previewStartSec \+ previewDurationSec > metadata\.durationSeconds/)
+  assert.match(upload, /durationSeconds: metadata\.durationSeconds/)
+  assert.match(trackType, /durationSeconds: number/)
+  assert.match(trackType, /durationFormatted: string/)
+})
+
+test('DJ role never grants a full stream and the licensed master path is exact', () => {
+  const tracksFn = read('functions/src/tracks.ts')
+  const downloads = read('functions/src/licensing/downloads.ts')
+  assert.match(tracksFn, /if \(track\.visibility === 'dj_only'\) return false/)
+  assert.match(downloads, /expectedOriginalPrefix = `artists\/\$\{track\.artistId\}\/originals\/\$\{agreement\.trackId\}\.`/)
+  assert.match(downloads, /track\.originalAudioPath\.startsWith\(expectedOriginalPrefix\)/)
+})
+
+test('the persistent player starts trimmed previews at zero, reports completions, and revalidates access', () => {
+  const player = read('src/contexts/PlayerContext.tsx')
+  const bar = read('src/components/player/PlayerBar.tsx')
+  assert.match(player, /audio\.currentTime = 0/)
+  assert.match(player, /recordTrackPlay\(current\.trackId, completedKind, 'completion'\)/)
+  assert.match(player, /window\.setInterval\(\(\) => void revalidate\(\), 60_000\)/)
+  assert.match(bar, /Want to hear the full/)
+  assert.match(bar, /FollowButton/)
+  assert.match(bar, /SupportButton/)
+})
+
+test('new releases default to follower access with a 45-second preview', () => {
+  const upload = read('src/pages/artist/dashboard/UploadTrackPage.tsx')
+  const media = read('src/constants/mediaConfig.ts')
+  assert.match(upload, /useState<TrackVisibility>\('followers'\)/)
+  assert.match(media, /PREVIEW_DEFAULT_DURATION_SEC = 45/)
 })

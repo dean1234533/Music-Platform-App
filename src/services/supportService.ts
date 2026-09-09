@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, onSnapshot, query, where } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, onSnapshot, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { callable } from '@/lib/callable'
 import type { SupportAllocationDoc } from '@/types/subscription'
@@ -9,18 +9,41 @@ export function subscribeIsSupporting(
   onChange: (supporting: boolean) => void,
   onError?: (error: Error) => void,
 ) {
-  return onSnapshot(
-    doc(db, 'supportRelationships', `${fanId}_${artistId}`),
-    (snap) => onChange(snap.exists()),
-    (error) => {
+  let relationshipExists = false
+  let activeSubscription = false
+  let relationshipReady = false
+  let subscriptionReady = false
+  const emit = () => {
+    if (relationshipReady && subscriptionReady) onChange(relationshipExists && activeSubscription)
+  }
+  const handleError = (error: Error) => {
       console.error('[subscribeIsSupporting] listener error:', error)
       onError?.(error)
-    },
-  )
+  }
+  const unsubscribeRelationship = onSnapshot(doc(db, 'supportRelationships', `${fanId}_${artistId}`), (snap) => {
+    relationshipExists = snap.exists()
+    relationshipReady = true
+    emit()
+  }, handleError)
+  const unsubscribeSubscription = onSnapshot(doc(db, 'subscriptions', `${fanId}_fan`), (snap) => {
+    const status = snap.data()?.status
+    activeSubscription = status === 'active' || status === 'trialing'
+    subscriptionReady = true
+    emit()
+  }, handleError)
+  return () => {
+    unsubscribeRelationship()
+    unsubscribeSubscription()
+  }
 }
 
 export async function listSupportedArtistIds(fanId: string): Promise<string[]> {
-  const snap = await getDocs(query(collection(db, 'supportRelationships'), where('fanId', '==', fanId)))
+  const [subscription, snap] = await Promise.all([
+    getDoc(doc(db, 'subscriptions', `${fanId}_fan`)),
+    getDocs(query(collection(db, 'supportRelationships'), where('fanId', '==', fanId))),
+  ])
+  const status = subscription.data()?.status
+  if (status !== 'active' && status !== 'trialing') return []
   return snap.docs.map((d) => (d.data() as { artistId: string }).artistId)
 }
 

@@ -5,7 +5,14 @@ import { requireActiveUser } from './roles.js'
 import { enforceRateLimit } from './rateLimit.js'
 import { getStorage } from 'firebase-admin/storage'
 
-type PlaybackKind = 'preview' | 'stream'
+type PlaybackKind = 'preview' | 'dj_preview' | 'stream'
+type PlaybackEvent = 'start' | 'completion'
+
+function isPublished(track: FirebaseFirestore.DocumentData): boolean {
+  // Compatibility: tracks created before the status field existed were
+  // published atomically after their files uploaded, so an absent value is published.
+  return track.status === undefined || track.status === 'published'
+}
 
 async function getRoles(uid: string): Promise<string[]> {
   const user = await db.collection('users').doc(uid).get()
@@ -23,6 +30,7 @@ async function getRoles(uid: string): Promise<string[]> {
 async function canPreviewTrack(uid: string | null, track: FirebaseFirestore.DocumentData): Promise<boolean> {
   if (track.takenDown === true || (track.restrictedCapabilities ?? []).includes('streaming')) return false
   if (uid === track.artistId) return true
+  if (!isPublished(track) || track.previewEnabled === false) return false
   if (track.visibility === 'private') {
     return uid ? (await getRoles(uid)).includes('admin') : false
   }
@@ -32,6 +40,14 @@ async function canPreviewTrack(uid: string | null, track: FirebaseFirestore.Docu
     return roles.includes('dj') || roles.includes('admin')
   }
   return true
+}
+
+async function canPlayDjPreview(uid: string | null, track: FirebaseFirestore.DocumentData): Promise<boolean> {
+  if (!uid || track.takenDown === true || !isPublished(track)) return false
+  if ((track.restrictedCapabilities ?? []).includes('streaming') || (track.restrictedCapabilities ?? []).includes('dj_licensing')) return false
+  if (uid === track.artistId) return true
+  const roles = await getRoles(uid)
+  return roles.includes('admin') || (roles.includes('dj') && track.djPromotion === true && typeof track.djPreviewAudioPath === 'string')
 }
 
 /**
@@ -62,6 +78,7 @@ async function canStreamFullTrack(uid: string | null, track: FirebaseFirestore.D
     roles = await getRoles(uid)
     if (roles.includes('admin')) return true
   }
+  if (!isPublished(track)) return false
   if (track.visibility === 'public') return true
   if (track.visibility === 'early_access') {
     // The public-release date (if any) is checked before the auth guard
@@ -71,9 +88,12 @@ async function canStreamFullTrack(uid: string | null, track: FirebaseFirestore.D
     if (publicAt !== undefined && Date.now() >= publicAt) return true
   }
   if (!uid) return false
-  if (track.visibility === 'dj_only') return roles.includes('dj')
+  // DJ role alone never grants a full stream or the master. DJs receive the
+  // DJ/public preview here and the original only through an active licence.
+  if (track.visibility === 'dj_only') return false
   if (track.visibility === 'followers') {
-    return (await db.collection('follows').doc(`${uid}_${track.artistId}`).get()).exists
+    const follow = await db.collection('follows').doc(`${uid}_${track.artistId}`).get()
+    return follow.exists || isActiveSupporter(uid, track.artistId)
   }
   if (track.visibility === 'supporters') {
     return isActiveSupporter(uid, track.artistId)
@@ -100,19 +120,24 @@ async function canStreamFullTrack(uid: string | null, track: FirebaseFirestore.D
  */
 export const getTrackPlaybackUrl = onCall(async (request) => {
   const { trackId, kind } = request.data ?? {} as { trackId?: string; kind?: PlaybackKind }
-  if (!trackId || (kind !== 'preview' && kind !== 'stream')) {
+  if (!trackId || (kind !== 'preview' && kind !== 'dj_preview' && kind !== 'stream')) {
     throw new HttpsError('invalid-argument', 'trackId and a valid playback kind are required.')
   }
   const snap = await db.collection('tracks').doc(trackId).get()
   if (!snap.exists) throw new HttpsError('not-found', 'Track does not exist.')
   const track = snap.data()!
   const uid = request.auth?.uid ?? null
-  const allowed = kind === 'preview' ? await canPreviewTrack(uid, track) : await canStreamFullTrack(uid, track)
+  const allowed = kind === 'preview'
+    ? await canPreviewTrack(uid, track)
+    : kind === 'dj_preview'
+      ? await canPlayDjPreview(uid, track)
+      : await canStreamFullTrack(uid, track)
   if (!allowed) {
     throw new HttpsError('permission-denied', 'You do not have access to this audio.')
   }
-  const path = kind === 'preview' ? track.previewAudioPath : track.streamAudioPath
-  const expectedPrefix = `artists/${track.artistId}/${kind === 'preview' ? 'previews' : 'streaming'}/`
+  const path = kind === 'preview' ? track.previewAudioPath : kind === 'dj_preview' ? track.djPreviewAudioPath : track.streamAudioPath
+  const directory = kind === 'preview' ? 'previews' : kind === 'dj_preview' ? 'dj-previews' : 'streaming'
+  const expectedPrefix = `artists/${track.artistId}/${directory}/${trackId}.`
   if (typeof path !== 'string' || !path.startsWith(expectedPrefix)) {
     throw new HttpsError('failed-precondition', 'The track audio path is invalid.')
   }
@@ -160,6 +185,7 @@ export const deleteTrack = onCall(async (request) => {
     bucket.deleteFiles({ prefix: `artists/${track.artistId}/originals/${trackId}.` }),
     bucket.deleteFiles({ prefix: `artists/${track.artistId}/streaming/${trackId}.` }),
     bucket.deleteFiles({ prefix: `artists/${track.artistId}/previews/${trackId}.` }),
+    bucket.deleteFiles({ prefix: `artists/${track.artistId}/dj-previews/${trackId}.` }),
     bucket.deleteFiles({ prefix: `artists/${track.artistId}/artwork/${trackId}.` }),
   ])
 
@@ -199,10 +225,11 @@ export const deleteTrack = onCall(async (request) => {
 export const recordTrackPlay = onCall(async (request) => {
   const trackId = request.data?.trackId as string | undefined
   const kind = request.data?.kind as PlaybackKind | undefined
-  if (!trackId || (kind !== 'preview' && kind !== 'stream')) {
-    throw new HttpsError('invalid-argument', 'trackId and a valid playback kind are required.')
+  const event = (request.data?.event ?? 'start') as PlaybackEvent
+  if (!trackId || (kind !== 'preview' && kind !== 'dj_preview' && kind !== 'stream') || (event !== 'start' && event !== 'completion')) {
+    throw new HttpsError('invalid-argument', 'trackId, playback kind, and event are required.')
   }
-  await enforceRateLimit(`recordTrackPlay_${trackId}`, 120, 60)
+  await enforceRateLimit(`recordTrackPlay_${trackId}_${event}`, 120, 60)
 
   const ref = db.collection('tracks').doc(trackId)
   const snap = await ref.get()
@@ -210,14 +237,35 @@ export const recordTrackPlay = onCall(async (request) => {
     throw new HttpsError('not-found', 'Track does not exist.')
   }
   const track = snap.data()!
+  const uid = request.auth?.uid ?? null
+  const allowed = kind === 'preview'
+    ? await canPreviewTrack(uid, track)
+    : kind === 'dj_preview'
+      ? await canPlayDjPreview(uid, track)
+      : await canStreamFullTrack(uid, track)
+  if (!allowed) throw new HttpsError('permission-denied', 'This playback event is not authorised.')
 
   const update: Record<string, unknown> = {}
-  if (kind === 'preview') {
+  if ((kind === 'preview' || kind === 'dj_preview') && event === 'start') {
     update.playCount = FieldValue.increment(1)
-    if (track.visibility === 'dj_only') update.djPreviewCount = FieldValue.increment(1)
-  } else {
+    update.previewStarts = FieldValue.increment(1)
+    if (kind === 'dj_preview' || track.visibility === 'dj_only') {
+      update.djPreviewCount = FieldValue.increment(1)
+      update.djPreviewPlays = FieldValue.increment(1)
+    }
+  } else if (kind === 'preview' || kind === 'dj_preview') {
+    update.previewCompletions = FieldValue.increment(1)
+  } else if (event === 'start') {
     update.fullPlayCount = FieldValue.increment(1)
-    if (track.visibility === 'supporters') update.supporterPlayCount = FieldValue.increment(1)
+    update.fullTrackStarts = FieldValue.increment(1)
+    if (track.visibility === 'supporters') {
+      update.supporterPlayCount = FieldValue.increment(1)
+      update.supporterFullPlays = FieldValue.increment(1)
+    }
+    else if (track.visibility === 'followers') update.followerFullPlays = FieldValue.increment(1)
+    else if (track.visibility === 'public') update.publicFullPlays = FieldValue.increment(1)
+  } else {
+    update.fullTrackCompletions = FieldValue.increment(1)
   }
   await ref.update(update)
 
@@ -225,8 +273,7 @@ export const recordTrackPlay = onCall(async (request) => {
   // — the only thing onFollowCreate/onSupportRelationshipCreate trust to
   // count a genuine preview -> follow/support conversion, rather than
   // assuming every follow/support came from a preview.
-  const uid = request.auth?.uid
-  if (kind === 'preview' && uid && uid !== track.artistId) {
+  if ((kind === 'preview' || kind === 'dj_preview') && uid && uid !== track.artistId) {
     await db.collection('previewSessions').doc(`${uid}_${track.artistId}`).set({
       uid,
       artistId: track.artistId,

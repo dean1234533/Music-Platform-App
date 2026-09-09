@@ -140,6 +140,7 @@ export function TrackPage() {
     isFollowing,
     isSupporting,
   })
+  const previewUnavailable = !access.fullAccess && track.previewEnabled === false
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-10">
@@ -166,17 +167,17 @@ export function TrackPage() {
           {streamingRestricted ? <p className="text-xs font-medium text-danger-500">Streaming is temporarily restricted while this track is under review.</p> : null}
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => !streamingRestricted && (isCurrent ? togglePlay() : playTrack(track))}
-              disabled={streamingRestricted}
+              onClick={() => !streamingRestricted && !previewUnavailable && (isCurrent ? togglePlay() : playTrack(track))}
+              disabled={streamingRestricted || previewUnavailable}
               className="flex items-center gap-2 rounded-full bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-ink-3"
             >
               {isCurrent && isPlaying ? <Pause className="h-4 w-4" fill="currentColor" /> : <Play className="h-4 w-4 translate-x-0.5" fill="currentColor" />}
-              {isCurrent && isPlaying ? 'Playing' : isCurrent && playbackKind ? (playbackKind === 'stream' ? 'Play Full Track' : 'Play Preview') : access.playLabel}
+              {isCurrent && isPlaying ? 'Playing' : isCurrent && playbackKind ? (playbackKind === 'stream' ? 'Play Full Track' : playbackKind === 'dj_preview' ? 'Play DJ Preview' : 'Play Preview') : access.playLabel}
             </button>
             {artist ? <FollowButton artistId={artist.artistId} /> : null}
             {artist ? <SupportButton artistId={artist.artistId} size="sm" /> : null}
             <TrackActions track={track} labels />
-            {artist ? (
+            {artist && !track.restrictedCapabilities?.includes('sharing') ? (
               <ShareButton
                 url={trackShareUrl(artist.slug, track.trackSlug ?? track.trackId)}
                 title={track.title}
@@ -216,7 +217,9 @@ export function TrackPage() {
         <Meta label="Genre" value={track.genre} />
         {track.bpm ? <Meta label="BPM" value={String(track.bpm)} /> : null}
         {track.mood ? <Meta label="Mood" value={track.mood} /> : null}
-        <Meta label={access.fullAccess ? 'Full track' : 'Preview'} value={access.fullAccess ? 'Available to you' : formatDuration(track.previewDurationSec)} />
+        <Meta label="Full track" value={track.durationFormatted || (track.durationSeconds ? formatDuration(track.durationSeconds) : 'Duration unavailable')} />
+        <Meta label="Preview" value={track.previewEnabled === false ? 'Unavailable' : formatDuration(track.previewDurationSec)} />
+        <Meta label="Your access" value={access.fullAccess ? 'Full Track' : track.previewEnabled === false ? 'Locked' : 'Preview'} />
       </div>
 
       {(track.credits.songwriters.length > 0 || track.credits.producers.length > 0 || track.credits.featuredArtists.length > 0) && (

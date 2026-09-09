@@ -243,13 +243,16 @@ async function buildTrackCard(projectId: string, slug: string, trackParam: strin
   // Fall back to the artist-level card rather than fabricating track data.
   const track = await fetchFirestoreDoc(projectId, `tracks/${trackId}`)
   if (!track) return buildArtistCard(projectId, slug, url)
+  if ((track.restrictedCapabilities as string[] | undefined)?.includes('sharing') || track.takenDown === true) {
+    return buildArtistCard(projectId, slug, url)
+  }
 
   const artist = await fetchFirestoreDoc(projectId, `artistProfiles/${artistId}`)
   const artistName = (artist?.name as string | undefined) ?? 'an independent artist'
 
   const html = renderMetaHtml({
     title: `${track.title as string} — ${artistName}`,
-    description: `Listen to "${track.title as string}" by ${artistName} on BackTheVibes.`,
+    description: `Listen to "${track.title as string}" by ${artistName}${track.durationFormatted ? ` — ${track.durationFormatted as string}` : ''} on BackTheVibes.`,
     image: (track.artworkURL as string | null) ?? (artist?.photoURL as string | null) ?? null,
     url,
     jsonLd: {
@@ -258,6 +261,7 @@ async function buildTrackCard(projectId: string, slug: string, trackParam: strin
       name: track.title as string,
       url,
       byArtist: { '@type': 'MusicGroup', name: artistName },
+      ...(typeof track.durationSeconds === 'number' ? { duration: `PT${Math.floor(track.durationSeconds as number)}S` } : {}),
       ...(track.genre ? { genre: track.genre as string } : {}),
       ...(track.artworkURL ? { image: track.artworkURL as string } : {}),
     },

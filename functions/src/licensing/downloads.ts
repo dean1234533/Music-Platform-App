@@ -119,6 +119,11 @@ export const downloadLicensedTrack = onRequest(async (req, res) => {
       res.status(403).json({ error: 'This track is under a copyright review — downloads are temporarily unavailable. Your signed agreement record is preserved.' })
       return
     }
+    const expectedOriginalPrefix = `artists/${track.artistId}/originals/${agreement.trackId}.`
+    if (typeof track.originalAudioPath !== 'string' || !track.originalAudioPath.startsWith(expectedOriginalPrefix)) {
+      res.status(412).json({ error: 'The licensed original file path is invalid.' })
+      return
+    }
 
     const bucket = getStorage().bucket()
     const file = bucket.file(track.originalAudioPath as string)

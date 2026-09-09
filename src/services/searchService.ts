@@ -46,7 +46,7 @@ export async function searchPlatform(rawTerm: string): Promise<SearchResults> {
     getDocs(
       query(
         collection(db, 'tracks'),
-        where('visibility', '==', 'public'),
+        where('visibility', 'in', ['public', 'followers', 'supporters', 'early_access']),
         orderBy('titleLower'),
         where('titleLower', '>=', term),
         where('titleLower', '<=', upperBound),
@@ -57,7 +57,7 @@ export async function searchPlatform(rawTerm: string): Promise<SearchResults> {
       ? getDocs(
           query(
             collection(db, 'tracks'),
-            where('visibility', '==', 'public'),
+            where('visibility', 'in', ['public', 'followers', 'supporters', 'early_access']),
             where('genre', '==', genre),
             orderBy('createdAt', 'desc'),
             limit(15),
@@ -68,8 +68,13 @@ export async function searchPlatform(rawTerm: string): Promise<SearchResults> {
   ])
 
   const tracksById = new Map<string, TrackDoc>()
-  for (const d of titleTrackSnap.docs) tracksById.set(d.id, d.data() as TrackDoc)
-  if (genreTrackSnap) for (const d of genreTrackSnap.docs) tracksById.set(d.id, d.data() as TrackDoc)
+  const addIfDiscoverable = (id: string, track: TrackDoc) => {
+    if (track.takenDown === true || track.status === 'unpublished' || track.status === 'processing' || track.status === 'failed') return
+    if (track.restrictedCapabilities?.includes('discovery')) return
+    tracksById.set(id, track)
+  }
+  for (const d of titleTrackSnap.docs) addIfDiscoverable(d.id, d.data() as TrackDoc)
+  if (genreTrackSnap) for (const d of genreTrackSnap.docs) addIfDiscoverable(d.id, d.data() as TrackDoc)
 
   const djs = djSnap.docs
     .map((d) => d.data() as DJProfile)

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { Button } from '@/components/common/Button'
 import { Input, Label } from '@/components/common/Input'
-import { updateTrackAccessSettings } from '@/services/trackService'
+import { regenerateTrackPreview, updateTrackAccessSettings } from '@/services/trackService'
 import { PREVIEW_MAX_DURATION_SEC, PREVIEW_MIN_DURATION_SEC, SUGGESTED_PREVIEW_DURATIONS_SEC } from '@/constants/mediaConfig'
 import { ACCESS_SUMMARY, VISIBILITY_OPTIONS } from '@/utils/trackAccess'
 import type { TrackDoc, TrackVisibility } from '@/types/track'
@@ -21,6 +21,7 @@ function toDateInputValue(ts: TrackDoc['followerReleaseAt']): string {
  */
 export function TrackAccessSettingsModal({ track, onClose }: { track: TrackDoc; onClose: () => void }) {
   const [visibility, setVisibility] = useState<TrackVisibility>(track.visibility)
+  const [previewEnabled, setPreviewEnabled] = useState(track.previewEnabled !== false)
   const [previewStartSec, setPreviewStartSec] = useState(track.previewStartSec)
   const [previewDurationSec, setPreviewDurationSec] = useState(track.previewDurationSec)
   const [followerReleaseDate, setFollowerReleaseDate] = useState(toDateInputValue(track.followerReleaseAt))
@@ -29,11 +30,29 @@ export function TrackAccessSettingsModal({ track, onClose }: { track: TrackDoc; 
   const [error, setError] = useState<string | null>(null)
 
   async function handleSave() {
+    if (!Number.isFinite(previewStartSec) || previewStartSec < 0 || !Number.isFinite(previewDurationSec)
+      || previewDurationSec < PREVIEW_MIN_DURATION_SEC || previewDurationSec > PREVIEW_MAX_DURATION_SEC) {
+      setError(`Preview timing must use a start at or after 0 and a length between ${PREVIEW_MIN_DURATION_SEC} and ${PREVIEW_MAX_DURATION_SEC} seconds.`)
+      return
+    }
+    if (previewEnabled && track.durationSeconds && previewStartSec + previewDurationSec > track.durationSeconds) {
+      setError(`The preview must end within the full ${track.durationFormatted} track.`)
+      return
+    }
+    const accessRank: Record<TrackVisibility, number> = { public: 0, followers: 1, early_access: 2, supporters: 3, dj_only: 4, private: 5 }
+    if (accessRank[visibility] > accessRank[track.visibility] && !window.confirm('This makes the full track less accessible. Existing listeners may lose full-track access. Continue?')) {
+      return
+    }
     setSaving(true)
     setError(null)
     try {
+      const previewTimingChanged = previewStartSec !== track.previewStartSec || previewDurationSec !== track.previewDurationSec
+      if (previewEnabled && previewTimingChanged) {
+        await regenerateTrackPreview(track, previewStartSec, previewDurationSec)
+      }
       await updateTrackAccessSettings(track.trackId, {
         visibility,
+        previewEnabled,
         previewStartSec,
         previewDurationSec,
         followerReleaseAt: visibility === 'early_access' && followerReleaseDate ? new Date(followerReleaseDate) : null,
@@ -53,7 +72,7 @@ export function TrackAccessSettingsModal({ track, onClose }: { track: TrackDoc; 
     <Modal title={`Access settings for "${track.title}"`} onClose={onClose}>
       <div className="flex flex-col gap-4 text-sm">
         <div>
-          <Label>Who can stream this track?</Label>
+          <Label>Who can hear the full track?</Label>
           <select
             value={visibility}
             onChange={(e) => setVisibility(e.target.value as TrackVisibility)}
@@ -88,10 +107,18 @@ export function TrackAccessSettingsModal({ track, onClose }: { track: TrackDoc; 
           </div>
         ) : null}
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="rounded-xl border border-surface-border bg-surface-2 p-3">
+          <p className="text-xs text-ink-2">Full track</p>
+          <p className="mt-0.5 font-semibold text-ink-0">{track.durationFormatted || 'Duration unavailable for this older upload'}</p>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-ink-1">
+          <input type="checkbox" checked={previewEnabled} onChange={(e) => setPreviewEnabled(e.target.checked)} className="h-4 w-4 accent-brand-500" />
+          Public preview enabled
+        </label>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <Label>Preview start (seconds)</Label>
-            <Input type="number" min={0} value={previewStartSec} onChange={(e) => setPreviewStartSec(Number(e.target.value))} />
+            <Input disabled={!previewEnabled} type="number" min={0} max={track.durationSeconds ? Math.max(0, track.durationSeconds - previewDurationSec) : undefined} value={previewStartSec} onChange={(e) => setPreviewStartSec(Number(e.target.value))} />
           </div>
           <div>
             <Label>Preview duration (seconds)</Label>
@@ -99,6 +126,7 @@ export function TrackAccessSettingsModal({ track, onClose }: { track: TrackDoc; 
               type="number"
               min={PREVIEW_MIN_DURATION_SEC}
               max={PREVIEW_MAX_DURATION_SEC}
+              disabled={!previewEnabled}
               value={previewDurationSec}
               onChange={(e) => setPreviewDurationSec(Number(e.target.value))}
             />
@@ -109,6 +137,7 @@ export function TrackAccessSettingsModal({ track, onClose }: { track: TrackDoc; 
             <button
               key={sec}
               type="button"
+              disabled={!previewEnabled}
               onClick={() => setPreviewDurationSec(sec)}
               className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
                 previewDurationSec === sec

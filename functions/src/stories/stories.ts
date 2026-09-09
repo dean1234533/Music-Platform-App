@@ -26,6 +26,15 @@ const CATEGORIES = [
 const VISIBILITIES = ['public', 'followers', 'supporters', 'dj'] as const
 const CTA_TYPES = ['track', 'follow', 'support'] as const
 
+async function isActiveSupporter(uid: string, artistId: string): Promise<boolean> {
+  const [relationship, subscription] = await Promise.all([
+    db.collection('supportRelationships').doc(`${uid}_${artistId}`).get(),
+    db.collection('subscriptions').doc(`${uid}_fan`).get(),
+  ])
+  const status = subscription.data()?.status
+  return relationship.exists && (status === 'active' || status === 'trialing')
+}
+
 /**
  * CTA targets are restricted to enumerated, server-validated destinations —
  * never an arbitrary URL from the client — so a Story can never be used as
@@ -130,10 +139,11 @@ async function canViewStory(uid: string | null, story: FirebaseFirestore.Documen
   if (roles.includes('admin')) return true
 
   if (story.visibility === 'followers') {
-    return (await db.collection('follows').doc(`${uid}_${story.artistId}`).get()).exists
+    const follow = await db.collection('follows').doc(`${uid}_${story.artistId}`).get()
+    return follow.exists || isActiveSupporter(uid, story.artistId)
   }
   if (story.visibility === 'supporters') {
-    return (await db.collection('supportRelationships').doc(`${uid}_${story.artistId}`).get()).exists
+    return isActiveSupporter(uid, story.artistId)
   }
   if (story.visibility === 'dj') {
     if (!roles.includes('dj')) return false

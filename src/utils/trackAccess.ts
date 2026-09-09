@@ -11,9 +11,9 @@ export const TRACK_ACCESS_LABEL: Record<TrackVisibility, string> = {
 }
 
 export const VISIBILITY_OPTIONS: { value: TrackVisibility; label: string }[] = [
-  { value: 'public', label: 'Public stream' },
-  { value: 'followers', label: 'Followers only' },
-  { value: 'supporters', label: 'Supporters only' },
+  { value: 'public', label: 'Everyone' },
+  { value: 'followers', label: 'Followers' },
+  { value: 'supporters', label: 'Supporters' },
   { value: 'early_access', label: 'Early access' },
   { value: 'dj_only', label: 'DJ only' },
   { value: 'private', label: 'Private' },
@@ -59,14 +59,14 @@ export function describeTrackAccess(
     return { fullAccess: true, playLabel: 'Play Full Track', lockedMessage: null }
   }
   if (track.visibility === 'followers') {
-    return viewer.isFollowing
+    return viewer.isFollowing || viewer.isSupporting
       ? { fullAccess: true, playLabel: 'Play Full Track', lockedMessage: null }
-      : { fullAccess: false, playLabel: 'Play Preview', lockedMessage: "You've reached the end of the preview. Follow to hear the full track." }
+      : { fullAccess: false, playLabel: track.previewEnabled === false ? 'Preview Unavailable' : 'Play Preview', lockedMessage: "Want to hear the full track? Follow this artist for free." }
   }
   if (track.visibility === 'supporters') {
     return viewer.isSupporting
       ? { fullAccess: true, playLabel: 'Play Full Track', lockedMessage: null }
-      : { fullAccess: false, playLabel: 'Play Preview', lockedMessage: 'Support this artist to unlock the full track and exclusive releases.' }
+      : { fullAccess: false, playLabel: track.previewEnabled === false ? 'Preview Unavailable' : 'Play Preview', lockedMessage: 'Support this artist to unlock the full track and exclusive releases.' }
   }
   if (track.visibility === 'early_access') {
     if (viewer.isSupporting) return { fullAccess: true, playLabel: 'Play Full Track', lockedMessage: null }

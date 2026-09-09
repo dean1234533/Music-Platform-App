@@ -9,13 +9,13 @@ import {
   type ReactNode,
 } from 'react'
 import { FirebaseError } from 'firebase/app'
-import { getPreviewPlaybackURL, getStreamPlaybackURL, recordTrackPlay } from '@/services/trackService'
+import { getDjPreviewPlaybackURL, getPreviewPlaybackURL, getStreamPlaybackURL, recordTrackPlay } from '@/services/trackService'
 import type { TrackDoc } from '@/types/track'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 
 /** null while nothing has loaded yet; otherwise which derivative the currently-loaded track actually is. */
-type PlaybackKind = 'preview' | 'stream' | null
+type PlaybackKind = 'preview' | 'dj_preview' | 'stream' | null
 
 interface PlayerContextValue {
   currentTrack: TrackDoc | null
@@ -27,6 +27,7 @@ interface PlayerContextValue {
   volume: number
   /** Whether the currently loaded audio is the full stream or a preview — the server decided this, not the client. */
   playbackKind: PlaybackKind
+  previewEnded: boolean
   playTrack: (track: TrackDoc, queue?: TrackDoc[]) => void
   togglePlay: () => void
   seek: (seconds: number) => void
@@ -39,12 +40,13 @@ interface PlayerContextValue {
 const PlayerContext = createContext<PlayerContextValue | undefined>(undefined)
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
-  const { firebaseUser } = useAuth()
+  const { firebaseUser, hasRole } = useAuth()
   const { notify } = useToast()
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const previousUserIdRef = useRef<string | null>(null)
   const queueRef = useRef<TrackDoc[]>([])
   const currentTrackRef = useRef<TrackDoc | null>(null)
+  const playbackKindRef = useRef<PlaybackKind>(null)
   const [currentTrack, setCurrentTrack] = useState<TrackDoc | null>(null)
   const [queue, setQueue] = useState<TrackDoc[]>([])
   const [isPlaying, setIsPlaying] = useState(false)
@@ -53,6 +55,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [durationSec, setDurationSec] = useState(0)
   const [volume, setVolumeState] = useState(0.85)
   const [playbackKind, setPlaybackKind] = useState<PlaybackKind>(null)
+  const [previewEnded, setPreviewEnded] = useState(false)
 
   useEffect(() => {
     const audio = new Audio()
@@ -63,6 +66,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const onLoadedMetadata = () => setDurationSec(audio.duration || 0)
     const onEnded = () => {
       const current = currentTrackRef.current
+      const completedKind = playbackKindRef.current
+      if (current && completedKind) {
+        void recordTrackPlay(current.trackId, completedKind, 'completion').catch(() => {})
+      }
+      if (completedKind === 'preview' || completedKind === 'dj_preview') {
+        setIsPlaying(false)
+        setPreviewEnded(true)
+        return
+      }
       const currentQueue = queueRef.current
       const index = current ? currentQueue.findIndex((track) => track.trackId === current.trackId) : -1
       const nextTrack = currentQueue[index + 1]
@@ -96,6 +108,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [currentTrack])
 
   useEffect(() => {
+    playbackKindRef.current = playbackKind
+  }, [playbackKind])
+
+  useEffect(() => {
     const previousUserId = previousUserIdRef.current
     const nextUserId = firebaseUser?.uid ?? null
     if (previousUserId && previousUserId !== nextUserId) {
@@ -111,6 +127,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setIsLoading(false)
       setProgressSec(0)
       setDurationSec(0)
+      setPlaybackKind(null)
+      setPreviewEnded(false)
     }
     previousUserIdRef.current = nextUserId
   }, [firebaseUser?.uid])
@@ -119,6 +137,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const audio = audioRef.current
     if (!audio) return
     setIsLoading(true)
+    setPreviewEnded(false)
     try {
       // Always ask for the full stream first — the server (getTrackPlaybackUrl)
       // is the only thing that actually decides whether this listener is
@@ -127,18 +146,31 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       // "everyone can hear the preview, only entitled listeners hear the
       // full track" ladder work without duplicating that entitlement logic
       // here — the client never guesses who's allowed to hear what.
-      let kind: 'preview' | 'stream' = 'stream'
+      let kind: 'preview' | 'dj_preview' | 'stream' = 'stream'
       let url: string
       try {
         url = await getStreamPlaybackURL(track)
       } catch (streamError) {
         const denied = streamError instanceof FirebaseError && streamError.code === 'functions/permission-denied'
         if (!denied) throw streamError
-        kind = 'preview'
-        url = await getPreviewPlaybackURL(track)
+        if (hasRole('dj') && track.djPreviewAudioPath) {
+          try {
+            kind = 'dj_preview'
+            url = await getDjPreviewPlaybackURL(track)
+          } catch {
+            kind = 'preview'
+            url = await getPreviewPlaybackURL(track)
+          }
+        } else {
+          kind = 'preview'
+          url = await getPreviewPlaybackURL(track)
+        }
       }
       audio.src = url
-      audio.currentTime = kind === 'preview' ? track.previewStartSec || 0 : 0
+      // A preview derivative already starts at the artist's selected source
+      // timestamp. Seeking it again would skip that many seconds inside the
+      // short derivative and can make the preview appear broken.
+      audio.currentTime = 0
       await audio.play()
       setIsPlaying(true)
       setPlaybackKind(kind)
@@ -148,11 +180,43 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       setIsPlaying(false)
       setPlaybackKind(null)
-      notify(error instanceof Error ? error.message : 'This track is not available to play.', 'error')
+      const message = error instanceof FirebaseError && error.code === 'functions/permission-denied'
+        ? 'Preview is currently unavailable.'
+        : error instanceof Error ? error.message : 'This track is not available to play.'
+      notify(message, 'error')
     } finally {
       setIsLoading(false)
     }
-  }, [notify])
+  }, [hasRole, notify])
+
+  // A signed URL is intentionally short lived, but access can still change
+  // while it is open. Re-check full streams periodically and whenever the
+  // app returns to the foreground; if access was lost, reload through the
+  // normal server gate (which safely falls back to the preview).
+  useEffect(() => {
+    if (!currentTrack || playbackKind !== 'stream') return
+    const revalidate = async () => {
+      try {
+        await getStreamPlaybackURL(currentTrack)
+      } catch (error) {
+        if (error instanceof FirebaseError && error.code === 'functions/permission-denied') {
+          await loadAndPlay(currentTrack)
+        }
+      }
+    }
+    const interval = window.setInterval(() => void revalidate(), 60_000)
+    const onFocus = () => void revalidate()
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void revalidate()
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [currentTrack, playbackKind, loadAndPlay])
 
   const playTrack = useCallback(
     (track: TrackDoc, nextQueue?: TrackDoc[]) => {
@@ -169,11 +233,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (isPlaying) {
       audio.pause()
       setIsPlaying(false)
+    } else if (audio.ended) {
+      void loadAndPlay(currentTrack)
     } else {
       void audio.play()
       setIsPlaying(true)
     }
-  }, [currentTrack, isPlaying])
+  }, [currentTrack, isPlaying, loadAndPlay])
 
   const seek = useCallback((seconds: number) => {
     const audio = audioRef.current
@@ -212,6 +278,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setProgressSec(0)
     setDurationSec(0)
     setPlaybackKind(null)
+    setPreviewEnded(false)
   }, [])
 
   const setVolume = useCallback((value: number) => {
@@ -229,6 +296,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       durationSec,
       volume,
       playbackKind,
+      previewEnded,
       playTrack,
       togglePlay,
       seek,
@@ -246,6 +314,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       durationSec,
       volume,
       playbackKind,
+      previewEnded,
       playTrack,
       togglePlay,
       seek,
