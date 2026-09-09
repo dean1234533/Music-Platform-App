@@ -75,6 +75,7 @@ const DJAnalyticsPage = lazy(() => import('@/pages/dj/DJAnalyticsPage').then((m)
 
 const TrackPage = lazy(() => import('@/pages/track/TrackPage').then((m) => ({ default: m.TrackPage })))
 const MyAgreementsPage = lazy(() => import('@/pages/agreements/MyAgreementsPage').then((m) => ({ default: m.MyAgreementsPage })))
+const SupportPage = lazy(() => import('@/pages/support/SupportPage').then((m) => ({ default: m.SupportPage })))
 const ContractPage = lazy(() => import('@/pages/agreements/ContractPage').then((m) => ({ default: m.ContractPage })))
 const RequestTimelinePage = lazy(() => import('@/pages/agreements/RequestTimelinePage').then((m) => ({ default: m.RequestTimelinePage })))
 
@@ -161,6 +162,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <MyAgreementsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/support"
+              element={
+                <ProtectedRoute>
+                  <SupportPage />
                 </ProtectedRoute>
               }
             />

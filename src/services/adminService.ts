@@ -2,7 +2,7 @@ import { collection, getDocs, limit, orderBy, query, where } from 'firebase/fire
 import { db } from '@/lib/firebase'
 import { callable } from '@/lib/callable'
 import type { UserProfile } from '@/types/user'
-import { OPEN_CLAIM_STATUSES, type CopyrightClaimDoc, type ReportDoc, type VerificationRequestDoc } from '@/types/moderation'
+import { OPEN_CLAIM_STATUSES, type CopyrightClaimDoc, type ReportDoc, type SupportMessageDoc, type VerificationRequestDoc } from '@/types/moderation'
 import type { RestrictedCapability } from '@/types/track'
 import type { SubscriptionPlan } from '@/types/platformSettings'
 import type { PlanFeatureKey, PlanLimitKey, PlanTier } from '@/types/entitlements'
@@ -32,6 +32,12 @@ export async function listCopyrightClaims(): Promise<CopyrightClaimDoc[]> {
   return snap.docs.map((d) => d.data() as CopyrightClaimDoc)
 }
 
+export async function listOpenSupportMessages(): Promise<SupportMessageDoc[]> {
+  const q = query(collection(db, 'supportMessages'), where('status', '==', 'open'), orderBy('createdAt', 'desc'))
+  const snap = await getDocs(q)
+  return snap.docs.map((d) => d.data() as SupportMessageDoc)
+}
+
 export async function listAllSubscriptionPlans(): Promise<SubscriptionPlan[]> {
   const snap = await getDocs(query(collection(db, 'subscriptionPlans'), where('role', '==', 'fan')))
   return snap.docs.map((d) => d.data() as SubscriptionPlan)
@@ -57,6 +63,7 @@ export const reviewCopyrightClaim = callable<
 export const adminResolveReport = callable<{ reportId: string; status: 'resolved' | 'dismissed' }, { ok: boolean }>(
   'adminResolveReport',
 )
+export const resolveSupportMessage = callable<{ supportMessageId: string }, { ok: boolean }>('resolveSupportMessage')
 export const adminUpsertSubscriptionPlan = callable<
   {
     planId: string

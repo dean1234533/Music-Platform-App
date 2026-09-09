@@ -483,6 +483,11 @@ service cloud.firestore {
       allow read: if isSignedIn() && (resource.data.reporterId == request.auth.uid || resource.data.artistId == request.auth.uid || isAdmin());
       allow write: if false;
     }
+    match /supportMessages/{docId} {
+      // Written only via submitSupportMessage/resolveSupportMessage (Admin SDK).
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
     // payoutHolds/{artistId} — admin/system only. An active hold blocks
     // requestPayout; artists can see their own hold status but never set it.
     match /payoutHolds/{artistId} {

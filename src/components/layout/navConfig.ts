@@ -13,6 +13,7 @@ import {
   Heart,
   Home,
   Layers,
+  LifeBuoy,
   Library,
   LineChart,
   ListMusic,
@@ -57,6 +58,7 @@ export const fanNavItems: NavItem[] = [
   { label: 'Notifications', to: '/app/notifications', icon: Bell },
   { label: 'Profile', to: '/app/profile', icon: User },
   { label: 'Settings', to: '/app/settings', icon: Settings },
+  { label: 'Support', to: '/support', icon: LifeBuoy },
 ]
 /** Notifications/Profile already have a persistent shortcut in TopBar on mobile — no need for them in the "More" sheet too. */
 export const fanMobileMoreExclude = ['/app/notifications', '/app/profile']
@@ -74,6 +76,7 @@ export const artistDashboardNavItems: NavItem[] = [
   { label: 'DJ Deals', to: '/dashboard/artist/deals', icon: Handshake },
   { label: 'Agreements', to: '/agreements', icon: FileText },
   { label: 'Settings', to: '/dashboard/artist/settings', icon: Settings },
+  { label: 'Support', to: '/support', icon: LifeBuoy },
 ]
 
 export const djNavItems: NavItem[] = [
@@ -85,6 +88,7 @@ export const djNavItems: NavItem[] = [
   { label: 'Analytics', to: '/dj/analytics', icon: LineChart },
   { label: 'Agreements', to: '/agreements', icon: FileText },
   { label: 'Profile', to: '/dj/profile', icon: Music4 },
+  { label: 'Support', to: '/support', icon: LifeBuoy },
 ]
 
 export const adminNavItems: NavItem[] = [

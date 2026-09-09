@@ -779,3 +779,28 @@ test('the workspace switcher stays visible whenever there is somewhere else to g
   // account sitting outside its one workspace — must not regress to that.
   assert.doesNotMatch(switcher, /workspaces\.length < 2/)
 })
+
+test('signed-in users can send a support message, and it lands somewhere an admin can actually see and resolve it', () => {
+  const fn = read('functions/src/support.ts')
+  assert.match(fn, /export const submitSupportMessage = onCall/)
+  assert.match(fn, /export const resolveSupportMessage = onCall/)
+  assert.match(fn, /await requireActiveUser\(request\.auth\.uid\)/)
+  assert.match(fn, /enforceRateLimit\(`submitSupportMessage_\$\{request\.auth\.uid\}`, 5, 3600\)/)
+  assert.match(fn, /const adminId = await requireAdmin\(request\)/)
+  assert.match(fn, /writeAuditLog\(adminId, 'resolve_support_message'/)
+
+  const rules = read('firestore.rules')
+  assert.match(rules, /match \/supportMessages\/\{docId\} \{/)
+  assert.match(rules, /resource\.data\.userId == request\.auth\.uid \|\| isAdmin\(\)/)
+
+  const page = read('src/pages/support/SupportPage.tsx')
+  assert.match(page, /submitSupportMessage\(\{ subject: subject\.trim\(\), message: message\.trim\(\) \}\)/)
+
+  const admin = read('src/pages/admin/AdminReportsPage.tsx')
+  assert.match(admin, /listOpenSupportMessages\(\)\.then\(setSupportMessages\)/)
+  assert.match(admin, /resolveSupportMessage\(\{ supportMessageId: id \}\)/)
+
+  assert.match(read('src/App.tsx'), /<Route\s+path="\/support"/)
+  assert.match(read('src/components/layout/navConfig.ts'), /label: 'Support', to: '\/support'/)
+  assert.match(read('functions/src/index.ts'), /export \{ submitSupportMessage, resolveSupportMessage \} from '\.\/support\.js'/)
+})

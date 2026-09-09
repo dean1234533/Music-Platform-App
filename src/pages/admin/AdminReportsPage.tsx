@@ -1,13 +1,21 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { adminResolveReport, adminSetLegalHold, listCopyrightClaims, listOpenReports, reviewCopyrightClaim } from '@/services/adminService'
+import {
+  adminResolveReport,
+  adminSetLegalHold,
+  listCopyrightClaims,
+  listOpenReports,
+  listOpenSupportMessages,
+  resolveSupportMessage,
+  reviewCopyrightClaim,
+} from '@/services/adminService'
 import { getCopyrightEvidenceUrls } from '@/services/moderationService'
 import { getArtistProfile } from '@/services/artistService'
 import { getTrack } from '@/services/trackService'
 import { Button } from '@/components/common/Button'
 import { TextArea } from '@/components/common/Input'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
-import type { CopyrightClaimDoc, CopyrightClaimStatus, ReportDoc } from '@/types/moderation'
+import type { CopyrightClaimDoc, CopyrightClaimStatus, ReportDoc, SupportMessageDoc } from '@/types/moderation'
 import type { RestrictedCapability } from '@/types/track'
 
 type ReportSubject = { label: string; href: string } | null
@@ -27,6 +35,7 @@ interface ClaimDraft {
 export function AdminReportsPage() {
   const [reports, setReports] = useState<ReportDoc[] | null>(null)
   const [claims, setClaims] = useState<CopyrightClaimDoc[] | null>(null)
+  const [supportMessages, setSupportMessages] = useState<SupportMessageDoc[] | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<Record<string, ClaimDraft>>({})
   const [evidenceUrls, setEvidenceUrls] = useState<Record<string, string[] | 'loading'>>({})
@@ -44,7 +53,18 @@ export function AdminReportsPage() {
   useEffect(() => {
     void listOpenReports().then(setReports)
     void listCopyrightClaims().then(setClaims)
+    void listOpenSupportMessages().then(setSupportMessages)
   }, [])
+
+  async function resolveSupport(id: string) {
+    setBusyId(id)
+    try {
+      await resolveSupportMessage({ supportMessageId: id })
+      setSupportMessages((prev) => prev?.filter((m) => m.supportMessageId !== id) ?? null)
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   // A report on its own is just a raw targetId — an admin can't actually
   // moderate "artist ABC123" without knowing who that is. Resolve each
@@ -132,6 +152,32 @@ export function AdminReportsPage() {
   return (
     <div className="flex flex-col gap-8">
       <h1 className="text-2xl font-semibold text-ink-0">Reports & copyright</h1>
+
+      <section>
+        <h2 className="mb-3 text-lg font-semibold text-ink-0">Support messages</h2>
+        {supportMessages === null ? (
+          <LoadingState />
+        ) : supportMessages.length === 0 ? (
+          <EmptyState title="No open support messages" />
+        ) : (
+          <div className="flex flex-col divide-y divide-surface-border rounded-xl border border-surface-border">
+            {supportMessages.map((msg) => (
+              <div key={msg.supportMessageId} className="flex items-start justify-between gap-3 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-ink-0">{msg.subject}</p>
+                  <p className="mt-1 text-xs text-ink-2">{msg.message}</p>
+                  <p className="mt-1 text-xs text-ink-3">
+                    {msg.userName ?? 'Unknown'} {msg.userEmail ? `(${msg.userEmail})` : ''}
+                  </p>
+                </div>
+                <Button size="sm" loading={busyId === msg.supportMessageId} onClick={() => resolveSupport(msg.supportMessageId)}>
+                  Mark resolved
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section>
         <h2 className="mb-3 text-lg font-semibold text-ink-0">Copyright claims</h2>

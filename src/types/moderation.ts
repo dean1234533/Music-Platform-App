@@ -67,6 +67,20 @@ export interface ReportDoc {
   createdAt: Timestamp | null
 }
 
+/** A general "I have an issue" message — not tied to a piece of content, unlike ReportDoc. */
+export interface SupportMessageDoc {
+  supportMessageId: string
+  userId: string
+  userEmail: string | null
+  userName: string | null
+  subject: string
+  message: string
+  status: 'open' | 'resolved'
+  createdAt: Timestamp | null
+  resolvedBy?: string | null
+  resolvedAt?: Timestamp | null
+}
+
 export interface VerificationRequestDoc {
   verificationRequestId: string
   userId: string
