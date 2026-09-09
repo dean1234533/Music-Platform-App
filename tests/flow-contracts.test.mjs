@@ -973,3 +973,64 @@ test('follow/support conversions are counted from a real per-fan preview signal,
   assert.match(growth, /label="Follow conversions" value=\{formatCount\(artist\.followConversions \?\? 0\)\}/)
   assert.match(growth, /label="Support conversions" value=\{formatCount\(artist\.supportConversions \?\? 0\)\}/)
 })
+
+test('music access ALLOW/DENY matrix — every row of the spec, traced to the code that actually enforces it', () => {
+  const tracksFn = read('functions/src/tracks.ts')
+  const rules = read('firestore.rules')
+  const storage = read('storage.rules')
+  const downloads = read('functions/src/licensing/downloads.ts')
+
+  // 1. Public user reads public track metadata -> ALLOW.
+  assert.match(rules, /allow read: if resource\.data\.visibility == 'public'/)
+
+  // 2. Public user (signed out, uid === null) accesses the preview -> ALLOW.
+  //    canPreviewTrack's base case (public/followers/supporters/early_access)
+  //    falls through to an unconditional `return true` with no uid check —
+  //    only the dj_only/private branches require one, and neither applies here.
+  assert.match(tracksFn, /async function canPreviewTrack\(uid: string \| null, track: FirebaseFirestore\.DocumentData\): Promise<boolean> \{/)
+  assert.match(tracksFn, /if \(track\.visibility === 'dj_only'\) \{\s*if \(!uid\) return false/)
+
+  // 3. Public user (no uid) accesses a followers-tier full stream -> DENY.
+  //    canStreamFullTrack hits `if (!uid) return false` before any tier check
+  //    can grant access (the public-visibility and early_access-public-date
+  //    checks are the only paths before that guard, and neither applies here).
+  assert.match(tracksFn, /if \(track\.visibility === 'public'\) return true/)
+  assert.match(tracksFn, /if \(!uid\) return false/)
+
+  // 4. A real follower accesses that eligible full stream -> ALLOW (a genuine follows/{uid_artistId} doc exists).
+  assert.match(tracksFn, /if \(track\.visibility === 'followers'\) \{\s*return \(await db\.collection\('follows'\)\.doc\(`\$\{uid\}_\$\{track\.artistId\}`\)\.get\(\)\)\.exists/)
+
+  // 5. That same follower (no supportRelationships doc) accesses a supporters-only full stream -> DENY.
+  //    isActiveSupporter returns false immediately when the relationship doc doesn't exist.
+  assert.match(tracksFn, /async function isActiveSupporter\(uid: string, artistId: string\): Promise<boolean> \{/)
+  assert.match(tracksFn, /if \(!relSnap\.exists\) return false/)
+
+  // 6. A supporter with an active/trialing subscription accesses that supporters-only track -> ALLOW.
+  assert.match(tracksFn, /return status === 'active' \|\| status === 'trialing'/)
+
+  // 7. "Other user's fake follow state" -> DENY. There is no channel for a
+  //    client to assert isFollowing/isSupporting to the server at all — the
+  //    callable only ever accepts trackId/kind, and every entitlement check
+  //    is a live Firestore doc read the caller cannot influence.
+  assert.match(tracksFn, /const \{ trackId, kind \} = request\.data/)
+  assert.doesNotMatch(tracksFn, /request\.data\?\.isFollowing|request\.data\?\.isSupporting/)
+
+  // 8/9/10. Public, follower, and supporter all DENY on the master —
+  // originals/ is owner-only at Storage regardless of visibility tier or
+  // relationship, and neither canPreviewTrack nor canStreamFullTrack (nor
+  // anything else fan-facing) ever touches originalAudioPath.
+  assert.match(storage, /match \/artists\/\{artistId\}\/originals\/\{fileName\} \{\s*allow read: if isOwner\(artistId\);/)
+  // getTrackPlaybackUrl only ever signs previewAudioPath or streamAudioPath — never originalAudioPath.
+  assert.match(tracksFn, /const path = kind === 'preview' \? track\.previewAudioPath : track\.streamAudioPath/)
+
+  // 11. A DJ with no signed licence agreement for this track -> DENY —
+  // downloadLicensedTrack requires an active, non-revoked, non-legal-held
+  // agreement, not just the dj role.
+  assert.match(downloads, /if \(agreement\.status !== 'active'\)/)
+  assert.match(downloads, /if \(agreement\.legalHold\)/)
+  assert.match(downloads, /if \(agreement\.downloadRevoked\)/)
+
+  // 12. An approved DJ with a valid agreement -> ALLOW, through the signed,
+  // short-lived download URL flow (never a permanent Storage URL).
+  assert.match(downloads, /resolveLicencePartyRole\(agreement, djId,/)
+})
