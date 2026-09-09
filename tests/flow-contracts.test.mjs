@@ -756,3 +756,18 @@ test('the dashboard workspace switcher only lists roles the account actually has
   // Fan must be gated the same way as artist/dj/admin, not unconditionally present.
   assert.doesNotMatch(switcher, /const workspaces: Workspace\[\] = \[\s*\{ label: 'Fan'/)
 })
+
+test('password reset, email verification, and email-change-revert links resolve on our own domain instead of the default firebaseapp.com action page', () => {
+  const action = read('src/pages/auth/AuthActionPage.tsx')
+  assert.match(action, /export function AuthActionPage/)
+  assert.match(action, /const mode = searchParams\.get\('mode'\)/)
+  assert.match(action, /const oobCode = searchParams\.get\('oobCode'\)/)
+  assert.match(action, /if \(mode === 'resetPassword'\) return <ResetPasswordAction/)
+  assert.match(action, /if \(mode === 'verifyEmail'\) return <VerifyEmailAction/)
+  assert.match(action, /if \(mode === 'recoverEmail'\) return <RecoverEmailAction/)
+  assert.match(action, /verifyPasswordResetCode\(auth, oobCode\)/)
+  assert.match(action, /await confirmPasswordReset\(auth, oobCode, password\)/)
+  assert.match(action, /applyActionCode\(auth, oobCode\)/)
+
+  assert.match(read('src/App.tsx'), /<Route path="\/auth\/action" element=\{<AuthActionPage \/>\} \/>/)
+})

@@ -29,6 +29,7 @@ const CopyrightClaimPage = lazy(() => import('@/pages/legal/CopyrightClaimPage')
 const SignInPage = lazy(() => import('@/pages/auth/SignInPage').then((m) => ({ default: m.SignInPage })))
 const SignUpPage = lazy(() => import('@/pages/auth/SignUpPage').then((m) => ({ default: m.SignUpPage })))
 const ForgotPasswordPage = lazy(() => import('@/pages/auth/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage })))
+const AuthActionPage = lazy(() => import('@/pages/auth/AuthActionPage').then((m) => ({ default: m.AuthActionPage })))
 const VerifyEmailPage = lazy(() => import('@/pages/auth/VerifyEmailPage').then((m) => ({ default: m.VerifyEmailPage })))
 const OnboardingPage = lazy(() => import('@/pages/onboarding/OnboardingPage').then((m) => ({ default: m.OnboardingPage })))
 const AddRolePage = lazy(() => import('@/pages/onboarding/AddRolePage').then((m) => ({ default: m.AddRolePage })))
@@ -116,6 +117,7 @@ function App() {
             <Route path="/sign-in" element={<SignInPage />} />
             <Route path="/sign-up" element={<SignUpPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/auth/action" element={<AuthActionPage />} />
             <Route
               path="/verify-email"
               element={

@@ -9,6 +9,9 @@ const MESSAGES: Record<string, string> = {
   'auth/weak-password': 'Password must be at least 6 characters.',
   'auth/too-many-requests': 'Too many attempts. Please wait a moment and try again.',
   'auth/popup-closed-by-user': 'Sign-in was cancelled.',
+  'auth/expired-action-code': 'This link has expired. Request a new one and try again.',
+  'auth/invalid-action-code': 'This link has already been used or is invalid. Request a new one and try again.',
+  'auth/user-disabled': 'This account has been disabled.',
 }
 
 export function friendlyAuthError(error: unknown): string {
