@@ -73,14 +73,12 @@ test('install banner only shows once signed in, and first-time profiles are awai
   assert.match(users, /permission-denied[\s\S]*?unavailable/)
 })
 
-test('browser tab uses the high-contrast BackTheVibes favicon', () => {
+test('browser tab uses the approved BTV brand favicon', () => {
   const html = read('index.html')
-  const favicon = read('public/icons/backthevibes-favicon.svg')
-  assert.match(html, /rel="icon"[^>]+backthevibes-favicon\.svg\?v=3/)
-  assert.match(html, /rel="shortcut icon"[^>]+backthevibes-favicon\.svg\?v=3/)
+  assert.match(html, /rel="icon"[^>]+backthevibes-favicon-48\.png\?v=4/)
+  assert.match(html, /rel="icon"[^>]+backthevibes-favicon-96\.png\?v=4/)
+  assert.match(html, /rel="shortcut icon"[^>]+favicon\.ico\?v=4/)
   assert.doesNotMatch(html, /href="\/backthevibes-mark\.svg"/)
-  assert.match(favicon, /#C8F33F/)
-  assert.match(favicon, /stroke-linecap="round"/)
 })
 
 test('the fan home feed does not repeat artists or releases across sections', () => {
