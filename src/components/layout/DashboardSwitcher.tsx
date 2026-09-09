@@ -11,12 +11,13 @@ interface Workspace {
   isActive: (path: string) => boolean
 }
 
-/** Every signed-in user can reach the fan side; artist/DJ/admin appear only once that role exists on the account. */
+/** A workspace only appears once that role actually exists on the account — an artist-only account isn't also "the fan". */
 function useWorkspaces(): Workspace[] {
   const { hasRole } = useAuth()
-  const workspaces: Workspace[] = [
-    { label: 'Fan', to: '/app/home', icon: Compass, isActive: (p) => p.startsWith('/app') },
-  ]
+  const workspaces: Workspace[] = []
+  if (hasRole('fan')) {
+    workspaces.push({ label: 'Fan', to: '/app/home', icon: Compass, isActive: (p) => p.startsWith('/app') })
+  }
   if (hasRole('artist')) {
     workspaces.push({ label: 'Artist', to: '/dashboard/artist', icon: LayoutDashboard, isActive: (p) => p.startsWith('/dashboard/artist') })
   }

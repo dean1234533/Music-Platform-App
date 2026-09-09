@@ -747,3 +747,12 @@ test('end-to-end scenario: a DJ finds a track through a shared link and can requ
   // (separately tested) — this scenario only needs the entry point to be real.
   assert.match(read('src/services/trackService.ts'), /export function isTrackAcceptingDjRequests/)
 })
+
+test('the dashboard workspace switcher only lists roles the account actually has (user-reported: an artist-only account should not also be "the fan")', () => {
+  const switcher = read('src/components/layout/DashboardSwitcher.tsx')
+  assert.match(switcher, /const workspaces: Workspace\[\] = \[\]/)
+  assert.match(switcher, /if \(hasRole\('fan'\)\) \{/)
+  assert.match(switcher, /workspaces\.push\(\{ label: 'Fan'/)
+  // Fan must be gated the same way as artist/dj/admin, not unconditionally present.
+  assert.doesNotMatch(switcher, /const workspaces: Workspace\[\] = \[\s*\{ label: 'Fan'/)
+})
