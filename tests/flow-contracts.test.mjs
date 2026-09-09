@@ -804,3 +804,60 @@ test('signed-in users can send a support message, and it lands somewhere an admi
   assert.match(read('src/components/layout/navConfig.ts'), /label: 'Support', to: '\/support'/)
   assert.match(read('functions/src/index.ts'), /export \{ submitSupportMessage, resolveSupportMessage \} from '\.\/support\.js'/)
 })
+
+test('music access ladder: everyone can hear the preview regardless of a track\'s full-stream tier, but the full stream stays strictly gated (user-reported: the player never actually streamed the full track to entitled listeners)', () => {
+  const fn = read('functions/src/tracks.ts')
+
+  // Preview access is permissive — a followers/supporters-tier track's
+  // preview must not be gated the same way its full stream is, or the
+  // preview -> follow -> unlock funnel never gets off the ground.
+  assert.match(fn, /async function canPreviewTrack\(uid: string \| null, track: FirebaseFirestore\.DocumentData\): Promise<boolean> \{/)
+  assert.match(fn, /return true\n\}/)
+
+  // Full-stream access keeps the strict ladder, plus a real fix: a
+  // supportRelationships doc alone isn't proof of a *currently active*
+  // subscription (it isn't cleaned up the instant Stripe cancels one).
+  assert.match(fn, /async function canStreamFullTrack\(uid: string \| null, track: FirebaseFirestore\.DocumentData\): Promise<boolean> \{/)
+  assert.match(fn, /db\.collection\('subscriptions'\)\.doc\(`\$\{uid\}_fan`\)\.get\(\)/)
+  assert.match(fn, /return status === 'active' \|\| status === 'trialing'/)
+
+  // getTrackPlaybackUrl must route to the matching check per kind — using
+  // the same strict check for both would silently re-break the split above.
+  assert.match(fn, /const allowed = kind === 'preview' \? await canPreviewTrack\(uid, track\) : await canStreamFullTrack\(uid, track\)/)
+
+  // Analytics stay honest: preview and full-stream plays are separate
+  // counters, further broken down by DJ-preview and supporter-tier plays —
+  // never summed into one inflated "plays" figure.
+  assert.match(fn, /export const recordTrackPlay = onCall/)
+  assert.match(fn, /update\.playCount = FieldValue\.increment\(1\)/)
+  assert.match(fn, /update\.fullPlayCount = FieldValue\.increment\(1\)/)
+  assert.match(fn, /if \(track\.visibility === 'dj_only'\) update\.djPreviewCount = FieldValue\.increment\(1\)/)
+  assert.match(fn, /if \(track\.visibility === 'supporters'\) update\.supporterPlayCount = FieldValue\.increment\(1\)/)
+
+  // The player must actually request the full stream first and only fall
+  // back to the preview when the server itself says no — never decide
+  // client-side who is "probably" entitled.
+  const player = read('src/contexts/PlayerContext.tsx')
+  assert.match(player, /url = await getStreamPlaybackURL\(track\)/)
+  assert.match(player, /streamError instanceof FirebaseError && streamError\.code === 'functions\/permission-denied'/)
+  assert.match(player, /url = await getPreviewPlaybackURL\(track\)/)
+  assert.match(player, /void recordTrackPlay\(track\.trackId, kind\)/)
+
+  // Firestore rules: track metadata (never audio) is visible for a locked
+  // followers/supporters/early_access track too, so the public profile can
+  // show it locked-with-a-CTA instead of hiding it outright — the real
+  // gate stays entirely in getTrackPlaybackUrl + storage.rules.
+  const rules = read('firestore.rules')
+  assert.match(rules, /resource\.data\.visibility == 'followers'\n {8}\|\| resource\.data\.visibility == 'supporters'/)
+  assert.match(rules, /request\.resource\.data\.get\('fullPlayCount', 0\) == resource\.data\.get\('fullPlayCount', 0\)/)
+  assert.match(rules, /request\.resource\.data\.get\('supporterPlayCount', 0\) == resource\.data\.get\('supporterPlayCount', 0\)/)
+  assert.match(rules, /request\.resource\.data\.get\('djPreviewCount', 0\) == resource\.data\.get\('djPreviewCount', 0\)/)
+
+  // Storage stays the real backstop regardless of the Firestore doc-read
+  // relaxation above — previews/streaming/originals are all owner-only,
+  // full stop, no visibility-based branch to accidentally get wrong.
+  const storage = read('storage.rules')
+  assert.match(storage, /match \/artists\/\{artistId\}\/previews\/\{fileName\} \{\s*\/\/[\s\S]*?allow read: if isOwner\(artistId\);/)
+  assert.match(storage, /match \/artists\/\{artistId\}\/streaming\/\{fileName\} \{[\s\S]*?allow read: if isOwner\(artistId\);/)
+  assert.match(storage, /match \/artists\/\{artistId\}\/originals\/\{fileName\} \{[\s\S]*?allow read: if isOwner\(artistId\);/)
+})

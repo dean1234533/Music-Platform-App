@@ -8,10 +8,14 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { getPreviewPlaybackURL, recordPreviewPlay } from '@/services/trackService'
+import { FirebaseError } from 'firebase/app'
+import { getPreviewPlaybackURL, getStreamPlaybackURL, recordTrackPlay } from '@/services/trackService'
 import type { TrackDoc } from '@/types/track'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
+
+/** null while nothing has loaded yet; otherwise which derivative the currently-loaded track actually is. */
+type PlaybackKind = 'preview' | 'stream' | null
 
 interface PlayerContextValue {
   currentTrack: TrackDoc | null
@@ -21,6 +25,8 @@ interface PlayerContextValue {
   progressSec: number
   durationSec: number
   volume: number
+  /** Whether the currently loaded audio is the full stream or a preview — the server decided this, not the client. */
+  playbackKind: PlaybackKind
   playTrack: (track: TrackDoc, queue?: TrackDoc[]) => void
   togglePlay: () => void
   seek: (seconds: number) => void
@@ -46,6 +52,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [progressSec, setProgressSec] = useState(0)
   const [durationSec, setDurationSec] = useState(0)
   const [volume, setVolumeState] = useState(0.85)
+  const [playbackKind, setPlaybackKind] = useState<PlaybackKind>(null)
 
   useEffect(() => {
     const audio = new Audio()
@@ -113,16 +120,34 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (!audio) return
     setIsLoading(true)
     try {
-      const url = await getPreviewPlaybackURL(track)
+      // Always ask for the full stream first — the server (getTrackPlaybackUrl)
+      // is the only thing that actually decides whether this listener is
+      // entitled to it (owner/admin/public/follower/supporter/DJ). Falling
+      // back to the preview on a permission-denied is what makes the
+      // "everyone can hear the preview, only entitled listeners hear the
+      // full track" ladder work without duplicating that entitlement logic
+      // here — the client never guesses who's allowed to hear what.
+      let kind: 'preview' | 'stream' = 'stream'
+      let url: string
+      try {
+        url = await getStreamPlaybackURL(track)
+      } catch (streamError) {
+        const denied = streamError instanceof FirebaseError && streamError.code === 'functions/permission-denied'
+        if (!denied) throw streamError
+        kind = 'preview'
+        url = await getPreviewPlaybackURL(track)
+      }
       audio.src = url
-      audio.currentTime = track.previewStartSec || 0
+      audio.currentTime = kind === 'preview' ? track.previewStartSec || 0 : 0
       await audio.play()
       setIsPlaying(true)
-      void recordPreviewPlay(track.trackId).catch(() => {
+      setPlaybackKind(kind)
+      void recordTrackPlay(track.trackId, kind).catch(() => {
         // Best-effort analytics — playback should not fail if this errors.
       })
     } catch (error) {
       setIsPlaying(false)
+      setPlaybackKind(null)
       notify(error instanceof Error ? error.message : 'This track is not available to play.', 'error')
     } finally {
       setIsLoading(false)
@@ -186,6 +211,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setIsLoading(false)
     setProgressSec(0)
     setDurationSec(0)
+    setPlaybackKind(null)
   }, [])
 
   const setVolume = useCallback((value: number) => {
@@ -202,6 +228,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       progressSec,
       durationSec,
       volume,
+      playbackKind,
       playTrack,
       togglePlay,
       seek,
@@ -218,6 +245,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       progressSec,
       durationSec,
       volume,
+      playbackKind,
       playTrack,
       togglePlay,
       seek,

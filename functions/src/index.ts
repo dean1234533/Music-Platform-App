@@ -1,6 +1,6 @@
 export { onUserCreate } from './users.js'
 export { onFollowCreate, onFollowDelete } from './follows.js'
-export { recordPreviewPlay, getTrackPlaybackUrl, deleteTrack } from './tracks.js'
+export { recordTrackPlay, getTrackPlaybackUrl, deleteTrack } from './tracks.js'
 export { recordProfileView, recordTrackView } from './analytics.js'
 export { onNotificationCreatePush } from './notifications/pushTrigger.js'
 export { onFanOfferCreate, onFanOfferDelete } from './fanOffers.js'

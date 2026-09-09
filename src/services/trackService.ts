@@ -327,8 +327,8 @@ export async function listDJPromotionTracks(count = 20): Promise<TrackDoc[]> {
   return listDJPromotionTracksFiltered({}, { includeProPlusOnly: true, includeDjOnly: true, count })
 }
 
-/** Server-side play counting keeps playCount out of reach of client tampering. */
-export async function recordPreviewPlay(trackId: string): Promise<void> {
-  const fn = httpsCallable(functions, 'recordPreviewPlay')
-  await fn({ trackId })
+/** Server-side play counting keeps play counts out of reach of client tampering. */
+export async function recordTrackPlay(trackId: string, kind: 'preview' | 'stream'): Promise<void> {
+  const fn = httpsCallable(functions, 'recordTrackPlay')
+  await fn({ trackId, kind })
 }

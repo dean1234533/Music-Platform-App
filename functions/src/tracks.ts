@@ -7,14 +7,48 @@ import { getStorage } from 'firebase-admin/storage'
 
 type PlaybackKind = 'preview' | 'stream'
 
-async function canPlayTrack(uid: string | null, track: FirebaseFirestore.DocumentData): Promise<boolean> {
+async function getRoles(uid: string): Promise<string[]> {
+  const user = await db.collection('users').doc(uid).get()
+  return (user.data()?.roles ?? []) as string[]
+}
+
+/**
+ * Whether this listener may hear the configured preview clip. Deliberately
+ * permissive — the acquisition funnel (preview -> follow -> full track) only
+ * works if a follower/supporter-tier track's preview stays open to everyone,
+ * not just entitled listeners. A public visitor previewing a supporters-only
+ * track and a follower previewing that same track get the identical preview;
+ * only the full-stream check below actually gates anything by relationship.
+ */
+async function canPreviewTrack(uid: string | null, track: FirebaseFirestore.DocumentData): Promise<boolean> {
+  if (track.takenDown === true || (track.restrictedCapabilities ?? []).includes('streaming')) return false
+  if (uid === track.artistId) return true
+  if (track.visibility === 'private') {
+    return uid ? (await getRoles(uid)).includes('admin') : false
+  }
+  if (track.visibility === 'dj_only') {
+    if (!uid) return false
+    const roles = await getRoles(uid)
+    return roles.includes('dj') || roles.includes('admin')
+  }
+  return true
+}
+
+/**
+ * Whether this listener may hear the full-length stream — the strict
+ * entitlement ladder (public / followers / supporters / dj_only / private).
+ * Supporter access additionally requires the fan's own subscription to
+ * currently be active: supportRelationships isn't cleaned up the instant a
+ * subscription lapses (it only changes on the next allocation write), so
+ * relationship-existence alone isn't proof of a live paid relationship.
+ */
+async function canStreamFullTrack(uid: string | null, track: FirebaseFirestore.DocumentData): Promise<boolean> {
   if (track.takenDown === true || (track.restrictedCapabilities ?? []).includes('streaming')) return false
   if (uid === track.artistId) return true
 
   let roles: string[] = []
   if (uid) {
-    const user = await db.collection('users').doc(uid).get()
-    roles = (user.data()?.roles ?? []) as string[]
+    roles = await getRoles(uid)
     if (roles.includes('admin')) return true
   }
   if (track.visibility === 'public') return true
@@ -24,7 +58,13 @@ async function canPlayTrack(uid: string | null, track: FirebaseFirestore.Documen
     return (await db.collection('follows').doc(`${uid}_${track.artistId}`).get()).exists
   }
   if (track.visibility === 'supporters') {
-    return (await db.collection('supportRelationships').doc(`${uid}_${track.artistId}`).get()).exists
+    const [relSnap, subSnap] = await Promise.all([
+      db.collection('supportRelationships').doc(`${uid}_${track.artistId}`).get(),
+      db.collection('subscriptions').doc(`${uid}_fan`).get(),
+    ])
+    if (!relSnap.exists) return false
+    const status = subSnap.data()?.status
+    return status === 'active' || status === 'trialing'
   }
   return false
 }
@@ -42,7 +82,9 @@ export const getTrackPlaybackUrl = onCall(async (request) => {
   const snap = await db.collection('tracks').doc(trackId).get()
   if (!snap.exists) throw new HttpsError('not-found', 'Track does not exist.')
   const track = snap.data()!
-  if (!(await canPlayTrack(request.auth?.uid ?? null, track))) {
+  const uid = request.auth?.uid ?? null
+  const allowed = kind === 'preview' ? await canPreviewTrack(uid, track) : await canStreamFullTrack(uid, track)
+  if (!allowed) {
     throw new HttpsError('permission-denied', 'You do not have access to this audio.')
   }
   const path = kind === 'preview' ? track.previewAudioPath : track.streamAudioPath
@@ -117,26 +159,42 @@ export const deleteTrack = onCall(async (request) => {
 })
 
 /**
- * playCount lives only on the server so a listener can't inflate their own
+ * Play counts live only on the server so a listener can't inflate their own
  * favourite tracks by hammering an updateDoc from the client — Firestore
- * rules also reject any client write that changes playCount directly.
+ * rules also reject any client write that changes these fields directly.
  * Deliberately callable while signed out (public previews are meant to be
  * playable by anonymous visitors), so the abuse control here is a coarse
  * per-track rate limit rather than a per-user one.
+ *
+ * playCount == preview plays (kept under its original name — every existing
+ * track already has real data in it and every dashboard already labels it
+ * "preview"/"sample" plays). fullPlayCount is the new full-stream counter;
+ * supporterPlayCount/djPreviewCount are narrower breakdowns of those two,
+ * not separate totals — never summed together for a "total plays" figure.
  */
-export const recordPreviewPlay = onCall(async (request) => {
+export const recordTrackPlay = onCall(async (request) => {
   const trackId = request.data?.trackId as string | undefined
-  if (!trackId || typeof trackId !== 'string') {
-    throw new HttpsError('invalid-argument', 'trackId is required.')
+  const kind = request.data?.kind as PlaybackKind | undefined
+  if (!trackId || (kind !== 'preview' && kind !== 'stream')) {
+    throw new HttpsError('invalid-argument', 'trackId and a valid playback kind are required.')
   }
-  await enforceRateLimit(`recordPreviewPlay_${trackId}`, 120, 60)
+  await enforceRateLimit(`recordTrackPlay_${trackId}`, 120, 60)
 
   const ref = db.collection('tracks').doc(trackId)
   const snap = await ref.get()
   if (!snap.exists) {
     throw new HttpsError('not-found', 'Track does not exist.')
   }
+  const track = snap.data()!
 
-  await ref.update({ playCount: FieldValue.increment(1) })
+  const update: Record<string, unknown> = {}
+  if (kind === 'preview') {
+    update.playCount = FieldValue.increment(1)
+    if (track.visibility === 'dj_only') update.djPreviewCount = FieldValue.increment(1)
+  } else {
+    update.fullPlayCount = FieldValue.increment(1)
+    if (track.visibility === 'supporters') update.supporterPlayCount = FieldValue.increment(1)
+  }
+  await ref.update(update)
   return { ok: true }
 })

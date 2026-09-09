@@ -101,17 +101,19 @@ service cloud.firestore {
     // takenDown are frozen from client writes.
     // ---------------------------------------------------------------------
     match /tracks/{trackId} {
-      // A shared track link must work for a legitimately-entitled viewer, not
-      // just the public/dj_only/owner/admin cases — mirrors artistPosts'
-      // existence-check pattern. early_access has no dedicated relationship
-      // collection yet, so it's treated as follower-equivalent for now.
+      // Metadata (title/artwork/etc, never audio) is readable for any
+      // non-private, non-dj_only-to-non-DJs track, even by a signed-out
+      // visitor — the public profile shows a locked followers/supporters
+      // track with a Follow/Support CTA rather than hiding it outright. The
+      // real gate is entirely in getTrackPlaybackUrl + storage.rules: this
+      // doc never contains playable audio, only Storage paths that are
+      // owner-only at the Storage layer regardless of who can read this doc.
       allow read: if resource.data.visibility == 'public'
+        || resource.data.visibility == 'followers'
+        || resource.data.visibility == 'supporters'
+        || resource.data.visibility == 'early_access'
         || (resource.data.visibility == 'dj_only' && hasRole('dj'))
         || (isSignedIn() && resource.data.artistId == request.auth.uid)
-        || ((resource.data.visibility == 'followers' || resource.data.visibility == 'early_access') && isSignedIn() &&
-            exists(/databases/$(database)/documents/follows/$(request.auth.uid + '_' + resource.data.artistId)))
-        || (resource.data.visibility == 'supporters' && isSignedIn() &&
-            exists(/databases/$(database)/documents/supportRelationships/$(request.auth.uid + '_' + resource.data.artistId)))
         || isAdmin();
 
       allow create: if isSignedIn()
@@ -130,6 +132,9 @@ service cloud.firestore {
         && resource.data.artistId == request.auth.uid
         && request.resource.data.artistId == resource.data.artistId
         && request.resource.data.playCount == resource.data.playCount
+        && request.resource.data.get('fullPlayCount', 0) == resource.data.get('fullPlayCount', 0)
+        && request.resource.data.get('supporterPlayCount', 0) == resource.data.get('supporterPlayCount', 0)
+        && request.resource.data.get('djPreviewCount', 0) == resource.data.get('djPreviewCount', 0)
         && request.resource.data.get('takenDown', false) == resource.data.get('takenDown', false)
         && request.resource.data.get('fileHash', null) == resource.data.get('fileHash', null)
         && request.resource.data.get('fileSize', null) == resource.data.get('fileSize', null)

@@ -62,7 +62,14 @@ export interface TrackDoc {
   djPromoTier: 'all' | 'pro_plus_only'
   /** Hidden from DJ discovery and requests until this date passes. */
   embargoUntil: Timestamp | null
+  /** Preview plays — kept under its original name; every dashboard already labels this "preview"/"sample" plays. */
   playCount: number
+  /** Full-length stream plays — separate counter, never summed with playCount for a "total plays" figure. */
+  fullPlayCount?: number
+  /** Narrower breakdown of fullPlayCount: full plays specifically gated by the supporters tier. */
+  supporterPlayCount?: number
+  /** Narrower breakdown of playCount: preview plays specifically on a dj_only track. */
+  djPreviewCount?: number
   createdAt: Timestamp | null
   updatedAt: Timestamp | null
   rightsConfirmed: boolean

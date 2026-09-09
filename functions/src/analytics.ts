@@ -14,7 +14,7 @@ function sanitizeRef(ref: unknown): string | null {
 
 /**
  * Anonymous-friendly view counters for the public artist/track pages — most
- * visitors here are signed out, so this mirrors recordPreviewPlay's callable
+ * visitors here are signed out, so this mirrors recordTrackPlay's callable
  * + coarse per-content rate limit pattern rather than a per-viewer dedup.
  * Real, server-recorded counts; not exact unique-visitor precision.
  */
