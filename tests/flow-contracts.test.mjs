@@ -428,7 +428,7 @@ test('drawn signatures export on an opaque white background and degrade graceful
   assert.match(pad, /ctx\.strokeStyle = '#000000'/)
   assert.match(pad, /useEffect\(fillWhite, \[\]\)/)
   const contract = read('src/pages/agreements/ContractPage.tsx')
-  assert.match(contract, /e\.currentTarget\.style\.display = 'none'/)
+  assert.match(contract, /onError=\{\(\) => setImageFailed\(true\)\}/)
 })
 
 test('Download PDF waits for signature images to be ready before printing (user-reported)', () => {
@@ -449,6 +449,17 @@ test('the DJ access request modal closes on success even when opened from /dj/re
   const submitBody = modal.slice(modal.indexOf('async function handleSubmit'), modal.indexOf('async function handleSubmit') + 900)
   assert.match(submitBody, /onClose\(\)/)
   assert.match(submitBody, /navigate\('\/dj\/requests'\)/)
+})
+
+test('a signed party always shows something that reads as an actual signature (user-reported)', () => {
+  // A typed signature never has a drawn image at all, and a drawn one can genuinely fail to
+  // load — either way, the contract previously showed nothing but the plain legal name next to
+  // a "Signed" label once that happened, which doesn't read as a signed legal document.
+  const contract = read('src/pages/agreements/ContractPage.tsx')
+  assert.match(contract, /fontFamily: "'Caveat', cursive"/)
+  assert.match(contract, /\{signedAt \? \(/)
+  const html = read('index.html')
+  assert.match(html, /fonts\.googleapis\.com\/css2\?family=Caveat/)
 })
 
 test('the persistent player can be fully dismissed', () => {

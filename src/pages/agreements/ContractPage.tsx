@@ -397,22 +397,30 @@ function Party({
   signedAt: unknown
   signatureImageUrl: string | null
 }) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const showImage = Boolean(signatureImageUrl) && !imageFailed
+
   return (
     <div className="rounded-xl border border-surface-border bg-surface-2 p-4">
       <p className="text-xs text-ink-3">{label}</p>
       <p className="text-sm font-medium text-ink-0">{name}</p>
       <p className="mt-1 text-xs text-ink-3">ID: {userId}</p>
       <p className="mt-1 text-xs text-ink-3">{signedAt ? 'Signed' : 'Not yet signed'}</p>
-      {signatureImageUrl ? (
+      {signedAt ? (
+        // The actual signature, shown regardless of whether a drawn image exists or loads —
+        // a typed signature never has an image at all, and a drawn one can genuinely fail to
+        // load (expired URL, network hiccup). Either way, this is what makes it read as a
+        // signed document rather than just a name with a timestamp next to it.
+        <p className="mt-2 -rotate-1 truncate text-3xl leading-none text-ink-0" style={{ fontFamily: "'Caveat', cursive" }}>
+          {name}
+        </p>
+      ) : null}
+      {showImage ? (
         <img
-          src={signatureImageUrl}
-          alt={`${label} signature`}
+          src={signatureImageUrl!}
+          alt={`${label} drawn signature`}
           className="mt-2 h-14 w-full max-w-[220px] rounded-md border border-surface-border bg-white object-contain object-left p-1"
-          onError={(e) => {
-            // The signed URL can genuinely fail (expired mid-view, network hiccup) — hide the
-            // broken-image icon rather than show it; the legal name above is still shown either way.
-            e.currentTarget.style.display = 'none'
-          }}
+          onError={() => setImageFailed(true)}
         />
       ) : null}
     </div>
