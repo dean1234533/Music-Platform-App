@@ -71,6 +71,8 @@ export interface LicenceRequestDoc {
   currentOfferId?: string
   /** Admin/backend-only: blocks automatic retention cleanup from touching this request. */
   legalHold?: boolean
+  /** uids who removed this closed request from their own list — the doc and the other party's view are untouched. */
+  dismissedBy?: string[]
   createdAt: Timestamp | null
   updatedAt: Timestamp | null
 }

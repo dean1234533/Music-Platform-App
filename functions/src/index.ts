@@ -12,7 +12,7 @@ export { updateSupportAllocations } from './support/allocations.js'
 export { onSupportRelationshipCreate, onSupportRelationshipDelete } from './support/triggers.js'
 
 // Phase 3 — DJ discovery, licence requests, messaging.
-export { submitLicenceRequest, respondToLicenceRequest, acceptExistingDeal } from './licensing/requests.js'
+export { submitLicenceRequest, respondToLicenceRequest, acceptExistingDeal, dismissLicenceRequest } from './licensing/requests.js'
 export { sendOffer, counterOffer, acceptOffer, rejectOffer, withdrawOffer } from './licensing/offers.js'
 export { sendMessage } from './messaging/messages.js'
 

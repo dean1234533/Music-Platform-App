@@ -35,6 +35,9 @@ export async function respondToLicenceRequest(requestId: string, action: 'start_
   return respondCallable({ requestId, action, actingRole })
 }
 
+/** Removes a closed (rejected/cancelled/expired) request from the caller's own list — the doc and the other party's view are untouched. */
+export const dismissLicenceRequest = callable<{ requestId: string }, { ok: boolean }>('dismissLicenceRequest')
+
 export function subscribeLicenceRequest(
   requestId: string,
   onChange: (req: LicenceRequestDoc | null) => void,

@@ -296,3 +296,33 @@ export const respondToLicenceRequest = onCall(async (request) => {
 
   return { status: nextStatus }
 })
+
+const DISMISSIBLE_STATUSES = ['rejected', 'cancelled', 'expired']
+
+/**
+ * "Delete" from a party's own request list. licenceRequests is a shared doc between the artist
+ * and DJ — actually deleting it would erase the other party's copy of a closed negotiation too
+ * (and, for an artist, any pattern of a DJ repeatedly requesting-then-cancelling), which this
+ * app never does silently elsewhere (see cleanupAbandonedRequests: anonymise, not delete). So
+ * this only ever removes the request from the calling party's own view; the doc and the other
+ * party's copy are untouched. Only allowed once the request is in a closed, non-negotiable state.
+ */
+export const dismissLicenceRequest = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
+  const uid = request.auth.uid
+  const { requestId } = request.data ?? {}
+  if (!requestId || typeof requestId !== 'string') throw new HttpsError('invalid-argument', 'requestId is required.')
+
+  const ref = db.collection('licenceRequests').doc(requestId)
+  const snap = await ref.get()
+  if (!snap.exists) throw new HttpsError('not-found', 'Request not found.')
+  const data = snap.data()!
+  if (data.artistId !== uid && data.djId !== uid) throw new HttpsError('permission-denied', 'Not a participant in this request.')
+  if (!DISMISSIBLE_STATUSES.includes(data.status)) {
+    throw new HttpsError('failed-precondition', 'Only a rejected, cancelled, or expired request can be removed.')
+  }
+
+  await ref.update({ dismissedBy: FieldValue.arrayUnion(uid) })
+  return { ok: true }
+})

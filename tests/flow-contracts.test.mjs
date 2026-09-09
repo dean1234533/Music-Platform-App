@@ -366,6 +366,28 @@ test('a fully completed licence request reads as Active, not the internal "appro
   assert.match(artistPage, /status: \['approved'\], label: 'Active'/)
 })
 
+test('the DJ requests list can be filtered so closed requests stop cluttering it by default (user-reported)', () => {
+  const page = read('src/pages/dj/DJRequestsPage.tsx')
+  assert.match(page, /const CLOSED_STATUSES = \['rejected', 'cancelled', 'expired'\]/)
+  assert.match(page, /useState<\(typeof REQUEST_FILTERS\)\[number\]\['key'\]>\('open'\)/)
+  assert.match(page, /No \$\{requestFilter\} requests/)
+})
+
+test('a DJ can delete a closed request from their own list without erasing the artist\'s copy (user-reported)', () => {
+  const backend = read('functions/src/licensing/requests.ts')
+  const service = read('src/services/licenceService.ts')
+  const page = read('src/pages/dj/DJRequestsPage.tsx')
+  assert.match(backend, /export const dismissLicenceRequest = onCall/)
+  // Must only ever touch the calling party's own visibility, never delete the shared doc itself.
+  assert.match(backend, /dismissedBy: FieldValue\.arrayUnion\(uid\)/)
+  assert.doesNotMatch(backend, /ref\.delete\(\)/)
+  assert.match(backend, /DISMISSIBLE_STATUSES = \['rejected', 'cancelled', 'expired'\]/)
+  assert.match(service, /dismissLicenceRequest = callable/)
+  assert.match(page, /dismissedBy\?\.includes\(firebaseUser\?\.uid/)
+  assert.match(page, /void deleteRequest\(\)/)
+  assert.match(read('functions/src/index.ts'), /dismissLicenceRequest/)
+})
+
 test('the persistent player can be fully dismissed', () => {
   const player = read('src/contexts/PlayerContext.tsx')
   const bar = read('src/components/player/PlayerBar.tsx')

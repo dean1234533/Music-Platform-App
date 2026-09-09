@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Handshake, MessageSquare, Radar } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { respondToLicenceRequest, submitLicenceRequest, subscribeRequestsForDj } from '@/services/licenceService'
+import { dismissLicenceRequest, respondToLicenceRequest, submitLicenceRequest, subscribeRequestsForDj } from '@/services/licenceService'
 import { listArtistsSeekingDJExposure } from '@/services/discoveryService'
 import { getTrack } from '@/services/trackService'
 import { getDealsByIds } from '@/services/dealService'
@@ -45,10 +45,17 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: 'Cancelled',
 }
 
+const CLOSED_STATUSES = ['rejected', 'cancelled', 'expired']
+const REQUEST_FILTERS = [
+  { key: 'open', label: 'Open' },
+  { key: 'closed', label: 'Closed' },
+  { key: 'all', label: 'All' },
+] as const
+
 export function DJRequestsPage() {
   const { firebaseUser } = useAuth()
   const { notify } = useToast()
-  const [requests, setRequests] = useState<LicenceRequestDoc[] | null>(null)
+  const [allRequests, setRequests] = useState<LicenceRequestDoc[] | null>(null)
   const [requestError, setRequestError] = useState(false)
   const [openTracks, setOpenTracks] = useState<TrackDoc[] | null>(null)
   const [dealOpportunities, setDealOpportunities] = useState<DealOpportunity[] | null>(null)
@@ -57,6 +64,7 @@ export function DJRequestsPage() {
   const [requestTarget, setRequestTarget] = useState<RequestTarget | null>(null)
   const [acceptingDealId, setAcceptingDealId] = useState<string | null>(null)
   const [offerModal, setOfferModal] = useState<{ requestId: string; previousOffer: LicenceOfferDoc } | null>(null)
+  const [requestFilter, setRequestFilter] = useState<(typeof REQUEST_FILTERS)[number]['key']>('open')
 
   useEffect(() => {
     if (!firebaseUser) return
@@ -125,6 +133,8 @@ export function DJRequestsPage() {
       })
   }, [])
 
+  const requests = allRequests?.filter((r) => !r.dismissedBy?.includes(firebaseUser?.uid ?? '')) ?? null
+
   return (
     <div className="flex flex-col gap-10">
       <section className="flex flex-col gap-5">
@@ -156,16 +166,47 @@ export function DJRequestsPage() {
             )}
           />
         ) : (
-          <div className="flex flex-col divide-y divide-surface-border overflow-hidden rounded-2xl border border-surface-border bg-surface-1">
-            {requests.map((req) => (
-              <RequestRow
-                key={req.requestId}
-                request={req}
-                onCounter={(offer) => setOfferModal({ requestId: req.requestId, previousOffer: offer })}
-                onError={(message) => notify(message, 'error')}
-              />
-            ))}
-          </div>
+          <>
+            <div className="scrollbar-none flex gap-1 overflow-x-auto rounded-full border border-surface-border bg-surface-1 p-1">
+              {REQUEST_FILTERS.map((filter) => {
+                const count =
+                  filter.key === 'all'
+                    ? requests.length
+                    : requests.filter((r) => CLOSED_STATUSES.includes(r.status) === (filter.key === 'closed')).length
+                return (
+                  <button
+                    key={filter.key}
+                    type="button"
+                    onClick={() => setRequestFilter(filter.key)}
+                    className={`shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
+                      requestFilter === filter.key ? 'bg-surface-3 text-ink-0' : 'text-ink-2 hover:text-ink-0'
+                    }`}
+                  >
+                    {filter.label} ({count})
+                  </button>
+                )
+              })}
+            </div>
+            {(() => {
+              const filtered = requests.filter((r) =>
+                requestFilter === 'all' ? true : CLOSED_STATUSES.includes(r.status) === (requestFilter === 'closed'),
+              )
+              return filtered.length === 0 ? (
+                <EmptyState title={`No ${requestFilter} requests`} />
+              ) : (
+                <div className="flex flex-col divide-y divide-surface-border overflow-hidden rounded-2xl border border-surface-border bg-surface-1">
+                  {filtered.map((req) => (
+                    <RequestRow
+                      key={req.requestId}
+                      request={req}
+                      onCounter={(offer) => setOfferModal({ requestId: req.requestId, previousOffer: offer })}
+                      onError={(message) => notify(message, 'error')}
+                    />
+                  ))}
+                </div>
+              )
+            })()}
+          </>
         )}
       </section>
 
@@ -337,6 +378,8 @@ function RequestRow({
   const artist = useArtistSummary(request.artistId)
   const [trackTitle, setTrackTitle] = useState('Track request')
   const [cancelling, setCancelling] = useState(false)
+  const [dismissing, setDismissing] = useState(false)
+  const isClosed = ['rejected', 'cancelled', 'expired'].includes(request.status)
 
   useEffect(() => {
     let active = true
@@ -358,6 +401,16 @@ function RequestRow({
       onError(error instanceof Error ? error.message : 'Could not cancel this request.')
     } finally {
       setCancelling(false)
+    }
+  }
+
+  async function deleteRequest() {
+    setDismissing(true)
+    try {
+      await dismissLicenceRequest({ requestId: request.requestId })
+    } catch (error) {
+      onError(error instanceof Error ? error.message : 'Could not remove this request.')
+      setDismissing(false)
     }
   }
 
@@ -389,6 +442,11 @@ function RequestRow({
             Cancel request
           </Button>
         </div>
+      ) : null}
+      {isClosed ? (
+        <Button size="sm" variant="secondary" loading={dismissing} onClick={() => void deleteRequest()} className="w-fit">
+          Delete
+        </Button>
       ) : null}
     </div>
   )
