@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowUpRight, Disc3, Eye, Headphones, Heart, Megaphone, Music2, Radio, Sparkles, UploadCloud, Users, Wallet } from 'lucide-react'
+import { ArrowUpRight, AudioWaveform, Disc3, Eye, Headphones, Heart, Megaphone, Radio, UploadCloud, Users, Wallet } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeArtistProfile, subscribeArtistTracks } from '@/services/artistService'
+import { MusicGlyph } from '@/components/common/MusicGlyph'
 import { LoadingState } from '@/components/common/StateViews'
 import { formatCount } from '@/utils/format'
 import type { ArtistProfile } from '@/types/artist'
@@ -35,14 +36,22 @@ export function OverviewPage() {
   return (
     <div className="flex flex-col gap-7 pb-4">
       <section className="relative isolate overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#0d1109] px-5 py-6 shadow-[0_24px_80px_rgba(0,0,0,.28)] sm:px-8 sm:py-8">
-        {artist.coverURL ? <img src={artist.coverURL} alt="" className="absolute inset-0 -z-20 h-full w-full object-cover opacity-35" /> : null}
-        <div className="absolute inset-0 -z-10 bg-[linear-gradient(100deg,rgba(7,9,5,.98)_15%,rgba(7,9,5,.75)_58%,rgba(7,9,5,.25))]" />
+        <img
+              src={artist.coverURL || '/artist-command-centre-bg.png?v=20260909'}
+          alt=""
+          className="absolute inset-0 -z-20 h-full w-full object-cover object-[68%_center] opacity-[0.68]"
+        />
+        <div className="absolute inset-0 -z-10 bg-[linear-gradient(100deg,rgba(7,9,5,.99)_10%,rgba(7,9,5,.88)_46%,rgba(7,9,5,.42)_78%,rgba(7,9,5,.2))]" />
+        <div className="absolute inset-x-0 bottom-0 -z-10 h-px bg-gradient-to-r from-transparent via-brand-400/35 to-transparent" />
         <div className="absolute -right-16 -top-24 -z-10 h-72 w-72 rounded-full bg-brand-500/20 blur-3xl" />
 
         <div className="flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
           <div className="max-w-xl">
             <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-brand-400">
-              <Sparkles className="h-3.5 w-3.5" /> Artist command centre
+              <span className="grid h-6 w-6 place-items-center rounded-full border border-brand-400/30 bg-brand-500/10">
+                <AudioWaveform className="h-3.5 w-3.5" />
+              </span>
+              Artist command centre
             </p>
             <h1 className="mt-4 text-3xl font-semibold tracking-[-0.035em] text-white sm:text-4xl">Welcome back, {artist.name}</h1>
             <p className="mt-3 max-w-lg text-sm leading-6 text-white/60 sm:text-base">Your audience, releases and opportunities—together in one clear view.</p>
@@ -58,7 +67,7 @@ export function OverviewPage() {
 
           <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/25 p-3 pr-5 backdrop-blur-md">
             <div className="h-12 w-12 overflow-hidden rounded-xl border border-white/10 bg-white/10">
-              {artist.photoURL ? <img src={artist.photoURL} alt="" className="h-full w-full object-cover" /> : <Music2 className="m-3 h-6 w-6 text-brand-400" />}
+              {artist.photoURL ? <img src={artist.photoURL} alt="" className="h-full w-full object-cover" /> : <MusicGlyph className="m-3 h-6 w-6 text-brand-400" />}
             </div>
             <div>
               <p className="text-xs text-white/45">Public address</p>
@@ -87,7 +96,7 @@ export function OverviewPage() {
 
           {topTracks.length === 0 ? (
             <div className="flex min-h-64 flex-col items-center justify-center px-5 py-10 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-brand-400/20 bg-brand-500/10 text-brand-400"><Music2 className="h-6 w-6" /></div>
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-brand-400/20 bg-[radial-gradient(circle_at_30%_20%,rgba(200,243,63,.18),rgba(200,243,63,.04))] text-brand-400 shadow-[inset_0_1px_0_rgba(255,255,255,.08)]"><MusicGlyph className="h-7 w-7" /></div>
               <h3 className="mt-4 text-base font-semibold text-ink-0">Your first release starts here</h3>
               <p className="mt-1 max-w-xs text-sm leading-6 text-ink-2">Upload a track to begin building your catalogue and tracking listener activity.</p>
               <Link to="/dashboard/artist/upload" className="mt-4 text-sm font-semibold text-brand-400 hover:text-brand-300">Upload a track →</Link>
