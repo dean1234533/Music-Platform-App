@@ -13,7 +13,7 @@ import {
 import { db } from '@/lib/firebase'
 import type { ArtistProfile } from '@/types/artist'
 import type { TrackDoc } from '@/types/track'
-import { slugify } from '@/utils/slug'
+import { RESERVED_ARTIST_SLUGS, slugify } from '@/utils/slug'
 
 function artistRef(artistId: string) {
   return doc(db, 'artistProfiles', artistId)
@@ -60,9 +60,14 @@ export async function createArtistProfile(
     let candidate = baseSlug
     let attempt = 0
     // Try the natural slug first, then append short suffixes on collision.
+    // A reserved word (e.g. "support", "admin") is treated the same as a
+    // taken slug rather than a hard block, so a legitimate artist with that
+    // name still gets a working URL, just not the bare unqualified one.
     while (attempt < 25) {
-      const existing = await tx.get(slugRef(candidate))
-      if (!existing.exists()) break
+      if (!RESERVED_ARTIST_SLUGS.has(candidate)) {
+        const existing = await tx.get(slugRef(candidate))
+        if (!existing.exists()) break
+      }
       attempt += 1
       candidate = `${baseSlug}-${attempt + 1}`
     }
