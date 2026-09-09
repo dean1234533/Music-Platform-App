@@ -223,7 +223,7 @@ export function ArtistPublicProfilePage() {
           </div>
           <div className="flex shrink-0 gap-2 self-stretch sm:self-auto">
             <FollowButton artistId={artist.artistId} />
-            {!firebaseUser || !hasRole('dj') || hasRole('fan') ? <SupportButton /> : null}
+            {!firebaseUser || !hasRole('dj') || hasRole('fan') ? <SupportButton artistId={artist.artistId} /> : null}
             <ShareButton
               url={artistShareUrl(artist.slug)}
               title={artist.name}

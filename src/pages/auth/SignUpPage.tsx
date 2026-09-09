@@ -7,6 +7,7 @@ import { PasswordStrengthMeter } from '@/components/auth/PasswordStrengthMeter'
 import { signUpWithEmail } from '@/services/authService'
 import { friendlyAuthError } from '@/utils/authErrors'
 import { checkPassword, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
+import { isSafeReturnPath } from '@/utils/returnTo'
 
 export function SignUpPage() {
   const navigate = useNavigate()
@@ -14,7 +15,11 @@ export function SignUpPage() {
   const requestedRole = ['fan', 'artist', 'dj'].includes(searchParams.get('role') ?? '')
     ? searchParams.get('role')
     : null
-  const roleQuery = requestedRole ? `?role=${requestedRole}` : ''
+  const returnToParam = searchParams.get('returnTo')
+  const nextQuery = new URLSearchParams()
+  if (requestedRole) nextQuery.set('role', requestedRole)
+  if (isSafeReturnPath(returnToParam)) nextQuery.set('returnTo', returnToParam)
+  const roleQuery = nextQuery.size > 0 ? `?${nextQuery.toString()}` : ''
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -85,7 +90,7 @@ export function SignUpPage() {
 
       <p className="mt-6 text-center text-sm text-ink-2">
         Already have an account?{' '}
-        <Link to="/sign-in" className="font-medium text-brand-400 hover:underline">
+        <Link to={isSafeReturnPath(returnToParam) ? `/sign-in?returnTo=${encodeURIComponent(returnToParam)}` : '/sign-in'} className="font-medium text-brand-400 hover:underline">
           Sign in
         </Link>
       </p>

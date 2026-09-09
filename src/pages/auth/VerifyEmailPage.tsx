@@ -6,6 +6,7 @@ import { Button } from '@/components/common/Button'
 import { useAuth } from '@/contexts/AuthContext'
 import { resendVerificationEmail } from '@/services/authService'
 import { auth } from '@/lib/firebase'
+import { isSafeReturnPath } from '@/utils/returnTo'
 
 export function VerifyEmailPage() {
   const { firebaseUser } = useAuth()
@@ -34,7 +35,11 @@ export function VerifyEmailPage() {
         return
       }
       const role = searchParams.get('role')
-      navigate(`/onboarding${['fan', 'artist', 'dj'].includes(role ?? '') ? `?role=${role}` : ''}`)
+      const returnToParam = searchParams.get('returnTo')
+      const nextQuery = new URLSearchParams()
+      if (['fan', 'artist', 'dj'].includes(role ?? '')) nextQuery.set('role', role!)
+      if (isSafeReturnPath(returnToParam)) nextQuery.set('returnTo', returnToParam)
+      navigate(`/onboarding${nextQuery.size > 0 ? `?${nextQuery.toString()}` : ''}`)
     } finally {
       setChecking(false)
     }

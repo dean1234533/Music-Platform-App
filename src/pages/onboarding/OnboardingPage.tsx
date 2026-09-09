@@ -7,6 +7,7 @@ import { createArtistProfile } from '@/services/artistService'
 import { createDJProfile } from '@/services/djService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
+import { isSafeReturnPath } from '@/utils/returnTo'
 import type { UserRole } from '@/types/user'
 
 const ROLE_OPTIONS: { role: UserRole; title: string; description: string; icon: typeof Headphones }[] = [
@@ -68,7 +69,10 @@ export function OnboardingPage() {
         })
       }
 
-      if (selectedRole === 'artist') {
+      const returnToParam = searchParams.get('returnTo')
+      if (isSafeReturnPath(returnToParam)) {
+        navigate(returnToParam)
+      } else if (selectedRole === 'artist') {
         navigate('/dashboard/artist')
       } else if (selectedRole === 'dj') {
         navigate('/dj/discover')

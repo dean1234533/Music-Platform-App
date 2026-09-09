@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { getPlatformSettings, listActiveSubscriptionPlansForRole } from '@/services/platformSettingsService'
 import { openBillingPortal, subscribeToOwnSubscription, subscribeToPlan } from '@/services/subscriptionService'
 import { subscribeSupportAllocations, updateSupportAllocations } from '@/services/supportService'
-import { listFollowedArtistIds } from '@/services/followService'
+import { followArtist, listFollowedArtistIds } from '@/services/followService'
 import { getArtistProfile } from '@/services/artistService'
 import { Button } from '@/components/common/Button'
 import { MusicGlyph } from '@/components/common/MusicGlyph'
@@ -161,13 +161,24 @@ export function SubscriptionPage() {
             Math.round(activePlan.priceMinor * (platformSettings.artistAllocationPercent / 100)),
           )}
           currency={activePlan.currency}
+          highlightArtistId={params.get('artist')}
         />
       ) : null}
     </div>
   )
 }
 
-function AllocationEditor({ fanId, planCapMinor, currency }: { fanId: string; planCapMinor: number; currency: string }) {
+function AllocationEditor({
+  fanId,
+  planCapMinor,
+  currency,
+  highlightArtistId,
+}: {
+  fanId: string
+  planCapMinor: number
+  currency: string
+  highlightArtistId?: string | null
+}) {
   const [artists, setArtists] = useState<ArtistProfile[]>([])
   const [amounts, setAmounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
@@ -178,6 +189,10 @@ function AllocationEditor({ fanId, planCapMinor, currency }: { fanId: string; pl
   useEffect(() => {
     let cancelled = false
     async function load() {
+      // Support only ever lists artists the fan follows below — arriving here via
+      // "Support Artist" on a profile the fan doesn't yet follow would otherwise silently
+      // omit that exact artist from the list they're trying to allocate to.
+      if (highlightArtistId) await followArtist(fanId, highlightArtistId).catch(() => undefined)
       const ids = await listFollowedArtistIds(fanId)
       const profiles = await Promise.all(ids.map((id) => getArtistProfile(id)))
       if (!cancelled) {
@@ -189,7 +204,7 @@ function AllocationEditor({ fanId, planCapMinor, currency }: { fanId: string; pl
     return () => {
       cancelled = true
     }
-  }, [fanId])
+  }, [fanId, highlightArtistId])
 
   useEffect(() => {
     return subscribeSupportAllocations(fanId, (doc: SupportAllocationDoc | null) => {
@@ -240,7 +255,10 @@ function AllocationEditor({ fanId, planCapMinor, currency }: { fanId: string; pl
       ) : (
         <div className="flex flex-col divide-y divide-surface-border rounded-xl border border-surface-border">
           {artists.map((artist) => (
-            <div key={artist.artistId} className="flex items-center justify-between gap-3 px-4 py-3">
+            <div
+              key={artist.artistId}
+              className={`flex items-center justify-between gap-3 px-4 py-3 ${artist.artistId === highlightArtistId ? 'bg-support-500/[0.06]' : ''}`}
+            >
               <span className="text-sm font-medium text-ink-0">{artist.name}</span>
               <div className="flex items-center gap-1 text-sm text-ink-2">
                 {currency === 'gbp' ? '£' : currency.toUpperCase() + ' '}

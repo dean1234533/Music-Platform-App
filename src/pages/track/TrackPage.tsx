@@ -6,6 +6,7 @@ import { usePlayer } from '@/contexts/PlayerContext'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { useAuth } from '@/contexts/AuthContext'
 import { FollowButton } from '@/components/music/FollowButton'
+import { SupportButton } from '@/components/music/SupportButton'
 import { TrackActions } from '@/components/music/TrackActions'
 import { RequestDjAccessModal } from '@/components/track/RequestDjAccessModal'
 import { ReportTrackModal } from '@/components/track/ReportTrackModal'
@@ -78,6 +79,7 @@ export function TrackPage() {
               {isCurrent && isPlaying ? <Pause className="h-5 w-5" fill="currentColor" /> : <Play className="h-5 w-5 translate-x-0.5" fill="currentColor" />}
             </button>
             {artist ? <FollowButton artistId={artist.artistId} /> : null}
+            {artist ? <SupportButton artistId={artist.artistId} size="sm" /> : null}
             <TrackActions track={track} labels />
             {artist ? (
               <ShareButton

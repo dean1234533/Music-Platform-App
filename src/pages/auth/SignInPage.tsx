@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { AuthLayout } from './AuthLayout'
 import { Input, Label } from '@/components/common/Input'
 import { Button } from '@/components/common/Button'
 import { signInWithEmail, signOut } from '@/services/authService'
 import { friendlyAuthError } from '@/utils/authErrors'
 import { ensureUserDocument, getUserProfile } from '@/services/userService'
+import { isSafeReturnPath } from '@/utils/returnTo'
 import type { User } from 'firebase/auth'
 
 const SUSPENDED_MESSAGE = 'This account has been suspended. Contact support if you believe this is a mistake.'
@@ -30,8 +31,11 @@ async function dashboardAfterSignIn(user: User): Promise<string> {
 export function SignInPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
   const from = (location.state as { from?: { pathname: string; search: string } } | null)?.from
-  const redirectTo = from ? `${from.pathname}${from.search}` : null
+  const returnToParam = searchParams.get('returnTo')
+  const redirectTo = from ? `${from.pathname}${from.search}` : isSafeReturnPath(returnToParam) ? returnToParam : null
+  const signUpHref = returnToParam ? `/sign-up?returnTo=${encodeURIComponent(returnToParam)}` : '/sign-up'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -83,7 +87,7 @@ export function SignInPage() {
 
       <p className="mt-6 text-center text-sm text-ink-2">
         Don&apos;t have an account?{' '}
-        <Link to="/sign-up" className="font-medium text-brand-400 hover:underline">
+        <Link to={signUpHref} className="font-medium text-brand-400 hover:underline">
           Sign up
         </Link>
       </p>
