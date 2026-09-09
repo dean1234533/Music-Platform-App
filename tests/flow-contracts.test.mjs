@@ -319,6 +319,18 @@ test('the contract page states the DJ receives only the listed rights, not owner
   assert.match(contract, /REQUIRES QUALIFIED MUSIC\/IP LEGAL\s*\n\s*REVIEW BEFORE PRODUCTION/)
 })
 
+test('a drawn signature upload never calls getDownloadURL on a read-denied Storage path', () => {
+  // storage.rules sets `allow read: if false` on licenceSignatures/{agreementId}/{fileName}
+  // deliberately (nothing displays the image back). getDownloadURL() requires a read-permission
+  // check under the hood, so calling it here is rejected with a 403 even though the upload
+  // itself succeeds — every drawn-signature sign attempt failed before this fix.
+  const service = read('src/services/licenceService.ts')
+  assert.doesNotMatch(service, /import \{[^}]*getDownloadURL/)
+  assert.match(service, /return snap\.ref\.fullPath/)
+  const rules = read('storage.rules')
+  assert.match(rules, /match \/licenceSignatures\/\{agreementId\}\/\{fileName\}[\s\S]*?allow read: if false/)
+})
+
 test('player clears user-bound state on logout or account switch', () => {
   const player = read('src/contexts/PlayerContext.tsx')
   assert.match(player, /previousUserId && previousUserId !== nextUserId/)

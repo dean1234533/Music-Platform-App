@@ -1,5 +1,5 @@
 import { and, collection, doc, getDocs, onSnapshot, or, orderBy, query, where } from 'firebase/firestore'
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
+import { ref, uploadBytes } from 'firebase/storage'
 import { db, storage } from '@/lib/firebase'
 import { callable } from '@/lib/callable'
 import type { DownloadLogDoc, IntendedUse, LicenceAgreementDoc, LicenceOfferDoc, LicenceRequestDoc, LicenceRequestEventDoc } from '@/types/licence'
@@ -164,11 +164,17 @@ export const acceptExistingDeal = callable<{ requestId: string; actingRole: Lice
 export const rejectOffer = callable<{ requestId: string; reason?: string; actingRole: LicencePartyRole }, { ok: boolean }>('rejectOffer')
 export const withdrawOffer = callable<{ requestId: string; actingRole: LicencePartyRole }, { ok: boolean }>('withdrawOffer')
 
-/** Uploaded before calling signAgreement, matching copyrightEvidence's upload-then-reference ordering. */
+/**
+ * Uploaded before calling signAgreement, matching copyrightEvidence's upload-then-reference
+ * ordering. Storage rules deliberately set `allow read: if false` on this path (nothing in the
+ * product displays a stored signature image back — see storage.rules) — calling getDownloadURL()
+ * here would be rejected by that same rule, so the storage path itself is the reference, not a
+ * fetchable URL.
+ */
 export async function uploadDrawnSignature(agreementId: string, uid: string, actingRole: LicencePartyRole, blob: Blob): Promise<string> {
   const path = `licenceSignatures/${agreementId}/${actingRole}-${uid}.png`
   const snap = await uploadBytes(ref(storage, path), blob)
-  return getDownloadURL(snap.ref)
+  return snap.ref.fullPath
 }
 
 /** Full offer/counter-offer history for a request, oldest first — the backbone of the request activity timeline. Never mutated, only appended to. */
