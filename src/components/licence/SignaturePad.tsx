@@ -1,7 +1,14 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/common/Button'
 
-/** HTML canvas drawn-signature capture. Renders to a PNG blob on "Done" — upload happens in the caller. */
+/**
+ * HTML canvas drawn-signature capture. Renders to a PNG blob on "Done" — upload happens in the
+ * caller. The exported PNG must have an opaque white background: canvas.toBlob only captures
+ * actual drawing operations, not the surrounding CSS background, so a stroke drawn straight onto
+ * an untouched canvas exports with a *transparent* backing — invisible once displayed elsewhere
+ * (e.g. the contract page) against anything light-coloured. Filling white first and stroking in
+ * black (a real ink-on-paper look) guarantees it reads correctly wherever it's shown.
+ */
 export function SignaturePad({ onDone }: { onDone: (blob: Blob) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const drawing = useRef(false)
@@ -11,6 +18,16 @@ export function SignaturePad({ onDone }: { onDone: (blob: Blob) => void }) {
     const canvas = canvasRef.current
     return canvas?.getContext('2d') ?? null
   }
+
+  function fillWhite() {
+    const canvas = canvasRef.current
+    const ctx = getContext()
+    if (!canvas || !ctx) return
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+  }
+
+  useEffect(fillWhite, [])
 
   function pointerPos(e: React.PointerEvent<HTMLCanvasElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -34,7 +51,7 @@ export function SignaturePad({ onDone }: { onDone: (blob: Blob) => void }) {
     const { x, y } = pointerPos(e)
     ctx.lineWidth = 2
     ctx.lineCap = 'round'
-    ctx.strokeStyle = '#ffffff'
+    ctx.strokeStyle = '#000000'
     ctx.lineTo(x, y)
     ctx.stroke()
   }
@@ -48,6 +65,7 @@ export function SignaturePad({ onDone }: { onDone: (blob: Blob) => void }) {
     const ctx = getContext()
     if (!canvas || !ctx) return
     ctx.clearRect(0, 0, canvas.width, canvas.height)
+    fillWhite()
     setHasDrawn(false)
   }
 
@@ -69,7 +87,7 @@ export function SignaturePad({ onDone }: { onDone: (blob: Blob) => void }) {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
-        className="w-full touch-none rounded-lg border border-surface-border bg-surface-3"
+        className="w-full touch-none rounded-lg border border-surface-border bg-white"
       />
       <div className="flex gap-2">
         <Button size="sm" variant="secondary" type="button" onClick={handleClear}>

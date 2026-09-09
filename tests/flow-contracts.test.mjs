@@ -414,6 +414,20 @@ test('downloading the licensed track does not navigate away from the contract pa
   assert.match(handleDownloadBody, /window\.open\(url, '_blank', 'noopener,noreferrer'\)/)
 })
 
+test('drawn signatures export on an opaque white background and degrade gracefully if the image fails to load (user-reported)', () => {
+  // canvas.toBlob only captures actual drawing operations, not the surrounding CSS background —
+  // a stroke drawn on an untouched canvas exports transparent, invisible once shown elsewhere
+  // against anything light. Confirmed from the user's screenshot: both signature boxes were
+  // blank/broken on the contract page.
+  const pad = read('src/components/licence/SignaturePad.tsx')
+  assert.match(pad, /ctx\.fillStyle = '#ffffff'/)
+  assert.match(pad, /ctx\.fillRect\(0, 0, canvas\.width, canvas\.height\)/)
+  assert.match(pad, /ctx\.strokeStyle = '#000000'/)
+  assert.match(pad, /useEffect\(fillWhite, \[\]\)/)
+  const contract = read('src/pages/agreements/ContractPage.tsx')
+  assert.match(contract, /e\.currentTarget\.style\.display = 'none'/)
+})
+
 test('the persistent player can be fully dismissed', () => {
   const player = read('src/contexts/PlayerContext.tsx')
   const bar = read('src/components/player/PlayerBar.tsx')

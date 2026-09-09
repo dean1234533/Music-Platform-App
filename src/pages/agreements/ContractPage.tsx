@@ -392,6 +392,11 @@ function Party({
           src={signatureImageUrl}
           alt={`${label} signature`}
           className="mt-2 h-14 w-full max-w-[220px] rounded-md border border-surface-border bg-white object-contain object-left p-1"
+          onError={(e) => {
+            // The signed URL can genuinely fail (expired mid-view, network hiccup) — hide the
+            // broken-image icon rather than show it; the legal name above is still shown either way.
+            e.currentTarget.style.display = 'none'
+          }}
         />
       ) : null}
     </div>
