@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { AuthLayout } from './AuthLayout'
 import { Input, Label } from '@/components/common/Input'
 import { Button } from '@/components/common/Button'
-import { signInWithEmail, signInWithGoogle, signOut } from '@/services/authService'
+import { signInWithEmail, signOut } from '@/services/authService'
 import { friendlyAuthError } from '@/utils/authErrors'
 import { ensureUserDocument, getUserProfile } from '@/services/userService'
 import type { User } from 'firebase/auth'
@@ -37,7 +37,6 @@ export function SignInPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [googleLoading, setGoogleLoading] = useState(false)
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -50,19 +49,6 @@ export function SignInPage() {
       setError(err instanceof SuspendedAccountError ? err.message : friendlyAuthError(err))
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function handleGoogle() {
-    setError(null)
-    setGoogleLoading(true)
-    try {
-      const credential = await signInWithGoogle()
-      navigate(redirectTo ?? (await dashboardAfterSignIn(credential.user)))
-    } catch (err) {
-      setError(err instanceof SuspendedAccountError ? err.message : friendlyAuthError(err))
-    } finally {
-      setGoogleLoading(false)
     }
   }
 
@@ -94,16 +80,6 @@ export function SignInPage() {
           Sign in
         </Button>
       </form>
-
-      <div className="my-5 flex items-center gap-3 text-xs text-ink-3">
-        <span className="h-px flex-1 bg-surface-border" />
-        or
-        <span className="h-px flex-1 bg-surface-border" />
-      </div>
-
-      <Button variant="secondary" className="w-full" loading={googleLoading} onClick={handleGoogle}>
-        Continue with Google
-      </Button>
 
       <p className="mt-6 text-center text-sm text-ink-2">
         Don&apos;t have an account?{' '}

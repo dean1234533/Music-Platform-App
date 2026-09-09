@@ -4,9 +4,8 @@ import { AuthLayout } from './AuthLayout'
 import { Input, Label, FieldError } from '@/components/common/Input'
 import { Button } from '@/components/common/Button'
 import { PasswordStrengthMeter } from '@/components/auth/PasswordStrengthMeter'
-import { signInWithGoogle, signUpWithEmail } from '@/services/authService'
+import { signUpWithEmail } from '@/services/authService'
 import { friendlyAuthError } from '@/utils/authErrors'
-import { ensureUserDocument } from '@/services/userService'
 import { checkPassword, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 
 export function SignUpPage() {
@@ -22,7 +21,6 @@ export function SignUpPage() {
   const [passwordTouched, setPasswordTouched] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [googleLoading, setGoogleLoading] = useState(false)
 
   const passwordCheck = checkPassword(password)
 
@@ -39,20 +37,6 @@ export function SignUpPage() {
       setError(friendlyAuthError(err))
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function handleGoogle() {
-    setError(null)
-    setGoogleLoading(true)
-    try {
-      const credential = await signInWithGoogle()
-      await ensureUserDocument(credential.user)
-      navigate(`/onboarding${roleQuery}`)
-    } catch (err) {
-      setError(friendlyAuthError(err))
-    } finally {
-      setGoogleLoading(false)
     }
   }
 
@@ -98,16 +82,6 @@ export function SignUpPage() {
           Create account
         </Button>
       </form>
-
-      <div className="my-5 flex items-center gap-3 text-xs text-ink-3">
-        <span className="h-px flex-1 bg-surface-border" />
-        or
-        <span className="h-px flex-1 bg-surface-border" />
-      </div>
-
-      <Button variant="secondary" className="w-full" loading={googleLoading} onClick={handleGoogle}>
-        Continue with Google
-      </Button>
 
       <p className="mt-6 text-center text-sm text-ink-2">
         Already have an account?{' '}

@@ -61,12 +61,13 @@ test('email signup cannot continue before verification', () => {
 test('install banner only shows once signed in, and first-time profiles are awaited', () => {
   const banner = read('src/components/pwa/InstallBanner.tsx')
   const signIn = read('src/pages/auth/SignInPage.tsx')
-  const signUp = read('src/pages/auth/SignUpPage.tsx')
   const authContext = read('src/contexts/AuthContext.tsx')
   const users = read('src/services/userService.ts')
   assert.match(banner, /if \(!firebaseUser\) return null/)
   assert.match(signIn, /await ensureUserDocument\(user\)/)
-  assert.match(signUp, /await ensureUserDocument\(credential\.user\)/)
+  // Email signup itself has no ensureUserDocument call — AuthContext's own onAuthStateChanged
+  // listener calls it for every signed-in user regardless of entry point, so this isn't a gap.
+  assert.match(authContext, /await ensureUserDocument\(user\)/)
   assert.match(authContext, /profileReadyUid !== firebaseUser\.uid/)
   assert.match(users, /getIdToken\(true\)/)
   assert.match(users, /permission-denied[\s\S]*?unavailable/)
@@ -513,6 +514,20 @@ test('the Revenue page download history can be filtered by track and shows real 
   assert.match(page, /<option value="all">All tracks<\/option>/)
   assert.match(page, /downloads\.filter\(\(d\) => d\.trackId === downloadTrackFilter\)/)
   assert.match(page, /trackTitles\[d\.trackId\] \?\? 'Track'/)
+})
+
+test('the Google sign-in/sign-up button is removed from both auth pages', () => {
+  const signIn = read('src/pages/auth/SignInPage.tsx')
+  const signUp = read('src/pages/auth/SignUpPage.tsx')
+  for (const page of [signIn, signUp]) {
+    assert.doesNotMatch(page, /Continue with Google/)
+    assert.doesNotMatch(page, /signInWithGoogle/)
+  }
+  // Google auth itself stays — DeleteAccountModal still uses reauthenticateWithGoogle for
+  // Google-only accounts to reauthenticate, a different use case from the login/signup entry
+  // points that were asked to be removed.
+  assert.match(read('src/services/authService.ts'), /export async function signInWithGoogle/)
+  assert.match(read('src/components/account/DeleteAccountModal.tsx'), /reauthenticateWithGoogle/)
 })
 
 test('the persistent player can be fully dismissed', () => {
