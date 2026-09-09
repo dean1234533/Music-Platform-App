@@ -530,6 +530,23 @@ test('the Google sign-in/sign-up button is removed from both auth pages', () => 
   assert.match(read('src/components/account/DeleteAccountModal.tsx'), /reauthenticateWithGoogle/)
 })
 
+test('an admin can fully delete another account, reusing the same audited deletion logic and gated by a typed confirmation', () => {
+  const backend = read('functions/src/account/deleteAccount.ts')
+  assert.match(backend, /export const adminDeleteAccount = onCall/)
+  assert.match(backend, /requireAdmin\(request\)/)
+  // Must reuse the same core logic as the self-service flow, not a second/divergent implementation.
+  assert.match(backend, /async function performAccountDeletion\(uid: string\)/)
+  const performBody = backend.slice(backend.indexOf('async function performAccountDeletion'), backend.indexOf('export const deleteAccount'))
+  assert.match(performBody, /getAuth\(\)\.deleteUser\(uid\)/)
+  assert.match(backend, /await performAccountDeletion\(uid\)/)
+  assert.match(backend, /await performAccountDeletion\(userId\)/)
+  assert.match(backend, /writeAuditLog\(adminId, 'admin_delete_account'/)
+  assert.match(read('functions/src/index.ts'), /adminDeleteAccount/)
+  const page = read('src/pages/admin/AdminUsersPage.tsx')
+  assert.match(page, /disabled=\{confirmText !== 'DELETE'\}/)
+  assert.match(page, /adminDeleteAccount\(\{ userId: user\.uid \}\)/)
+})
+
 test('the persistent player can be fully dismissed', () => {
   const player = read('src/contexts/PlayerContext.tsx')
   const bar = read('src/components/player/PlayerBar.tsx')

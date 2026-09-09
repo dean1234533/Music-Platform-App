@@ -5,6 +5,7 @@ import { getAuth } from 'firebase-admin/auth'
 import { getStorage } from 'firebase-admin/storage'
 import { db } from '../admin.js'
 import { getStripe, stripeSecretKey } from '../stripe/client.js'
+import { requireAdmin, writeAuditLog } from '../admin/guard.js'
 
 const RECENT_AUTH_WINDOW_SEC = 5 * 60
 
@@ -84,8 +85,11 @@ async function offboardArtistStories(artistId: string): Promise<void> {
 }
 
 /**
- * Full account deletion: Firebase Auth user, users doc, artist/DJ profiles
- * and their public visibility, uploaded content not covered by an active
+ * The actual deletion work, shared by the self-service callable below and
+ * adminDeleteAccount — both must run identical cleanup so an admin-triggered
+ * deletion isn't a second, potentially-diverging implementation of something
+ * this sensitive. Firebase Auth user, users doc, artist/DJ profiles and
+ * their public visibility, uploaded content not covered by an active
  * licence, playlists/crates/follows/likes/notifications/deals. Deliberately
  * leaves licenceRequests, licenceOffers, licenceAgreements, conversations,
  * messages, downloadLogs, transactions, payouts, and copyright/verification
@@ -94,15 +98,7 @@ async function offboardArtistStories(artistId: string): Promise<void> {
  * retention schedule, not this flow. Idempotent: every step is safe to
  * re-run if a previous attempt partially failed.
  */
-export const deleteAccount = onCall({ secrets: [stripeSecretKey] }, async (request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
-  const uid = request.auth.uid
-
-  const authTime = request.auth.token.auth_time as number | undefined
-  if (!authTime || Date.now() / 1000 - authTime > RECENT_AUTH_WINDOW_SEC) {
-    throw new HttpsError('failed-precondition', 'Please sign in again before deleting your account.')
-  }
-
+async function performAccountDeletion(uid: string): Promise<void> {
   const statusRef = db.collection('accountDeletions').doc(uid)
   await statusRef.set(
     { uid, status: 'processing', requestedAt: FieldValue.serverTimestamp() },
@@ -175,8 +171,49 @@ export const deleteAccount = onCall({ secrets: [stripeSecretKey] }, async (reque
       { status: 'failed', error: err instanceof Error ? err.message : String(err) },
       { merge: true },
     )
+    throw err
+  }
+}
+
+export const deleteAccount = onCall({ secrets: [stripeSecretKey] }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  const uid = request.auth.uid
+
+  const authTime = request.auth.token.auth_time as number | undefined
+  if (!authTime || Date.now() / 1000 - authTime > RECENT_AUTH_WINDOW_SEC) {
+    throw new HttpsError('failed-precondition', 'Please sign in again before deleting your account.')
+  }
+
+  try {
+    await performAccountDeletion(uid)
+  } catch {
     throw new HttpsError('internal', 'Account deletion failed partway through — it is safe to try again.')
   }
+
+  return { ok: true }
+})
+
+/**
+ * Admin-triggered equivalent of the self-service flow above, for removing
+ * another user's account entirely (e.g. on their own request, spam, abuse).
+ * Reuses the exact same performAccountDeletion() logic — never a second,
+ * divergent implementation of something this destructive. Audit-logged like
+ * every other admin action in this codebase.
+ */
+export const adminDeleteAccount = onCall({ secrets: [stripeSecretKey] }, async (request) => {
+  const adminId = await requireAdmin(request)
+  const { userId } = request.data ?? {}
+  if (!userId || typeof userId !== 'string') {
+    throw new HttpsError('invalid-argument', 'userId is required.')
+  }
+
+  try {
+    await performAccountDeletion(userId)
+  } catch {
+    throw new HttpsError('internal', 'Account deletion failed partway through — it is safe to try again.')
+  }
+
+  await writeAuditLog(adminId, 'admin_delete_account', { targetUid: userId })
 
   return { ok: true }
 })

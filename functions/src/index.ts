@@ -46,7 +46,7 @@ export { createStory, toggleStoryHighlight, getStoryMediaUrl } from './stories/s
 export { onStoryViewCreate, onStoryReactionCreate, onStoryReactionDelete, onStoryPollVoteCreate } from './stories/triggers.js'
 
 // Account security, deletion, data export, and retention/cleanup.
-export { deleteAccount } from './account/deleteAccount.js'
+export { deleteAccount, adminDeleteAccount } from './account/deleteAccount.js'
 export { exportUserData } from './account/exportUserData.js'
 export { adminUpdateDataRetentionSettings, adminSetLegalHold } from './admin/retentionSettings.js'
 export { adminEnableStrongPasswordPolicy } from './admin/passwordPolicy.js'

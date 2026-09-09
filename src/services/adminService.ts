@@ -40,6 +40,7 @@ export async function listAllSubscriptionPlans(): Promise<SubscriptionPlan[]> {
 export const adminSetUserSuspension = callable<{ userId: string; suspended: boolean }, { ok: boolean }>(
   'adminSetUserSuspension',
 )
+export const adminDeleteAccount = callable<{ userId: string }, { ok: boolean }>('adminDeleteAccount')
 export const adminSetTrackTakedown = callable<{ trackId: string; takenDown: boolean }, { ok: boolean }>(
   'adminSetTrackTakedown',
 )
