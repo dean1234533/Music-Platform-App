@@ -98,6 +98,8 @@ export const adminUpdatePlatformSettings = onCall(async (request) => {
     allowedPreviewDurationsSec,
     maxUploadSizeMB,
     supportedAudioTypes,
+    defaultTrackVisibility,
+    defaultPreviewDurationSec,
   } = request.data ?? {}
 
   const percentages = [platformFeePercent, artistAllocationPercent, djServiceFeePercent]
@@ -119,6 +121,20 @@ export const adminUpdatePlatformSettings = onCall(async (request) => {
   if (Array.isArray(allowedPreviewDurationsSec)) update.allowedPreviewDurationsSec = allowedPreviewDurationsSec
   if (typeof maxUploadSizeMB === 'number') update.maxUploadSizeMB = maxUploadSizeMB
   if (Array.isArray(supportedAudioTypes)) update.supportedAudioTypes = supportedAudioTypes
+  const VALID_VISIBILITIES = ['public', 'followers', 'supporters', 'early_access', 'dj_only', 'private']
+  if (typeof defaultTrackVisibility === 'string') {
+    if (!VALID_VISIBILITIES.includes(defaultTrackVisibility)) {
+      throw new HttpsError('invalid-argument', 'defaultTrackVisibility must be a valid track visibility.')
+    }
+    update.defaultTrackVisibility = defaultTrackVisibility
+  }
+  // 5/90 mirrors PREVIEW_MIN_DURATION_SEC/PREVIEW_MAX_DURATION_SEC in src/constants/mediaConfig.ts.
+  if (typeof defaultPreviewDurationSec === 'number') {
+    if (!Number.isInteger(defaultPreviewDurationSec) || defaultPreviewDurationSec < 5 || defaultPreviewDurationSec > 90) {
+      throw new HttpsError('invalid-argument', 'defaultPreviewDurationSec must be an integer between 5 and 90.')
+    }
+    update.defaultPreviewDurationSec = defaultPreviewDurationSec
+  }
 
   await db.collection('platformSettings').doc('default').set(update, { merge: true })
   await writeAuditLog(adminId, 'update_platform_settings', update)

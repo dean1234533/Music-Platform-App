@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Handshake, Megaphone, Plus, Radio, Trash2 } from 'lucide-react'
+import { Handshake, Megaphone, Plus, Radio, Settings2, Trash2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeArtistTracks } from '@/services/artistService'
 import { subscribeArtistCopyrightClaims } from '@/services/moderationService'
@@ -8,6 +8,7 @@ import { Button } from '@/components/common/Button'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import { BulkDjOutreachModal } from '@/components/track/BulkDjOutreachModal'
 import { CopyrightClaimBanner } from '@/components/track/CopyrightClaimBanner'
+import { TrackAccessSettingsModal } from '@/components/track/TrackAccessSettingsModal'
 import { TrackDealSettingsModal } from '@/components/licence/TrackDealSettingsModal'
 import { TrackDjAccessModal } from '@/components/licence/TrackDjAccessModal'
 import type { TrackDoc } from '@/types/track'
@@ -32,6 +33,7 @@ export function MusicPage() {
   const [outreachTrack, setOutreachTrack] = useState<TrackDoc | null>(null)
   const [dealsTrack, setDealsTrack] = useState<TrackDoc | null>(null)
   const [djAccessTrack, setDjAccessTrack] = useState<TrackDoc | null>(null)
+  const [accessSettingsTrack, setAccessSettingsTrack] = useState<TrackDoc | null>(null)
   const [deletingTrackId, setDeletingTrackId] = useState<string | null>(null)
 
   async function handleDelete(track: TrackDoc) {
@@ -124,6 +126,14 @@ export function MusicPage() {
               ) : null}
               <button
                 type="button"
+                onClick={() => setAccessSettingsTrack(track)}
+                className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-surface-3 hover:text-ink-0"
+                title="Fan access settings"
+              >
+                <Settings2 className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
                 onClick={() => setDjAccessTrack(track)}
                 className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-surface-3 hover:text-ink-0"
                 title="DJ access"
@@ -158,6 +168,7 @@ export function MusicPage() {
       ) : null}
       {dealsTrack ? <TrackDealSettingsModal track={dealsTrack} onClose={() => setDealsTrack(null)} /> : null}
       {djAccessTrack ? <TrackDjAccessModal track={djAccessTrack} onClose={() => setDjAccessTrack(null)} /> : null}
+      {accessSettingsTrack ? <TrackAccessSettingsModal track={accessSettingsTrack} onClose={() => setAccessSettingsTrack(null)} /> : null}
     </div>
   )
 }

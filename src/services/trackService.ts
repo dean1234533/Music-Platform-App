@@ -231,6 +231,33 @@ export async function updateTrackDealSettings(trackId: string, settings: TrackDj
   await updateDoc(trackRef(trackId), { djDealSettings: settings, updatedAt: serverTimestamp() })
 }
 
+export interface TrackAccessSettingsInput {
+  visibility: TrackVisibility
+  previewStartSec: number
+  previewDurationSec: number
+  /** Only meaningful when visibility === 'early_access'. */
+  followerReleaseAt: Date | null
+  publicReleaseAt: Date | null
+}
+
+/**
+ * Fan-facing access settings only — deliberately separate from
+ * updateTrackDjAccess/updateTrackDealSettings, since DJ licensing
+ * permissions are their own independent system (downloadLicensedTrack
+ * never even reads track.visibility) and shouldn't be editable from the
+ * same call as fan-streaming access.
+ */
+export async function updateTrackAccessSettings(trackId: string, input: TrackAccessSettingsInput): Promise<void> {
+  await updateDoc(trackRef(trackId), {
+    visibility: input.visibility,
+    previewStartSec: input.previewStartSec,
+    previewDurationSec: input.previewDurationSec,
+    followerReleaseAt: input.followerReleaseAt ? Timestamp.fromDate(input.followerReleaseAt) : null,
+    publicReleaseAt: input.publicReleaseAt ? Timestamp.fromDate(input.publicReleaseAt) : null,
+    updatedAt: serverTimestamp(),
+  })
+}
+
 /** The core DJ-access toggle — set at upload time, but also editable afterwards from Music. */
 export async function updateTrackDjAccess(
   trackId: string,

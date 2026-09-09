@@ -15,6 +15,8 @@ import { formatCurrency } from '@/utils/format'
 import { DEFAULT_DATA_RETENTION, type DataRetentionSettings, type SubscriptionPlan } from '@/types/platformSettings'
 import { PLAN_TIERS, type PlanFeatureKey, type PlanLimitKey, type PlanTier } from '@/types/entitlements'
 import { AccountSecuritySection } from '@/components/account/AccountSecuritySection'
+import { PREVIEW_DEFAULT_DURATION_SEC, SUGGESTED_PREVIEW_DURATIONS_SEC } from '@/constants/mediaConfig'
+import type { TrackVisibility } from '@/types/track'
 
 const RETENTION_FIELDS: { key: keyof DataRetentionSettings; label: string }[] = [
   { key: 'notificationsDays', label: 'Notifications (days)' },
@@ -69,6 +71,12 @@ export function AdminSettingsPage() {
   const [seeding, setSeeding] = useState(false)
   const [feeForm, setFeeForm] = useState({ platformFeePercent: '', artistAllocationPercent: '', djServiceFeePercent: '', minimumPayoutMinor: '' })
   const [savingFees, setSavingFees] = useState(false)
+  const [trackDefaultsForm, setTrackDefaultsForm] = useState({
+    defaultTrackVisibility: 'public' as TrackVisibility,
+    defaultPreviewDurationSec: String(PREVIEW_DEFAULT_DURATION_SEC),
+    allowedPreviewDurationsSec: SUGGESTED_PREVIEW_DURATIONS_SEC.join(', '),
+  })
+  const [savingTrackDefaults, setSavingTrackDefaults] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)
   const [retentionForm, setRetentionForm] = useState<Record<keyof DataRetentionSettings, string>>(
     Object.fromEntries(Object.entries(DEFAULT_DATA_RETENTION).map(([k, v]) => [k, String(v)])) as Record<
@@ -96,6 +104,11 @@ export function AdminSettingsPage() {
         artistAllocationPercent: String(settings.artistAllocationPercent),
         djServiceFeePercent: String(settings.djServiceFeePercent),
         minimumPayoutMinor: String(settings.minimumPayoutMinor),
+      })
+      setTrackDefaultsForm({
+        defaultTrackVisibility: settings.defaultTrackVisibility ?? 'public',
+        defaultPreviewDurationSec: String(settings.defaultPreviewDurationSec ?? PREVIEW_DEFAULT_DURATION_SEC),
+        allowedPreviewDurationsSec: (settings.allowedPreviewDurationsSec ?? SUGGESTED_PREVIEW_DURATIONS_SEC).join(', '),
       })
     })
     void getDataRetentionSettings().then((settings) => {
@@ -171,6 +184,25 @@ export function AdminSettingsPage() {
       setSaved('Platform settings saved.')
     } finally {
       setSavingFees(false)
+    }
+  }
+
+  async function handleSaveTrackDefaults() {
+    setSavingTrackDefaults(true)
+    setSaved(null)
+    try {
+      const allowedPreviewDurationsSec = trackDefaultsForm.allowedPreviewDurationsSec
+        .split(',')
+        .map((s) => Number(s.trim()))
+        .filter((n) => Number.isInteger(n) && n > 0)
+      await adminUpdatePlatformSettings({
+        defaultTrackVisibility: trackDefaultsForm.defaultTrackVisibility,
+        defaultPreviewDurationSec: Number(trackDefaultsForm.defaultPreviewDurationSec),
+        allowedPreviewDurationsSec,
+      })
+      setSaved('Track defaults saved.')
+    } finally {
+      setSavingTrackDefaults(false)
     }
   }
 
@@ -388,6 +420,51 @@ export function AdminSettingsPage() {
           <div className="col-span-2 sm:col-span-4">
             <Button size="sm" onClick={handleSaveFees} loading={savingFees}>
               Save platform settings
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-lg font-semibold text-ink-0">Track defaults</h2>
+        <p className="mb-3 text-xs text-ink-2">Applied to new uploads only — never changes an already-published track.</p>
+        <div className="grid grid-cols-2 gap-3 rounded-xl border border-surface-border bg-surface-1 p-4 sm:grid-cols-4">
+          <div>
+            <Label>Default visibility for new uploads</Label>
+            <select
+              value={trackDefaultsForm.defaultTrackVisibility}
+              onChange={(e) => setTrackDefaultsForm((f) => ({ ...f, defaultTrackVisibility: e.target.value as TrackVisibility }))}
+              className="w-full rounded-lg border border-surface-border bg-surface-2 px-3.5 py-2.5 text-base sm:text-sm text-ink-0 outline-none focus:border-brand-500"
+            >
+              <option value="public">Public stream</option>
+              <option value="followers">Followers only</option>
+              <option value="supporters">Supporters only</option>
+              <option value="early_access">Early access</option>
+              <option value="dj_only">DJ only</option>
+              <option value="private">Private</option>
+            </select>
+          </div>
+          <div>
+            <Label>Default preview duration (seconds)</Label>
+            <Input
+              type="number"
+              min={5}
+              max={90}
+              value={trackDefaultsForm.defaultPreviewDurationSec}
+              onChange={(e) => setTrackDefaultsForm((f) => ({ ...f, defaultPreviewDurationSec: e.target.value }))}
+            />
+          </div>
+          <div className="col-span-2">
+            <Label>Suggested preview durations shown to artists (seconds, comma separated)</Label>
+            <Input
+              value={trackDefaultsForm.allowedPreviewDurationsSec}
+              onChange={(e) => setTrackDefaultsForm((f) => ({ ...f, allowedPreviewDurationsSec: e.target.value }))}
+              placeholder="30, 45, 60"
+            />
+          </div>
+          <div className="col-span-2 sm:col-span-4">
+            <Button size="sm" onClick={handleSaveTrackDefaults} loading={savingTrackDefaults}>
+              Save track defaults
             </Button>
           </div>
         </div>

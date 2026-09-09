@@ -72,7 +72,9 @@ service cloud.firestore {
         && request.resource.data.verified == resource.data.verified
         && request.resource.data.get('trackCount', 0) == resource.data.get('trackCount', 0)
         && request.resource.data.get('profileViews', 0) == resource.data.get('profileViews', 0)
-        && request.resource.data.get('referralViews', {}) == resource.data.get('referralViews', {});
+        && request.resource.data.get('referralViews', {}) == resource.data.get('referralViews', {})
+        && request.resource.data.get('followConversions', 0) == resource.data.get('followConversions', 0)
+        && request.resource.data.get('supportConversions', 0) == resource.data.get('supportConversions', 0);
       allow delete: if false;
     }
 
@@ -362,6 +364,13 @@ service cloud.firestore {
     // (enforceRateLimit in functions/src/rateLimit.ts). Never client-readable
     // or writable; the count itself isn't meaningful to expose.
     match /rateLimits/{key} {
+      allow read, write: if false;
+    }
+
+    // previewSessions/{fanId_artistId} — Cloud-Function-only "did this fan
+    // recently preview this artist" signal, read by onFollowCreate/
+    // onSupportRelationshipCreate to count real (not assumed) conversions.
+    match /previewSessions/{sessionId} {
       allow read, write: if false;
     }
 

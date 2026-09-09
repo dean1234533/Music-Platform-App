@@ -38,6 +38,10 @@ export interface ArtistProfile {
   profileViews?: number
   /** Server-maintained (recordProfileView). Sanitized ?ref= source -> count, capped to a bounded number of distinct sources; overflow buckets into 'other'. */
   referralViews?: Record<string, number>
+  /** Server-maintained (onFollowCreate) — only counted when the fan genuinely previewed this artist within 24h beforehand, never assumed. */
+  followConversions?: number
+  /** Server-maintained (onSupportRelationshipCreate) — same real-preview-window signal as followConversions. */
+  supportConversions?: number
   createdAt: Timestamp | null
   updatedAt: Timestamp | null
 }

@@ -908,9 +908,68 @@ test('early access tracks: supporters get the full track immediately, followers/
   assert.match(upload, /Field label="Followers get full access on"/)
   assert.match(upload, /followerReleaseAt: visibility === 'early_access' && followerReleaseDate \? new Date\(followerReleaseDate\) : null/)
   // The artist sees exactly what each audience gets before publishing — never a fabricated/generic summary.
-  assert.match(upload, /const ACCESS_SUMMARY: Record<TrackVisibility/)
+  assert.match(upload, /import \{ ACCESS_SUMMARY, VISIBILITY_OPTIONS \} from '@\/utils\/trackAccess'/)
+  assert.match(read('src/utils/trackAccess.ts'), /export const ACCESS_SUMMARY: Record<TrackVisibility/)
 
   const access = read('src/utils/trackAccess.ts')
   assert.match(access, /if \(track\.visibility === 'early_access'\) \{/)
   assert.match(access, /if \(viewer\.isSupporting\) return \{ fullAccess: true/)
+})
+
+test('artists can edit a track\'s fan-facing access settings after upload, kept entirely separate from DJ licensing so changing it can never silently affect a signed licence', () => {
+  const modal = read('src/components/track/TrackAccessSettingsModal.tsx')
+  assert.match(modal, /export function TrackAccessSettingsModal/)
+  assert.match(modal, /await updateTrackAccessSettings\(track\.trackId, \{/)
+  assert.match(modal, /deliberately separate from TrackDjAccessModal/)
+
+  const service = read('src/services/trackService.ts')
+  assert.match(service, /export async function updateTrackAccessSettings/)
+  assert.match(service, /await updateDoc\(trackRef\(trackId\), \{\s*visibility: input\.visibility,/)
+
+  // DJ downloads never read track.visibility — the actual proof this separation is real, not just naming.
+  assert.doesNotMatch(read('functions/src/licensing/downloads.ts'), /visibility/)
+
+  const musicPage = read('src/pages/artist/dashboard/MusicPage.tsx')
+  assert.match(musicPage, /setAccessSettingsTrack\(track\)/)
+  assert.match(musicPage, /<TrackAccessSettingsModal track=\{accessSettingsTrack\}/)
+})
+
+test('the default preview length and default track visibility for new uploads are admin-configurable, not hard-coded (spec: "make this configurable")', () => {
+  const settingsFn = read('functions/src/admin/settings.ts')
+  assert.match(settingsFn, /defaultTrackVisibility,\s*\n\s*defaultPreviewDurationSec,/)
+  assert.match(settingsFn, /update\.defaultTrackVisibility = defaultTrackVisibility/)
+  assert.match(settingsFn, /update\.defaultPreviewDurationSec = defaultPreviewDurationSec/)
+
+  const adminPage = read('src/pages/admin/AdminSettingsPage.tsx')
+  assert.match(adminPage, /handleSaveTrackDefaults/)
+  assert.match(adminPage, /Default visibility for new uploads/)
+  assert.match(adminPage, /Default preview duration \(seconds\)/)
+
+  const upload = read('src/pages/artist/dashboard/UploadTrackPage.tsx')
+  assert.match(upload, /if \(settings\.defaultTrackVisibility\) setVisibility\(settings\.defaultTrackVisibility\)/)
+  assert.match(upload, /if \(settings\.defaultPreviewDurationSec\) setPreviewDurationSec\(settings\.defaultPreviewDurationSec\)/)
+  assert.match(upload, /if \(settings\.allowedPreviewDurationsSec\?\.length\) setSuggestedPreviewDurations\(settings\.allowedPreviewDurationsSec\)/)
+})
+
+test('follow/support conversions are counted from a real per-fan preview signal, not fabricated or assumed from every follow/support', () => {
+  const tracksFn = read('functions/src/tracks.ts')
+  assert.match(tracksFn, /if \(kind === 'preview' && uid && uid !== track\.artistId\) \{/)
+  assert.match(tracksFn, /db\.collection\('previewSessions'\)\.doc\(`\$\{uid\}_\$\{track\.artistId\}`\)\.set\(/)
+
+  const followsFn = read('functions/src/follows.ts')
+  assert.match(followsFn, /const RECENT_PREVIEW_WINDOW_MS = 24 \* 60 \* 60 \* 1000/)
+  assert.match(followsFn, /if \(lastPreviewAt && Date\.now\(\) - lastPreviewAt\.toMillis\(\) <= RECENT_PREVIEW_WINDOW_MS\) \{/)
+  assert.match(followsFn, /update\.followConversions = FieldValue\.increment\(1\)/)
+
+  const supportTriggersFn = read('functions/src/support/triggers.ts')
+  assert.match(supportTriggersFn, /update\.supportConversions = FieldValue\.increment\(1\)/)
+
+  const rules = read('firestore.rules')
+  assert.match(rules, /match \/previewSessions\/\{sessionId\} \{\s*allow read, write: if false;/)
+  assert.match(rules, /request\.resource\.data\.get\('followConversions', 0\) == resource\.data\.get\('followConversions', 0\)/)
+  assert.match(rules, /request\.resource\.data\.get\('supportConversions', 0\) == resource\.data\.get\('supportConversions', 0\)/)
+
+  const growth = read('src/pages/artist/dashboard/GrowthPage.tsx')
+  assert.match(growth, /label="Follow conversions" value=\{formatCount\(artist\.followConversions \?\? 0\)\}/)
+  assert.match(growth, /label="Support conversions" value=\{formatCount\(artist\.supportConversions \?\? 0\)\}/)
 })

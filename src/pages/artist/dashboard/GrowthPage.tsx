@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Eye, Headphones, MessageSquare, Radio, Share2, Users } from 'lucide-react'
+import { Eye, Headphones, Heart, MessageSquare, Play, Radio, Share2, UserPlus, Users } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeArtistProfile, subscribeArtistTracks } from '@/services/artistService'
 import { subscribeRequestsForArtist } from '@/services/licenceService'
@@ -36,6 +36,7 @@ export function GrowthPage() {
   const profileUrl = artistShareUrl(artist.slug)
   const totalTrackViews = tracks.reduce((sum, track) => sum + (track.viewCount ?? 0), 0)
   const totalSamplePlays = tracks.reduce((sum, track) => sum + track.playCount, 0)
+  const totalFullPlays = tracks.reduce((sum, track) => sum + (track.fullPlayCount ?? 0), 0)
   const referralEntries = Object.entries(artist.referralViews ?? {}).sort(([, a], [, b]) => b - a)
 
   async function handleCopyProfile() {
@@ -74,9 +75,13 @@ export function GrowthPage() {
       <section aria-label="Growth metrics" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard icon={<Eye className="h-5 w-5" />} label="Profile views" value={formatCount(artist.profileViews ?? 0)} accent="brand" />
         <StatCard icon={<Users className="h-5 w-5" />} label="Followers" value={formatCount(artist.followerCount)} accent="neutral" />
-        <StatCard icon={<Headphones className="h-5 w-5" />} label="Sample plays" value={formatCount(totalSamplePlays)} accent="dj" />
+        <StatCard icon={<Headphones className="h-5 w-5" />} label="Preview plays" value={formatCount(totalSamplePlays)} accent="dj" />
+        <StatCard icon={<Play className="h-5 w-5" />} label="Full-track plays" value={formatCount(totalFullPlays)} accent="brand" />
+        <StatCard icon={<UserPlus className="h-5 w-5" />} label="Follow conversions" value={formatCount(artist.followConversions ?? 0)} accent="neutral" />
+        <StatCard icon={<Heart className="h-5 w-5" />} label="Support conversions" value={formatCount(artist.supportConversions ?? 0)} accent="support" />
         <StatCard icon={<MessageSquare className="h-5 w-5" />} label="DJ requests received" value={formatCount(djRequests.length)} accent="support" />
       </section>
+      <p className="-mt-4 text-xs text-ink-3">Follow/support conversions only count when the fan played a preview of yours in the 24 hours beforehand — a real signal, not every follow or support.</p>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(280px,.85fr)]">
         <section className="overflow-hidden rounded-2xl border border-surface-border bg-surface-1 shadow-[0_18px_55px_rgba(0,0,0,.16)]">

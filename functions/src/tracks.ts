@@ -220,5 +220,18 @@ export const recordTrackPlay = onCall(async (request) => {
     if (track.visibility === 'supporters') update.supporterPlayCount = FieldValue.increment(1)
   }
   await ref.update(update)
+
+  // A real, server-recorded "this fan previewed this artist recently" signal
+  // — the only thing onFollowCreate/onSupportRelationshipCreate trust to
+  // count a genuine preview -> follow/support conversion, rather than
+  // assuming every follow/support came from a preview.
+  const uid = request.auth?.uid
+  if (kind === 'preview' && uid && uid !== track.artistId) {
+    await db.collection('previewSessions').doc(`${uid}_${track.artistId}`).set({
+      uid,
+      artistId: track.artistId,
+      lastPreviewAt: FieldValue.serverTimestamp(),
+    })
+  }
   return { ok: true }
 })

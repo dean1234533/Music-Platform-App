@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { createTrack, newTrackId, uploadTrackAssets } from '@/services/trackService'
 import { getArtistProfile } from '@/services/artistService'
+import { getPlatformSettings } from '@/services/platformSettingsService'
 import { deriveAudioAssets } from '@/services/audioProcessing'
 import { compressImage } from '@/services/imageProcessing'
 import { recordRightsDeclaration } from '@/services/legalService'
@@ -13,33 +14,11 @@ import { Input, Label, TextArea } from '@/components/common/Input'
 import { UploadProgress } from '@/components/common/UploadProgress'
 import { formatFileSize, MAX_AUDIO_MB, MAX_IMAGE_MB, validateAudioFile, validateImageFile } from '@/utils/uploadLimits'
 import { PREVIEW_MAX_DURATION_SEC, PREVIEW_MIN_DURATION_SEC, SUGGESTED_PREVIEW_DURATIONS_SEC } from '@/constants/mediaConfig'
+import { ACCESS_SUMMARY, VISIBILITY_OPTIONS } from '@/utils/trackAccess'
 import type { LicenceMode, TrackRightsMetadata, TrackVisibility } from '@/types/track'
 import type { SubscriptionDoc } from '@/types/subscription'
 import { CAMELOT_KEYS, GENRES, MOODS } from '@/constants/musicTaxonomy'
 import { MAX_STORED_TRACKS_PER_ARTIST } from '@/constants/platformLimits'
-
-const VISIBILITY_OPTIONS: { value: TrackVisibility; label: string }[] = [
-  { value: 'public', label: 'Public stream' },
-  { value: 'followers', label: 'Followers only' },
-  { value: 'supporters', label: 'Supporters only' },
-  { value: 'early_access', label: 'Early access' },
-  { value: 'dj_only', label: 'DJ only' },
-  { value: 'private', label: 'Private' },
-]
-
-const previewCopy = (sec: number) => `${sec}-second preview`
-const notAvailable = () => 'Not available'
-const fullTrack = () => 'Full track'
-
-/** What each audience actually gets, shown to the artist before they publish — never fabricated, mirrors the exact server-side ladder in canPreviewTrack/canStreamFullTrack. */
-const ACCESS_SUMMARY: Record<TrackVisibility, { public: (sec: number) => string; followers: (sec: number) => string; supporters: (sec: number) => string }> = {
-  public: { public: fullTrack, followers: fullTrack, supporters: fullTrack },
-  followers: { public: previewCopy, followers: fullTrack, supporters: fullTrack },
-  supporters: { public: previewCopy, followers: previewCopy, supporters: fullTrack },
-  early_access: { public: previewCopy, followers: () => 'Full track from your scheduled date', supporters: () => 'Full track now' },
-  dj_only: { public: notAvailable, followers: notAvailable, supporters: notAvailable },
-  private: { public: notAvailable, followers: notAvailable, supporters: notAvailable },
-}
 
 const LICENCE_OPTIONS: { value: LicenceMode; label: string }[] = [
   { value: 'not_available', label: 'Not available for DJ use' },
@@ -90,6 +69,18 @@ export function UploadTrackPage() {
   const [embargoDate, setEmbargoDate] = useState('')
   const [followerReleaseDate, setFollowerReleaseDate] = useState('')
   const [publicReleaseDate, setPublicReleaseDate] = useState('')
+  const [suggestedPreviewDurations, setSuggestedPreviewDurations] = useState<number[]>(SUGGESTED_PREVIEW_DURATIONS_SEC)
+
+  // Platform-configurable defaults (admin-set, not hard-coded) — only applied
+  // once, before the artist has had a chance to touch these fields.
+  useEffect(() => {
+    void getPlatformSettings().then((settings) => {
+      if (!settings) return
+      if (settings.defaultTrackVisibility) setVisibility(settings.defaultTrackVisibility)
+      if (settings.defaultPreviewDurationSec) setPreviewDurationSec(settings.defaultPreviewDurationSec)
+      if (settings.allowedPreviewDurationsSec?.length) setSuggestedPreviewDurations(settings.allowedPreviewDurationsSec)
+    })
+  }, [])
 
   useEffect(() => {
     if (!firebaseUser) return
@@ -432,7 +423,7 @@ export function UploadTrackPage() {
               </Field>
             </div>
             <div className="flex gap-2">
-              {SUGGESTED_PREVIEW_DURATIONS_SEC.map((sec) => (
+              {suggestedPreviewDurations.map((sec) => (
                 <button
                   key={sec}
                   type="button"

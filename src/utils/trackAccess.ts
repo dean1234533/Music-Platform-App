@@ -10,6 +10,29 @@ export const TRACK_ACCESS_LABEL: Record<TrackVisibility, string> = {
   private: 'PRIVATE',
 }
 
+export const VISIBILITY_OPTIONS: { value: TrackVisibility; label: string }[] = [
+  { value: 'public', label: 'Public stream' },
+  { value: 'followers', label: 'Followers only' },
+  { value: 'supporters', label: 'Supporters only' },
+  { value: 'early_access', label: 'Early access' },
+  { value: 'dj_only', label: 'DJ only' },
+  { value: 'private', label: 'Private' },
+]
+
+const previewCopy = (sec: number) => `${sec}-second preview`
+const notAvailable = () => 'Not available'
+const fullTrack = () => 'Full track'
+
+/** What each audience actually gets, shown to the artist before they publish/edit — never fabricated, mirrors the exact server-side ladder in canPreviewTrack/canStreamFullTrack. */
+export const ACCESS_SUMMARY: Record<TrackVisibility, { public: (sec: number) => string; followers: (sec: number) => string; supporters: (sec: number) => string }> = {
+  public: { public: fullTrack, followers: fullTrack, supporters: fullTrack },
+  followers: { public: previewCopy, followers: fullTrack, supporters: fullTrack },
+  supporters: { public: previewCopy, followers: previewCopy, supporters: fullTrack },
+  early_access: { public: previewCopy, followers: () => 'Full track from your scheduled date', supporters: () => 'Full track now' },
+  dj_only: { public: notAvailable, followers: notAvailable, supporters: notAvailable },
+  private: { public: notAvailable, followers: notAvailable, supporters: notAvailable },
+}
+
 export interface TrackAccessInfo {
   /** Whether this viewer should expect the full track to actually play — a display hint only. getTrackPlaybackUrl is the real, server-side gate regardless of what this says. */
   fullAccess: boolean
