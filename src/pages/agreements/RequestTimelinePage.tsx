@@ -105,6 +105,7 @@ export function RequestTimelinePage() {
     : belongsToArtist ? 'artist' : 'dj'
   const isArtist = actingRole === 'artist'
   const isDj = actingRole === 'dj'
+  const isTerminal = ['rejected', 'cancelled', 'expired'].includes(licenceRequest.status)
 
   async function cancelOrReject() {
     setBusy(true)
@@ -192,7 +193,7 @@ export function RequestTimelinePage() {
             <FileSignature className="h-4 w-4" /> View & sign contract
           </Link>
         </section>
-      ) : licenceRequest.currentOfferId ? (
+      ) : isTerminal ? null : licenceRequest.currentOfferId ? (
         <section>
           <h2 className="mb-3 text-sm font-semibold text-ink-0">Current offer</h2>
           <OfferCard

@@ -39,7 +39,7 @@ const STATUS_LABEL: Record<string, string> = {
   agreement_ready: 'Awaiting agreement',
   awaiting_signatures: 'Awaiting signatures',
   awaiting_payment: 'Awaiting payment',
-  approved: 'Approved',
+  approved: 'Active',
   rejected: 'Rejected',
   expired: 'Expired',
   cancelled: 'Cancelled',
@@ -380,7 +380,7 @@ function RequestRow({
         >
           Review & sign contract
         </Link>
-      ) : request.currentOfferId ? (
+      ) : ['rejected', 'cancelled', 'expired'].includes(request.status) ? null : request.currentOfferId ? (
         <OfferCard offerId={request.currentOfferId} requestId={request.requestId} actingRole="dj" onCounter={onCounter} />
       ) : ['submitted', 'artist_review', 'negotiating'].includes(request.status) ? (
         <div>

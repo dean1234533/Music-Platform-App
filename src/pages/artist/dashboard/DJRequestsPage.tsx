@@ -17,7 +17,7 @@ const GROUPS: { status: LicenceRequestStatus[]; label: string }[] = [
   { status: ['offer_sent', 'counter_offer'], label: 'Terms sent' },
   { status: ['agreement_ready', 'awaiting_signatures'], label: 'Needs signatures' },
   { status: ['awaiting_payment'], label: 'Waiting for DJ payment' },
-  { status: ['approved'], label: 'Licensed & downloadable' },
+  { status: ['approved'], label: 'Active' },
   { status: ['rejected', 'expired', 'cancelled'], label: 'Closed' },
 ]
 
@@ -141,7 +141,7 @@ export function DJRequestsPage() {
                         >
                           <FileSignature className="h-4 w-4" /> Review & sign contract
                         </Link>
-                      ) : request.currentOfferId ? (
+                      ) : ['rejected', 'expired', 'cancelled'].includes(request.status) ? null : request.currentOfferId ? (
                         <OfferCard
                           offerId={request.currentOfferId}
                           requestId={request.requestId}
