@@ -507,6 +507,14 @@ test('admin verification review shows the actual profile and the requester\'s ca
   }
 })
 
+test('the Revenue page download history can be filtered by track and shows real titles, not raw ids (user-reported)', () => {
+  const page = read('src/pages/artist/dashboard/RevenuePage.tsx')
+  assert.match(page, /downloadTrackFilter/)
+  assert.match(page, /<option value="all">All tracks<\/option>/)
+  assert.match(page, /downloads\.filter\(\(d\) => d\.trackId === downloadTrackFilter\)/)
+  assert.match(page, /trackTitles\[d\.trackId\] \?\? 'Track'/)
+})
+
 test('the persistent player can be fully dismissed', () => {
   const player = read('src/contexts/PlayerContext.tsx')
   const bar = read('src/components/player/PlayerBar.tsx')

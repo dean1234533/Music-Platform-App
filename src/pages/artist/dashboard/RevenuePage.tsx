@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { subscribeArtistBalance, subscribeArtistPayouts, subscribeArtistTransactions, requestPayout } from '@/services/revenueService'
 import { beginConnectOnboarding, openConnectDashboard, subscribeArtistPayoutAccount } from '@/services/connectService'
 import { listArtistDownloadLogs } from '@/services/licenceService'
+import { getTrack } from '@/services/trackService'
 import { Button } from '@/components/common/Button'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import { formatCurrency } from '@/utils/format'
@@ -24,6 +25,8 @@ export function RevenuePage() {
   const [payouts, setPayouts] = useState<PayoutDoc[]>([])
   const [payoutAccount, setPayoutAccount] = useState<ArtistPayoutAccountDoc | null>(null)
   const [downloads, setDownloads] = useState<DownloadLogDoc[] | null>(null)
+  const [trackTitles, setTrackTitles] = useState<Record<string, string>>({})
+  const [downloadTrackFilter, setDownloadTrackFilter] = useState('all')
   const [connecting, setConnecting] = useState(false)
   const [payingOut, setPayingOut] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -42,6 +45,16 @@ export function RevenuePage() {
       unsub4()
     }
   }, [firebaseUser])
+
+  useEffect(() => {
+    if (!downloads) return
+    const missing = [...new Set(downloads.map((d) => d.trackId).filter((id) => !(id in trackTitles)))]
+    if (missing.length === 0) return
+    void Promise.all(missing.map((id) => getTrack(id).then((t) => [id, t?.title ?? 'Deleted track'] as const))).then((entries) => {
+      setTrackTitles((prev) => ({ ...prev, ...Object.fromEntries(entries) }))
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [downloads])
 
   async function handleConnect() {
     setConnecting(true)
@@ -139,22 +152,45 @@ export function RevenuePage() {
       ) : null}
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold text-ink-0">Download history</h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-ink-0">Download history</h2>
+          {downloads && downloads.length > 0 ? (
+            <select
+              value={downloadTrackFilter}
+              onChange={(e) => setDownloadTrackFilter(e.target.value)}
+              className="rounded-lg border border-surface-border bg-surface-2 px-2.5 py-1.5 text-xs text-ink-0"
+            >
+              <option value="all">All tracks</option>
+              {[...new Set(downloads.map((d) => d.trackId))].map((trackId) => (
+                <option key={trackId} value={trackId}>
+                  {trackTitles[trackId] ?? 'Loading…'}
+                </option>
+              ))}
+            </select>
+          ) : null}
+        </div>
         {downloads === null ? (
           <LoadingState />
         ) : downloads.length === 0 ? (
           <EmptyState icon={<Download className="h-8 w-8 text-ink-3" />} title="No downloads yet" />
         ) : (
-          <div className="flex flex-col divide-y divide-surface-border rounded-xl border border-surface-border">
-            {downloads.map((d, index) => (
-              <div key={`${d.agreementId}-${index}`} className="flex items-center justify-between px-4 py-3 text-sm">
-                <span className="text-ink-0">Track {d.trackId}</span>
-                <span className="text-ink-2">
-                  {d.timestamp ? d.timestamp.toDate().toLocaleDateString() : '—'} · v{d.fileVersion}
-                </span>
+          (() => {
+            const filtered = downloadTrackFilter === 'all' ? downloads : downloads.filter((d) => d.trackId === downloadTrackFilter)
+            return filtered.length === 0 ? (
+              <EmptyState icon={<Download className="h-8 w-8 text-ink-3" />} title="No downloads for this track" />
+            ) : (
+              <div className="flex flex-col divide-y divide-surface-border rounded-xl border border-surface-border">
+                {filtered.map((d, index) => (
+                  <div key={`${d.agreementId}-${index}`} className="flex items-center justify-between px-4 py-3 text-sm">
+                    <span className="text-ink-0">{trackTitles[d.trackId] ?? 'Track'}</span>
+                    <span className="text-ink-2">
+                      {d.timestamp ? d.timestamp.toDate().toLocaleDateString() : '—'} · v{d.fileVersion}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )
+          })()
         )}
       </section>
     </div>
