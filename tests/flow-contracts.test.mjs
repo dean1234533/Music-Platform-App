@@ -487,6 +487,26 @@ test('the CSP allows the fonts and signed-URL image domains this app actually lo
   assert.match(headers, /img-src 'self' data: blob: https:\/\/firebasestorage\.googleapis\.com https:\/\/storage\.googleapis\.com https:\/\/lh3\.googleusercontent\.com/)
 })
 
+test('admin verification review shows the actual profile and the requester\'s case, not just a raw uid (user-reported)', () => {
+  // The admin page previously rendered only req.userId and req.profileType — a raw uid and a
+  // role string, nothing that helps decide whether an account is genuinely worth verifying.
+  const backend = read('functions/src/admin/verification.ts')
+  assert.match(backend, /note\.length < 10/)
+  assert.match(backend, /note,\n/)
+  const page = read('src/pages/admin/AdminVerificationPage.tsx')
+  assert.match(page, /getArtistProfile/)
+  assert.match(page, /getDJProfile/)
+  assert.match(page, /View public profile/)
+  assert.match(page, /Requester's case/)
+  assert.match(page, /\{req\.note/)
+  const djPage = read('src/pages/dj/DJProfilePage.tsx')
+  const artistPage = read('src/pages/artist/dashboard/ArtistSettingsPage.tsx')
+  for (const page2 of [djPage, artistPage]) {
+    assert.match(page2, /verificationNote\.trim\(\)\.length < 10/)
+    assert.match(page2, /note: verificationNote\.trim\(\)/)
+  }
+})
+
 test('the persistent player can be fully dismissed', () => {
   const player = read('src/contexts/PlayerContext.tsx')
   const bar = read('src/components/player/PlayerBar.tsx')

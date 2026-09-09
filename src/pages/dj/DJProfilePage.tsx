@@ -20,6 +20,9 @@ export function DJProfilePage() {
   const [saved, setSaved] = useState(false)
   const [requestingVerification, setRequestingVerification] = useState(false)
   const [verificationRequested, setVerificationRequested] = useState(false)
+  const [showVerificationForm, setShowVerificationForm] = useState(false)
+  const [verificationNote, setVerificationNote] = useState('')
+  const [verificationError, setVerificationError] = useState<string | null>(null)
   const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
@@ -41,10 +44,17 @@ export function DJProfilePage() {
   if (!profile) return <EmptyState title="No DJ profile found" description="Add a DJ profile from your account settings." />
 
   async function handleRequestVerification() {
+    if (verificationNote.trim().length < 10) {
+      setVerificationError('Tell the admin reviewing this why you should be verified (at least 10 characters).')
+      return
+    }
     setRequestingVerification(true)
+    setVerificationError(null)
     try {
-      await submitVerificationRequest({ profileType: 'dj' })
+      await submitVerificationRequest({ profileType: 'dj', note: verificationNote.trim() })
       setVerificationRequested(true)
+    } catch (err) {
+      setVerificationError(err instanceof Error ? err.message : 'Could not submit your request.')
     } finally {
       setRequestingVerification(false)
     }
@@ -78,9 +88,30 @@ export function DJProfilePage() {
         only appear once an admin approves your account.
       </p>
       {profile.verificationStatus === 'unverified' && !verificationRequested ? (
-        <Button size="sm" variant="secondary" className="w-fit" loading={requestingVerification} onClick={handleRequestVerification}>
-          Request verification
-        </Button>
+        showVerificationForm ? (
+          <div className="flex flex-col gap-2 rounded-xl border border-surface-border bg-surface-2 p-3">
+            <Label>Why should this account be verified?</Label>
+            <TextArea
+              rows={3}
+              value={verificationNote}
+              onChange={(e) => setVerificationNote(e.target.value)}
+              placeholder="e.g. links to your official socials/press, venues you've played, why you're notable enough to verify — an admin has nothing else to go on."
+            />
+            {verificationError ? <p className="text-xs text-danger-500">{verificationError}</p> : null}
+            <div className="flex gap-2">
+              <Button size="sm" loading={requestingVerification} onClick={handleRequestVerification}>
+                Submit request
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => setShowVerificationForm(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button size="sm" variant="secondary" className="w-fit" onClick={() => setShowVerificationForm(true)}>
+            Request verification
+          </Button>
+        )
       ) : null}
 
       <div>

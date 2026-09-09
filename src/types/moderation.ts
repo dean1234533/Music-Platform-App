@@ -72,6 +72,10 @@ export interface VerificationRequestDoc {
   userId: string
   profileType: 'artist' | 'dj'
   status: 'pending' | 'approved' | 'rejected'
+  /** The requester's own case for why they should be verified — an admin previously had nothing but a raw uid to go on. */
+  note: string
+  reviewedBy?: string
+  reviewedAt?: Timestamp | null
   createdAt: Timestamp | null
 }
 

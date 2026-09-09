@@ -14,6 +14,13 @@ export const submitVerificationRequest = onCall(async (request) => {
   if (profileType !== 'artist' && profileType !== 'dj') {
     throw new HttpsError('invalid-argument', 'profileType must be "artist" or "dj".')
   }
+  const note = typeof request.data?.note === 'string' ? request.data.note.trim() : ''
+  if (note.length < 10) {
+    throw new HttpsError('invalid-argument', 'Tell us why you should be verified (at least 10 characters) — an admin has nothing else to go on when reviewing this.')
+  }
+  if (note.length > 1000) {
+    throw new HttpsError('invalid-argument', 'Keep it under 1000 characters.')
+  }
 
   const collection = profileType === 'artist' ? 'artistProfiles' : 'djProfiles'
   const profileSnap = await db.collection(collection).doc(uid).get()
@@ -25,6 +32,7 @@ export const submitVerificationRequest = onCall(async (request) => {
     userId: uid,
     profileType,
     status: 'pending',
+    note,
     createdAt: FieldValue.serverTimestamp(),
   })
 

@@ -3,7 +3,7 @@ import { db } from '@/lib/firebase'
 import { callable } from '@/lib/callable'
 import type { VerificationRequestDoc } from '@/types/moderation'
 
-export const submitVerificationRequest = callable<{ profileType: 'artist' | 'dj' }, { verificationRequestId: string }>(
+export const submitVerificationRequest = callable<{ profileType: 'artist' | 'dj'; note: string }, { verificationRequestId: string }>(
   'submitVerificationRequest',
 )
 
