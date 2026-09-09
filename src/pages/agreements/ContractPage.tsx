@@ -109,7 +109,10 @@ export function ContractPage() {
     setActionError(null)
     try {
       const { url } = await getSecureDownloadUrl({ agreementId: agreement!.agreementId, actingRole })
-      window.location.href = url
+      // window.location.href would navigate this whole tab away to the raw file, losing this
+      // page (and its Back button) entirely — open it in a new tab instead so the contract
+      // page stays put.
+      window.open(url, '_blank', 'noopener,noreferrer')
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Could not prepare the download.')
     } finally {

@@ -405,6 +405,15 @@ test('My Agreements opens on the first tab that actually has something in it, no
   assert.doesNotMatch(page, /useState\(0\)/)
 })
 
+test('downloading the licensed track does not navigate away from the contract page (user-reported)', () => {
+  // window.location.href = url would replace the whole tab with the raw file, losing the
+  // contract page (and its Back button) entirely once the download starts.
+  const contract = read('src/pages/agreements/ContractPage.tsx')
+  const handleDownloadBody = contract.slice(contract.indexOf('async function handleDownload'), contract.indexOf('async function handleDownload') + 600)
+  assert.doesNotMatch(handleDownloadBody, /window\.location\.href = url/)
+  assert.match(handleDownloadBody, /window\.open\(url, '_blank', 'noopener,noreferrer'\)/)
+})
+
 test('the persistent player can be fully dismissed', () => {
   const player = read('src/contexts/PlayerContext.tsx')
   const bar = read('src/components/player/PlayerBar.tsx')
