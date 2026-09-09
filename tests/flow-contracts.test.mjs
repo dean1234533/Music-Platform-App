@@ -451,13 +451,14 @@ test('the DJ access request modal closes on success even when opened from /dj/re
   assert.match(submitBody, /navigate\('\/dj\/requests'\)/)
 })
 
-test('a signed party always shows something that reads as an actual signature (user-reported)', () => {
+test('a signed party shows exactly one signature — the drawn image when it loads, the cursive fallback otherwise, never both (user-reported)', () => {
   // A typed signature never has a drawn image at all, and a drawn one can genuinely fail to
-  // load — either way, the contract previously showed nothing but the plain legal name next to
-  // a "Signed" label once that happened, which doesn't read as a signed legal document.
+  // load — either way, something must still read as a signature. But showing the cursive
+  // fallback text *and* a successfully-loaded drawn image at once looks like two different
+  // signatures for the same party, which is exactly what was reported.
   const contract = read('src/pages/agreements/ContractPage.tsx')
   assert.match(contract, /fontFamily: "'Caveat', cursive"/)
-  assert.match(contract, /\{signedAt \? \(/)
+  assert.match(contract, /\{signedAt && !showImage \? \(/)
   const html = read('index.html')
   assert.match(html, /fonts\.googleapis\.com\/css2\?family=Caveat/)
 })

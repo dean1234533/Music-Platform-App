@@ -406,11 +406,11 @@ function Party({
       <p className="text-sm font-medium text-ink-0">{name}</p>
       <p className="mt-1 text-xs text-ink-3">ID: {userId}</p>
       <p className="mt-1 text-xs text-ink-3">{signedAt ? 'Signed' : 'Not yet signed'}</p>
-      {signedAt ? (
-        // The actual signature, shown regardless of whether a drawn image exists or loads —
-        // a typed signature never has an image at all, and a drawn one can genuinely fail to
-        // load (expired URL, network hiccup). Either way, this is what makes it read as a
-        // signed document rather than just a name with a timestamp next to it.
+      {signedAt && !showImage ? (
+        // Fallback signature style for whenever there's no drawn image to show instead — a
+        // typed signature never has one at all, and a drawn one can genuinely fail to load
+        // (expired URL, network hiccup). Never rendered alongside the actual drawn image: one
+        // party has exactly one signature, not two different-looking ones stacked together.
         <p className="mt-2 -rotate-1 truncate text-3xl leading-none text-ink-0" style={{ fontFamily: "'Caveat', cursive" }}>
           {name}
         </p>
