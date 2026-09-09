@@ -441,6 +441,16 @@ test('Download PDF waits for signature images to be ready before printing (user-
   assert.match(contract, /\.finally\(\(\) => setSignaturesReady\(true\)\)/)
 })
 
+test('the DJ access request modal closes on success even when opened from /dj/requests itself (user-reported)', () => {
+  // navigate('/dj/requests') is a no-op when already on that route (the modal is opened from
+  // its own "DJ promos & deals" section) — with no onClose() call, the form just stayed open
+  // with no visible confirmation the request went through.
+  const modal = read('src/components/track/RequestDjAccessModal.tsx')
+  const submitBody = modal.slice(modal.indexOf('async function handleSubmit'), modal.indexOf('async function handleSubmit') + 900)
+  assert.match(submitBody, /onClose\(\)/)
+  assert.match(submitBody, /navigate\('\/dj\/requests'\)/)
+})
+
 test('the persistent player can be fully dismissed', () => {
   const player = read('src/contexts/PlayerContext.tsx')
   const bar = read('src/components/player/PlayerBar.tsx')

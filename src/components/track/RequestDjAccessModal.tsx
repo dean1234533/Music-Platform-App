@@ -55,6 +55,10 @@ export function RequestDjAccessModal({
         recordingIntention,
         streamingIntention,
       })
+      // Called unconditionally: navigate() is a no-op when already on /dj/requests (opened from
+      // that page's own "DJ promos & deals" section), which otherwise left the modal open
+      // forever with no visible confirmation that the request actually went through.
+      onClose()
       navigate('/dj/requests')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not submit your request.')
