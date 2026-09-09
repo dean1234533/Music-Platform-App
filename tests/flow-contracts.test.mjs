@@ -462,6 +462,16 @@ test('a signed party always shows something that reads as an actual signature (u
   assert.match(html, /fonts\.googleapis\.com\/css2\?family=Caveat/)
 })
 
+test('the CSP allows the fonts and signed-URL image domains this app actually loads from (user-reported, console errors)', () => {
+  // storage.googleapis.com is what @google-cloud/storage's getSignedUrl() actually returns
+  // (not firebasestorage.googleapis.com) — every signature image was silently CSP-blocked
+  // regardless of any application code fix. Same for the Caveat font stylesheet/font files.
+  const headers = read('public/_headers')
+  assert.match(headers, /style-src 'self' 'unsafe-inline' https:\/\/fonts\.googleapis\.com/)
+  assert.match(headers, /font-src 'self' data: https:\/\/fonts\.gstatic\.com/)
+  assert.match(headers, /img-src 'self' data: blob: https:\/\/firebasestorage\.googleapis\.com https:\/\/storage\.googleapis\.com https:\/\/lh3\.googleusercontent\.com/)
+})
+
 test('the persistent player can be fully dismissed', () => {
   const player = read('src/contexts/PlayerContext.tsx')
   const bar = read('src/components/player/PlayerBar.tsx')
