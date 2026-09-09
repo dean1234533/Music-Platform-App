@@ -38,8 +38,8 @@ export type ImageAssetKind = keyof typeof IMAGE_DIMENSIONS
 export const IMAGE_COMPRESSION_TARGET_MB = 2
 
 export const STORY_MAX_DURATION_SEC = 60
-export const STORY_DEFAULT_DURATION_HOURS = 24
-export const STORY_MAX_DURATION_HOURS = 168 // 7 days, for highlight-eligible content
+/** Fixed, like Instagram — not artist-configurable. Mark a story a Highlight to keep it past this. */
+export const STORY_DURATION_HOURS = 24
 export const VIDEO_MAX_DURATION_SEC = 60
 
 /** Story/track video delivery target — 1080p max, 720p is fine on mobile. */

@@ -66,7 +66,6 @@ export interface CreateStoryInput {
   caption?: string
   visibility: StoryVisibility
   durationSec?: number
-  expiresInHours?: number
   ctaType?: StoryCtaType
   ctaTargetId?: string
   pollOptions?: string[]

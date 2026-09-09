@@ -48,35 +48,37 @@ export function StoryViewer({
   const [votedOptionId, setVotedOptionId] = useState<string | null>(null)
   const seenRef = useRef(new Set<string>())
   const touchStartY = useRef<number | null>(null)
-  const [resolvedMediaUrl, setResolvedMediaUrl] = useState<string | null>(null)
+  // Keyed by storyId so a prefetched-while-still-on-the-previous-story URL is already sitting
+  // here the instant playback needs it — the alternative (fetch only once a story becomes
+  // current) means every single advance waits out a fresh Cloud Function round-trip first,
+  // which is the actual delay: media doesn't even start downloading until that resolves.
+  const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({})
+  const fetchingRef = useRef(new Set<string>())
 
   const group = groups[groupIndex]
   const story = group?.stories[storyIndex]
   const artist = useArtistSummary(group?.artistId ?? null)
+  const resolvedMediaUrl = story ? (story.visibility === 'public' ? story.mediaUrl : (mediaUrls[story.storyId] ?? null)) : null
 
-  // Public-tier media is already directly playable via story.mediaUrl.
-  // Every other tier is owner-only at Storage — fetch a fresh short-lived
-  // signed URL for the story actually on screen, checked against the
-  // viewer's current entitlement rather than trusting a stale stored URL.
+  function resolveMediaUrl(target: StoryDoc | undefined) {
+    if (!target || target.visibility === 'public') return
+    if (mediaUrls[target.storyId] || fetchingRef.current.has(target.storyId)) return
+    fetchingRef.current.add(target.storyId)
+    void getStoryMediaUrl({ storyId: target.storyId })
+      .then(({ url }) => setMediaUrls((prev) => ({ ...prev, [target.storyId]: url })))
+      .catch(() => undefined)
+      .finally(() => fetchingRef.current.delete(target.storyId))
+  }
+
+  // Resolve the story on screen now, and prefetch whichever one an advance (timer or tap) would
+  // show next, so that by the time it's actually needed the round-trip has already happened.
   useEffect(() => {
-    if (!story) return
-    if (story.visibility === 'public') {
-      setResolvedMediaUrl(story.mediaUrl)
-      return
-    }
-    setResolvedMediaUrl(null)
-    let cancelled = false
-    void getStoryMediaUrl({ storyId: story.storyId })
-      .then(({ url }) => {
-        if (!cancelled) setResolvedMediaUrl(url)
-      })
-      .catch(() => {
-        if (!cancelled) setResolvedMediaUrl(null)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [story])
+    resolveMediaUrl(story)
+    const nextInGroup = group?.stories[storyIndex + 1]
+    const nextStory = nextInGroup ?? groups[groupIndex + 1]?.stories[0]
+    resolveMediaUrl(nextStory)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [story, groupIndex, storyIndex])
   const durationMs = useMemo(() => {
     if (!story) return DEFAULT_TEXT_DURATION_SEC * 1000
     return (story.durationSec || DEFAULT_TEXT_DURATION_SEC) * 1000

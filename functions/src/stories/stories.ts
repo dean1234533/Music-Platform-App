@@ -7,8 +7,10 @@ import { requireActiveUser, userHasRole } from '../roles.js'
 // Mirrors src/constants/mediaConfig.ts's STORY_* constants — rules/Functions
 // can't import client TS, so these are hand-kept-in-sync (same convention
 // already used for storage.rules' size/type literals).
-const STORY_DEFAULT_DURATION_HOURS = 24
-const STORY_MAX_DURATION_HOURS = 168
+// Fixed at exactly 24 hours, like Instagram — not artist-configurable. The only way to keep a
+// story around longer is to mark it a Highlight (isHighlight), which is exempt from expiry
+// entirely rather than just getting a longer timer.
+const STORY_DURATION_HOURS = 24
 const STORY_MAX_DURATION_SEC = 60
 
 const MEDIA_KINDS = ['image', 'video', 'audio', 'text', 'poll'] as const
@@ -46,7 +48,6 @@ export const createStory = onCall(async (request) => {
     caption,
     visibility,
     durationSec,
-    expiresInHours,
     ctaType,
     ctaTargetId,
     pollOptions,
@@ -89,8 +90,7 @@ export const createStory = onCall(async (request) => {
     pollVoteCounts = Object.fromEntries(resolvedPollOptions.map((o) => [o.id, 0]))
   }
 
-  const hours = Math.min(Math.max(Number(expiresInHours) || STORY_DEFAULT_DURATION_HOURS, 1), STORY_MAX_DURATION_HOURS)
-  const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000)
+  const expiresAt = new Date(Date.now() + STORY_DURATION_HOURS * 60 * 60 * 1000)
   const clampedDurationSec = Math.min(Math.max(Number(durationSec) || 5, 1), STORY_MAX_DURATION_SEC)
 
   const storyRef = db.collection('stories').doc()

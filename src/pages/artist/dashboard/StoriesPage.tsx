@@ -9,7 +9,6 @@ import { UploadProgress } from '@/components/common/UploadProgress'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
-import { STORY_DEFAULT_DURATION_HOURS, STORY_MAX_DURATION_HOURS } from '@/constants/mediaConfig'
 import type { TrackDoc } from '@/types/track'
 import type { StoryCategory, StoryCtaType, StoryDoc, StoryMediaKind, StoryVisibility } from '@/types/story'
 import { subscribeArtistStories } from '@/services/storyService'
@@ -50,7 +49,6 @@ export function StoriesPage() {
   const [caption, setCaption] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null)
-  const [expiresInHours, setExpiresInHours] = useState(STORY_DEFAULT_DURATION_HOURS)
   const [ctaType, setCtaType] = useState<StoryCtaType | ''>('')
   const [ctaTargetId, setCtaTargetId] = useState('')
   const [pollOptions, setPollOptions] = useState(['', ''])
@@ -124,7 +122,6 @@ export function StoriesPage() {
         mediaStoragePath,
         caption,
         visibility,
-        expiresInHours,
         ctaType: ctaType || undefined,
         ctaTargetId: ctaType === 'track' ? ctaTargetId : undefined,
         pollOptions: mediaKind === 'poll' ? pollOptions.filter((o) => o.trim()) : undefined,
@@ -277,31 +274,20 @@ export function StoriesPage() {
           <TextArea rows={2} value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="What's happening?" />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <Label>Visibility</Label>
-            <select
-              value={visibility}
-              onChange={(e) => setVisibility(e.target.value as StoryVisibility)}
-              className="w-full rounded-xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-ink-0"
-            >
-              {VISIBILITIES.map((v) => (
-                <option key={v.value} value={v.value}>
-                  {v.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <Label>{`Visible for (hours, 1-${STORY_MAX_DURATION_HOURS})`}</Label>
-            <Input
-              type="number"
-              min={1}
-              max={STORY_MAX_DURATION_HOURS}
-              value={expiresInHours}
-              onChange={(e) => setExpiresInHours(Number(e.target.value))}
-            />
-          </div>
+        <div>
+          <Label>Visibility</Label>
+          <select
+            value={visibility}
+            onChange={(e) => setVisibility(e.target.value as StoryVisibility)}
+            className="w-full rounded-xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-ink-0"
+          >
+            {VISIBILITIES.map((v) => (
+              <option key={v.value} value={v.value}>
+                {v.label}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1.5 text-xs text-ink-3">Disappears after 24 hours, like Instagram — mark it a Highlight to keep it around longer.</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">

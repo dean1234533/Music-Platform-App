@@ -547,6 +547,27 @@ test('an admin can fully delete another account, reusing the same audited deleti
   assert.match(page, /adminDeleteAccount\(\{ userId: user\.uid \}\)/)
 })
 
+test('stories always expire after exactly 24 hours, not an artist-configurable duration (user-reported: "like Instagram")', () => {
+  const backend = read('functions/src/stories/stories.ts')
+  const client = read('src/pages/artist/dashboard/StoriesPage.tsx')
+  const config = read('src/constants/mediaConfig.ts')
+  assert.match(backend, /const STORY_DURATION_HOURS = 24/)
+  assert.match(backend, /new Date\(Date\.now\(\) \+ STORY_DURATION_HOURS \* 60 \* 60 \* 1000\)/)
+  assert.doesNotMatch(backend, /expiresInHours/)
+  assert.doesNotMatch(client, /expiresInHours/)
+  assert.match(config, /STORY_DURATION_HOURS = 24/)
+  // Highlights stay the one documented way to keep a story past 24h — not touched by this change.
+  assert.match(read('src/services/storyService.ts'), /isHighlight/)
+})
+
+test('story playback prefetches the next story\'s media URL instead of fetching cold on every advance (user-reported delay)', () => {
+  const viewer = read('src/components/stories/StoryViewer.tsx')
+  assert.match(viewer, /const \[mediaUrls, setMediaUrls\] = useState<Record<string, string>>\(\{\}\)/)
+  assert.match(viewer, /function resolveMediaUrl\(target: StoryDoc \| undefined\)/)
+  assert.match(viewer, /const nextInGroup = group\?\.stories\[storyIndex \+ 1\]/)
+  assert.match(viewer, /resolveMediaUrl\(nextStory\)/)
+})
+
 test('the persistent player can be fully dismissed', () => {
   const player = read('src/contexts/PlayerContext.tsx')
   const bar = read('src/components/player/PlayerBar.tsx')
