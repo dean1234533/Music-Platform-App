@@ -113,7 +113,7 @@ test('DJ requests page exposes the request flow instead of becoming a dead end',
   assert.match(page, /bulkOutreachOptIn: true/)
   assert.match(page, /Accept deal/)
   assert.match(page, /submitLicenceRequest/)
-  assert.match(page, /Deal accepted\. Your contract is ready to review and sign\./)
+  assert.match(page, /Deal requested\. The artist will review it before the contract is created\./)
   assert.match(page, /Review & sign contract/)
   assert.match(page, /OfferCard/)
   assert.match(page, /Request access/)
@@ -237,6 +237,22 @@ test('the DJ<->artist request timeline replaces chat with a real backend-event a
   assert.match(read('src/services/licenceService.ts'), /subscribeOffersForRequest/)
   assert.match(read('src/pages/dj/DJRequestsPage.tsx'), /\/dj-requests\/\$\{request\.requestId\}/)
   assert.match(read('src/pages/artist/dashboard/DJRequestsPage.tsx'), /\/dj-requests\/\$\{request\.requestId\}/)
+})
+
+test('a single multi-role test account can complete the artist and DJ sides independently', () => {
+  const party = read('functions/src/licensing/party.ts')
+  const offers = read('functions/src/licensing/offers.ts')
+  const agreements = read('functions/src/licensing/agreements.ts')
+  const requestPage = read('src/pages/agreements/RequestTimelinePage.tsx')
+  const contractPage = read('src/pages/agreements/ContractPage.tsx')
+  assert.match(party, /Choose whether you are acting as the artist or the DJ/)
+  assert.match(offers, /previous\.createdByRole === actingRole/)
+  assert.match(offers, /offer\.createdByRole === actingRole/)
+  assert.match(agreements, /`\$\{agreementId\}_\$\{actingRole\}_\$\{uid\}`/)
+  assert.match(requestPage, /Artist side/)
+  assert.match(requestPage, /DJ side/)
+  assert.match(contractPage, /Each side|both sides/i)
+  assert.match(contractPage, /actingRole/)
 })
 
 test('offers may carry an optional acceptance deadline: cannot accept once expired, artist may reissue', () => {

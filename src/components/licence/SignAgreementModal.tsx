@@ -3,13 +3,14 @@ import { Modal } from '@/components/common/Modal'
 import { Button } from '@/components/common/Button'
 import { Input, Label } from '@/components/common/Input'
 import { SignaturePad } from './SignaturePad'
-import { signAgreement, uploadDrawnSignature } from '@/services/licenceService'
+import { signAgreement, uploadDrawnSignature, type LicencePartyRole } from '@/services/licenceService'
 
 export function SignAgreementModal({
   agreementId,
   agreementVersion,
   contentHash,
   uid,
+  actingRole,
   onClose,
   onSigned,
 }: {
@@ -17,6 +18,7 @@ export function SignAgreementModal({
   agreementVersion: number
   contentHash: string
   uid: string
+  actingRole: LicencePartyRole
   onClose: () => void
   onSigned: () => void
 }) {
@@ -37,7 +39,7 @@ export function SignAgreementModal({
     setError(null)
     try {
       const signatureReference =
-        signatureType === 'typed' ? legalName.trim() : await uploadDrawnSignature(agreementId, uid, drawnBlob!)
+        signatureType === 'typed' ? legalName.trim() : await uploadDrawnSignature(agreementId, uid, actingRole, drawnBlob!)
       await signAgreement({
         agreementId,
         agreementVersion,
@@ -47,6 +49,7 @@ export function SignAgreementModal({
         signatureType,
         signatureReference,
         authorityConfirmed: true,
+        actingRole,
       })
       onSigned()
       onClose()

@@ -3,11 +3,12 @@ import { db } from '../admin.js'
 import { requireActiveUser } from '../roles.js'
 import { getStripe, stripeSecretKey } from './client.js'
 import { getPlatformSettings } from '../platformSettings.js'
+import { resolveLicencePartyRole } from '../licensing/party.js'
 
 export const createLicencePaymentSession = onCall({ secrets: [stripeSecretKey] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   await requireActiveUser(request.auth.uid)
-  const { agreementId, successUrl, cancelUrl } = request.data ?? {}
+  const { agreementId, successUrl, cancelUrl, actingRole: requestedRole } = request.data ?? {}
   if (!agreementId || !successUrl || !cancelUrl) {
     throw new HttpsError('invalid-argument', 'agreementId, successUrl, and cancelUrl are required.')
   }
@@ -17,7 +18,7 @@ export const createLicencePaymentSession = onCall({ secrets: [stripeSecretKey] }
   if (!snap.exists) throw new HttpsError('not-found', 'Agreement not found.')
   const agreement = snap.data()!
 
-  if (agreement.djId !== request.auth.uid) {
+  if (resolveLicencePartyRole(agreement, request.auth.uid, requestedRole) !== 'dj') {
     throw new HttpsError('permission-denied', 'Only the requesting DJ can pay for this licence.')
   }
   if (agreement.status !== 'awaiting_payment') {

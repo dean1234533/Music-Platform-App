@@ -3,6 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore'
 import { getStorage } from 'firebase-admin/storage'
 import { db } from '../admin.js'
 import { requireActiveUser, userHasRole } from '../roles.js'
+import { resolveLicencePartyRole } from './party.js'
 
 const SIGNED_URL_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
@@ -17,7 +18,7 @@ export const getSecureDownloadUrl = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   await requireActiveUser(request.auth.uid)
   const djId = request.auth.uid
-  const { agreementId } = request.data ?? {}
+  const { agreementId, actingRole: requestedRole } = request.data ?? {}
   if (!agreementId || typeof agreementId !== 'string') {
     throw new HttpsError('invalid-argument', 'agreementId is required.')
   }
@@ -31,7 +32,7 @@ export const getSecureDownloadUrl = onCall(async (request) => {
   if (!agreementSnap.exists) throw new HttpsError('not-found', 'Agreement not found.')
   const agreement = agreementSnap.data()!
 
-  if (agreement.djId !== djId) {
+  if (resolveLicencePartyRole(agreement, djId, requestedRole) !== 'dj') {
     throw new HttpsError('permission-denied', 'This agreement does not belong to you.')
   }
   if (agreement.status !== 'active') {

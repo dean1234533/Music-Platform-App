@@ -95,7 +95,7 @@ export function DJRequestsPage() {
         venue: '',
         message: `Accepted “${deal.name}”.`,
       })
-      notify('Deal accepted. Your contract is ready to review and sign.', 'success')
+      notify('Deal requested. The artist will review it before the contract is created.', 'success')
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Could not accept this deal.', 'error')
     } finally {
@@ -161,7 +161,6 @@ export function DJRequestsPage() {
               <RequestRow
                 key={req.requestId}
                 request={req}
-                uid={firebaseUser!.uid}
                 onCounter={(offer) => setOfferModal({ requestId: req.requestId, previousOffer: offer })}
                 onError={(message) => notify(message, 'error')}
               />
@@ -264,6 +263,7 @@ export function DJRequestsPage() {
           requestId={offerModal.requestId}
           mode="counter"
           previousOffer={offerModal.previousOffer}
+          actingRole="dj"
           onClose={() => setOfferModal(null)}
         />
       ) : null}
@@ -319,7 +319,7 @@ function DealOpportunityCard({
         disabled={accepted}
         className="w-full"
       >
-        {accepted ? (canAcceptImmediately ? 'Contract ready' : 'Terms requested') : (canAcceptImmediately ? 'Accept deal' : 'Request final terms')}
+        {accepted ? (canAcceptImmediately ? 'Awaiting artist' : 'Terms requested') : (canAcceptImmediately ? 'Accept deal' : 'Request final terms')}
       </Button>
     </div>
   )
@@ -327,12 +327,10 @@ function DealOpportunityCard({
 
 function RequestRow({
   request,
-  uid,
   onCounter,
   onError,
 }: {
   request: LicenceRequestDoc
-  uid: string
   onCounter: (offer: LicenceOfferDoc) => void
   onError: (message: string) => void
 }) {
@@ -355,7 +353,7 @@ function RequestRow({
   async function cancelRequest() {
     setCancelling(true)
     try {
-      await respondToLicenceRequest(request.requestId, 'cancel')
+      await respondToLicenceRequest(request.requestId, 'cancel', 'dj')
     } catch (error) {
       onError(error instanceof Error ? error.message : 'Could not cancel this request.')
     } finally {
@@ -372,18 +370,18 @@ function RequestRow({
         </span>
         <span className="rounded-full bg-surface-3 px-2.5 py-1 text-xs text-ink-1">{STATUS_LABEL[request.status] ?? request.status}</span>
       </div>
-      <Link to={`/dj-requests/${request.requestId}`} className="w-fit text-xs font-medium text-dj-400 hover:text-dj-300">
+      <Link to={`/dj-requests/${request.requestId}?as=dj`} className="w-fit text-xs font-medium text-dj-400 hover:text-dj-300">
         View request details & activity
       </Link>
       {request.currentAgreementId ? (
         <Link
-          to={`/agreements/${request.currentAgreementId}`}
+          to={`/agreements/${request.currentAgreementId}?as=dj`}
           className="inline-flex w-fit items-center rounded-full bg-dj-400 px-4 py-2 text-sm font-semibold text-surface-0 hover:bg-dj-300"
         >
           Review & sign contract
         </Link>
       ) : request.currentOfferId ? (
-        <OfferCard offerId={request.currentOfferId} requestId={request.requestId} uid={uid} onCounter={onCounter} />
+        <OfferCard offerId={request.currentOfferId} requestId={request.requestId} actingRole="dj" onCounter={onCounter} />
       ) : ['submitted', 'artist_review', 'negotiating'].includes(request.status) ? (
         <div>
           <p className="text-xs text-ink-2">Waiting for the artist to approve your request and set the contract terms.</p>

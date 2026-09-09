@@ -6,6 +6,7 @@ import { requireActiveUser } from '../roles.js'
 import { writeSystemMessage } from '../messaging/messages.js'
 import { writeAgreementVersion, type AgreementTerms } from './agreements.js'
 import { writeRequestEvent } from './events.js'
+import { resolveLicencePartyRole, type LicencePartyRole } from './party.js'
 
 interface OfferTermsInput {
   priceMinor: number
@@ -34,19 +35,17 @@ function validateTerms(input: OfferTermsInput | undefined): asserts input is Off
 
 const NEGOTIABLE_STATUSES = ['submitted', 'negotiating', 'offer_sent', 'counter_offer', 'agreement_ready']
 
-async function loadNegotiableRequest(requestId: string, uid: string) {
+async function loadNegotiableRequest(requestId: string, uid: string, requestedRole: unknown) {
   if (!requestId || typeof requestId !== 'string') throw new HttpsError('invalid-argument', 'requestId is required.')
   const requestRef = db.collection('licenceRequests').doc(requestId)
   const snap = await requestRef.get()
   if (!snap.exists) throw new HttpsError('not-found', 'Request not found.')
   const licenceRequest = snap.data()!
-  const isArtist = licenceRequest.artistId === uid
-  const isDj = licenceRequest.djId === uid
-  if (!isArtist && !isDj) throw new HttpsError('permission-denied', 'Not a participant in this request.')
+  const actingRole = resolveLicencePartyRole(licenceRequest, uid, requestedRole)
   if (!NEGOTIABLE_STATUSES.includes(licenceRequest.status)) {
     throw new HttpsError('failed-precondition', 'This request is not open for offers.')
   }
-  return { requestRef, licenceRequest, isArtist, isDj }
+  return { requestRef, licenceRequest, actingRole }
 }
 
 /**
@@ -80,11 +79,11 @@ export const sendOffer = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
-  const { requestId, ...terms } = request.data ?? {}
+  const { requestId, actingRole: requestedRole, ...terms } = request.data ?? {}
   validateTerms(terms)
 
-  const { requestRef, licenceRequest, isArtist } = await loadNegotiableRequest(requestId, uid)
-  if (!isArtist) throw new HttpsError('permission-denied', 'Only the artist can send the opening offer.')
+  const { requestRef, licenceRequest, actingRole } = await loadNegotiableRequest(requestId, uid, requestedRole)
+  if (actingRole !== 'artist') throw new HttpsError('permission-denied', 'Only the artist can send the opening offer.')
   let reissueVersion = 1
   if (licenceRequest.currentOfferId) {
     const existingSnap = await db.collection('licenceOffers').doc(licenceRequest.currentOfferId).get()
@@ -132,10 +131,10 @@ export const counterOffer = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
-  const { requestId, ...terms } = request.data ?? {}
+  const { requestId, actingRole: requestedRole, ...terms } = request.data ?? {}
   validateTerms(terms)
 
-  const { requestRef, licenceRequest, isArtist } = await loadNegotiableRequest(requestId, uid)
+  const { requestRef, licenceRequest, actingRole } = await loadNegotiableRequest(requestId, uid, requestedRole)
   if (!licenceRequest.currentOfferId) throw new HttpsError('failed-precondition', 'No offer to counter yet.')
 
   const previousRef = db.collection('licenceOffers').doc(licenceRequest.currentOfferId)
@@ -148,7 +147,7 @@ export const counterOffer = onCall(async (request) => {
     await previousRef.update({ status: 'expired' })
     throw new HttpsError('failed-precondition', 'This offer has expired and can no longer be countered.')
   }
-  if (previous.createdBy === uid) throw new HttpsError('failed-precondition', 'You cannot counter your own offer.')
+  if (previous.createdByRole === actingRole) throw new HttpsError('failed-precondition', 'You cannot counter your own offer.')
   await enforceTrackDealSettings(licenceRequest.trackId, terms.priceMinor, false, licenceRequest.status)
 
   const offerRef = db.collection('licenceOffers').doc()
@@ -160,20 +159,20 @@ export const counterOffer = onCall(async (request) => {
   batch.update(previousRef, { status: 'countered', supersededByOfferId: offerRef.id })
   batch.set(
     offerRef,
-    buildOfferDoc(offerRef.id, requestId, licenceRequest, uid, isArtist ? 'artist' : 'dj', terms, previous.version + 1, null),
+    buildOfferDoc(offerRef.id, requestId, licenceRequest, uid, actingRole, terms, previous.version + 1, null),
   )
   batch.update(requestRef, { status: 'counter_offer', currentOfferId: offerRef.id, updatedAt: FieldValue.serverTimestamp() })
   writeRequestEvent(batch, requestRef, {
-    type: 'counter_offer', actorId: uid, actorRole: isArtist ? 'artist' : 'dj',
-    summary: `${isArtist ? 'Artist' : 'DJ'} sent a counter-offer.`, offerId: offerRef.id,
+    type: 'counter_offer', actorId: uid, actorRole: actingRole,
+    summary: `${actingRole === 'artist' ? 'Artist' : 'DJ'} sent a counter-offer.`, offerId: offerRef.id,
   })
   if (conversationRef) {
-    writeSystemMessage(batch, conversationRef, uid, 'offer_card', `${isArtist ? 'Artist' : 'DJ'} sent a counter-offer.`, {
+    writeSystemMessage(batch, conversationRef, uid, 'offer_card', `${actingRole === 'artist' ? 'Artist' : 'DJ'} sent a counter-offer.`, {
       offerId: offerRef.id,
     })
   }
-  const notifyId = isArtist ? licenceRequest.djId : licenceRequest.artistId
-  const notifyLink = isArtist ? '/dj/requests' : '/dashboard/artist/dj-requests'
+  const notifyId = actingRole === 'artist' ? licenceRequest.djId : licenceRequest.artistId
+  const notifyLink = actingRole === 'artist' ? '/dj/requests' : '/dashboard/artist/dj-requests'
   batch.set(db.collection('notifications').doc(), {
     userId: notifyId,
     type: 'offer_sent',
@@ -193,9 +192,9 @@ export const acceptOffer = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
-  const { requestId } = request.data ?? {}
+  const { requestId, actingRole: requestedRole } = request.data ?? {}
 
-  const { requestRef, licenceRequest, isArtist } = await loadNegotiableRequest(requestId, uid)
+  const { requestRef, licenceRequest, actingRole } = await loadNegotiableRequest(requestId, uid, requestedRole)
   if (!licenceRequest.currentOfferId) throw new HttpsError('failed-precondition', 'No offer to accept.')
 
   const offerRef = db.collection('licenceOffers').doc(licenceRequest.currentOfferId)
@@ -211,7 +210,7 @@ export const acceptOffer = onCall(async (request) => {
     await offerRef.update({ status: 'expired' })
     throw new HttpsError('failed-precondition', 'This offer has expired and can no longer be accepted.')
   }
-  if (offer.createdBy === uid) throw new HttpsError('failed-precondition', 'You cannot accept your own offer.')
+  if (offer.createdByRole === actingRole) throw new HttpsError('failed-precondition', 'You cannot accept your own offer.')
 
   const trackSnap = await db.collection('tracks').doc(licenceRequest.trackId).get()
   const track = trackSnap.data()
@@ -245,8 +244,8 @@ export const acceptOffer = onCall(async (request) => {
   batch.update(offerRef, { status: 'accepted' })
   const { agreementRef } = await writeAgreementVersion(batch, requestRef, licenceRequest, terms, { acceptedOfferId: offerRef.id })
   writeRequestEvent(batch, requestRef, {
-    type: 'offer_accepted', actorId: uid, actorRole: isArtist ? 'artist' : 'dj',
-    summary: `${isArtist ? 'Artist' : 'DJ'} accepted offer v${offer.version}. Contract generated.`,
+    type: 'offer_accepted', actorId: uid, actorRole: actingRole,
+    summary: `${actingRole === 'artist' ? 'Artist' : 'DJ'} accepted offer v${offer.version}. Contract generated.`,
     offerId: offerRef.id, agreementId: agreementRef.id,
   })
 
@@ -256,13 +255,13 @@ export const acceptOffer = onCall(async (request) => {
       agreementId: agreementRef.id,
     })
   }
-  const notifyId = isArtist ? licenceRequest.djId : licenceRequest.artistId
+  const notifyId = actingRole === 'artist' ? licenceRequest.djId : licenceRequest.artistId
   batch.set(db.collection('notifications').doc(), {
     userId: notifyId,
     type: 'agreement_ready',
     title: 'Offer accepted',
     body: 'Your offer was accepted — the contract is ready to sign.',
-    linkTo: `/agreements/${agreementRef.id}`,
+    linkTo: `/agreements/${agreementRef.id}?as=${actingRole === 'artist' ? 'dj' : 'artist'}`,
     read: false,
     createdAt: FieldValue.serverTimestamp(),
   })
@@ -276,15 +275,15 @@ export const rejectOffer = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
-  const { requestId, reason } = request.data ?? {}
-  const { requestRef, licenceRequest, isArtist } = await loadNegotiableRequest(requestId, uid)
+  const { requestId, reason, actingRole: requestedRole } = request.data ?? {}
+  const { requestRef, licenceRequest, actingRole } = await loadNegotiableRequest(requestId, uid, requestedRole)
   if (!licenceRequest.currentOfferId) throw new HttpsError('failed-precondition', 'No offer to reject.')
   const offerRef = db.collection('licenceOffers').doc(licenceRequest.currentOfferId)
   const offerSnap = await offerRef.get()
   if (!offerSnap.exists) throw new HttpsError('not-found', 'Offer not found.')
   const offer = offerSnap.data()!
   if (offer.status !== 'pending') throw new HttpsError('failed-precondition', 'This offer is no longer pending.')
-  if (offer.createdBy === uid) throw new HttpsError('failed-precondition', 'You cannot reject your own offer.')
+  if (offer.createdByRole === actingRole) throw new HttpsError('failed-precondition', 'You cannot reject your own offer.')
   const expiresAt = offer.offerExpiresAt as Timestamp | null | undefined
   if (expiresAt && expiresAt.toMillis() < Date.now()) throw new HttpsError('failed-precondition', 'This offer has expired.')
 
@@ -296,11 +295,11 @@ export const rejectOffer = onCall(async (request) => {
   })
   batch.update(requestRef, { status: 'rejected', updatedAt: FieldValue.serverTimestamp() })
   writeRequestEvent(batch, requestRef, {
-    type: 'offer_rejected', actorId: uid, actorRole: isArtist ? 'artist' : 'dj',
-    summary: `${isArtist ? 'Artist' : 'DJ'} rejected offer v${offer.version}.`, offerId: offerRef.id,
+    type: 'offer_rejected', actorId: uid, actorRole: actingRole,
+    summary: `${actingRole === 'artist' ? 'Artist' : 'DJ'} rejected offer v${offer.version}.`, offerId: offerRef.id,
   })
   batch.set(db.collection('notifications').doc(), {
-    userId: isArtist ? licenceRequest.djId : licenceRequest.artistId,
+    userId: actingRole === 'artist' ? licenceRequest.djId : licenceRequest.artistId,
     type: 'offer_rejected', title: 'Offer rejected', body: 'The latest DJ licence offer was rejected.',
     linkTo: `/dj-requests/${requestId}`, read: false, createdAt: FieldValue.serverTimestamp(),
   })
@@ -313,9 +312,9 @@ export const withdrawOffer = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
-  const { requestId } = request.data ?? {}
+  const { requestId, actingRole: requestedRole } = request.data ?? {}
 
-  const { requestRef, licenceRequest } = await loadNegotiableRequest(requestId, uid)
+  const { requestRef, licenceRequest, actingRole } = await loadNegotiableRequest(requestId, uid, requestedRole)
   if (!licenceRequest.currentOfferId) throw new HttpsError('failed-precondition', 'No offer to withdraw.')
 
   const offerRef = db.collection('licenceOffers').doc(licenceRequest.currentOfferId)
@@ -323,7 +322,7 @@ export const withdrawOffer = onCall(async (request) => {
   if (!offerSnap.exists) throw new HttpsError('not-found', 'Offer not found.')
   const offer = offerSnap.data()!
   if (offer.status !== 'pending') throw new HttpsError('failed-precondition', 'This offer is no longer pending.')
-  if (offer.createdBy !== uid) throw new HttpsError('permission-denied', 'You can only withdraw your own offer.')
+  if (offer.createdByRole !== actingRole) throw new HttpsError('permission-denied', 'You can only withdraw your own offer.')
 
   const conversationRef = licenceRequest.conversationId
     ? db.collection('conversations').doc(licenceRequest.conversationId)
@@ -332,8 +331,8 @@ export const withdrawOffer = onCall(async (request) => {
   batch.update(offerRef, { status: 'withdrawn' })
   batch.update(requestRef, { status: 'negotiating', currentOfferId: FieldValue.delete(), updatedAt: FieldValue.serverTimestamp() })
   writeRequestEvent(batch, requestRef, {
-    type: 'offer_withdrawn', actorId: uid, actorRole: offer.createdByRole,
-    summary: `${offer.createdByRole === 'artist' ? 'Artist' : 'DJ'} withdrew the offer.`, offerId: offerRef.id,
+    type: 'offer_withdrawn', actorId: uid, actorRole: actingRole,
+    summary: `${actingRole === 'artist' ? 'Artist' : 'DJ'} withdrew the offer.`, offerId: offerRef.id,
   })
   if (conversationRef) writeSystemMessage(batch, conversationRef, uid, 'system', 'The offer was withdrawn.', { offerId: offerRef.id })
 
@@ -346,7 +345,7 @@ function buildOfferDoc(
   requestId: string,
   licenceRequest: DocumentData,
   createdBy: string,
-  createdByRole: 'artist' | 'dj',
+  createdByRole: LicencePartyRole,
   terms: OfferTermsInput,
   version: number,
   supersededByOfferId: string | null,

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
-import { counterOffer, sendOffer, type OfferTermsInput } from '@/services/licenceService'
+import { counterOffer, sendOffer, type LicencePartyRole, type OfferTermsInput } from '@/services/licenceService'
 import type { LicenceOfferDoc } from '@/types/licence'
 import type { DjDealDoc } from '@/types/deal'
 
@@ -78,6 +78,7 @@ export function OfferFormModal({
   mode,
   previousOffer,
   sourceDeal = null,
+  actingRole,
   onClose,
 }: {
   requestId: string
@@ -85,6 +86,7 @@ export function OfferFormModal({
   previousOffer: LicenceOfferDoc | null
   /** The artist's published deal this request was made against, if any — pre-fills the form instead of starting blank. */
   sourceDeal?: DjDealDoc | null
+  actingRole: LicencePartyRole
   onClose: () => void
 }) {
   const initial = previousOffer ? fromOffer(previousOffer) : sourceDeal ? fromDeal(sourceDeal) : EMPTY
@@ -97,7 +99,7 @@ export function OfferFormModal({
     setSubmitting(true)
     setError(null)
     try {
-      const input = { requestId, ...terms, priceMinor: Math.round(Number(price || 0) * 100) }
+      const input = { requestId, actingRole, ...terms, priceMinor: Math.round(Number(price || 0) * 100) }
       if (mode === 'send') await sendOffer(input)
       else await counterOffer(input)
       onClose()

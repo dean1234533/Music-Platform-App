@@ -5,6 +5,7 @@ import { requireActiveUser, userHasRole } from '../roles.js'
 import { enforceRateLimit } from '../rateLimit.js'
 import { writeAgreementVersion, type AgreementTerms } from './agreements.js'
 import { writeRequestEvent } from './events.js'
+import { resolveLicencePartyRole } from './party.js'
 
 const INTENDED_USES = [
   'live_club_performance',
@@ -169,7 +170,7 @@ export const submitLicenceRequest = onCall(async (request) => {
       type: 'dj_request',
       title: 'New DJ request',
       body: `${djName} requested access to "${track.title}". Review the selected deal or send revised terms.`,
-      linkTo: `/dj-requests/${requestRef.id}`,
+      linkTo: `/dj-requests/${requestRef.id}?as=artist`,
       read: false,
       createdAt: FieldValue.serverTimestamp(),
     })
@@ -182,14 +183,15 @@ export const submitLicenceRequest = onCall(async (request) => {
 export const acceptExistingDeal = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   await requireActiveUser(request.auth.uid)
-  const { requestId } = request.data ?? {}
+  const { requestId, actingRole: requestedRole } = request.data ?? {}
   if (!requestId || typeof requestId !== 'string') throw new HttpsError('invalid-argument', 'requestId is required.')
 
   const requestRef = db.collection('licenceRequests').doc(requestId)
   const requestSnap = await requestRef.get()
   if (!requestSnap.exists) throw new HttpsError('not-found', 'Request not found.')
   const licenceRequest = requestSnap.data()!
-  if (licenceRequest.artistId !== request.auth.uid) throw new HttpsError('permission-denied', 'Only the artist can accept this deal.')
+  const actingRole = resolveLicencePartyRole(licenceRequest, request.auth.uid, requestedRole)
+  if (actingRole !== 'artist') throw new HttpsError('permission-denied', 'Only the artist can accept this deal.')
   if (!['submitted', 'artist_review'].includes(licenceRequest.status)) {
     throw new HttpsError('failed-precondition', 'This request is no longer awaiting artist review.')
   }
@@ -234,7 +236,7 @@ export const acceptExistingDeal = onCall(async (request) => {
     userId: licenceRequest.djId,
     type: 'agreement_ready', title: 'Deal accepted — contract ready',
     body: 'The artist accepted the selected deal. Review and sign the locked contract.',
-    linkTo: `/agreements/${agreementRef.id}`, read: false, createdAt: FieldValue.serverTimestamp(),
+    linkTo: `/agreements/${agreementRef.id}?as=dj`, read: false, createdAt: FieldValue.serverTimestamp(),
   })
   await batch.commit()
   return { agreementId: agreementRef.id }
@@ -247,7 +249,7 @@ export const respondToLicenceRequest = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
-  const { requestId, action } = request.data ?? {}
+  const { requestId, action, actingRole: requestedRole } = request.data ?? {}
   if (!requestId || typeof requestId !== 'string') throw new HttpsError('invalid-argument', 'requestId is required.')
 
   const ref = db.collection('licenceRequests').doc(requestId)
@@ -255,9 +257,9 @@ export const respondToLicenceRequest = onCall(async (request) => {
   if (!snap.exists) throw new HttpsError('not-found', 'Request not found.')
   const data = snap.data()!
 
-  const isArtist = data.artistId === uid
-  const isDj = data.djId === uid
-  if (!isArtist && !isDj) throw new HttpsError('permission-denied', 'Not a participant in this request.')
+  const actingRole = resolveLicencePartyRole(data, uid, requestedRole)
+  const isArtist = actingRole === 'artist'
+  const isDj = actingRole === 'dj'
 
   let nextStatus: string
   if (isArtist && (ARTIST_ACTIONS as readonly string[]).includes(action)) {
@@ -278,7 +280,7 @@ export const respondToLicenceRequest = onCall(async (request) => {
   writeRequestEvent(batch, ref, {
     type: nextStatus,
     actorId: uid,
-    actorRole: isArtist ? 'artist' : 'dj',
+    actorRole: actingRole,
     summary: nextStatus === 'rejected' ? 'Artist rejected the request.' : 'DJ cancelled the request.',
   })
   batch.set(db.collection('notifications').doc(), {
@@ -286,7 +288,7 @@ export const respondToLicenceRequest = onCall(async (request) => {
     type: nextStatus === 'rejected' ? 'request_rejected' : 'request_cancelled',
     title: nextStatus === 'rejected' ? 'Request declined' : 'Request cancelled',
     body: `Your DJ request status changed to "${nextStatus}".`,
-    linkTo: `/dj-requests/${requestId}`,
+    linkTo: `/dj-requests/${requestId}?as=${isArtist ? 'dj' : 'artist'}`,
     read: false,
     createdAt: FieldValue.serverTimestamp(),
   })

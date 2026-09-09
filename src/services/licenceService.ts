@@ -4,6 +4,8 @@ import { db, storage } from '@/lib/firebase'
 import { callable } from '@/lib/callable'
 import type { DownloadLogDoc, IntendedUse, LicenceAgreementDoc, LicenceOfferDoc, LicenceRequestDoc, LicenceRequestEventDoc } from '@/types/licence'
 
+export type LicencePartyRole = 'artist' | 'dj'
+
 export interface SubmitLicenceRequestInput {
   trackId: string
   intendedUse: IntendedUse
@@ -21,7 +23,7 @@ export interface SubmitLicenceRequestInput {
 const submitRequestCallable = callable<SubmitLicenceRequestInput, { requestId: string; agreementId: string | null }>(
   'submitLicenceRequest',
 )
-const respondCallable = callable<{ requestId: string; action: 'start_negotiation' | 'reject' | 'cancel' }, { status: string }>(
+const respondCallable = callable<{ requestId: string; action: 'start_negotiation' | 'reject' | 'cancel'; actingRole: LicencePartyRole }, { status: string }>(
   'respondToLicenceRequest',
 )
 
@@ -29,8 +31,8 @@ export async function submitLicenceRequest(input: SubmitLicenceRequestInput) {
   return submitRequestCallable(input)
 }
 
-export async function respondToLicenceRequest(requestId: string, action: 'start_negotiation' | 'reject' | 'cancel') {
-  return respondCallable({ requestId, action })
+export async function respondToLicenceRequest(requestId: string, action: 'start_negotiation' | 'reject' | 'cancel', actingRole: LicencePartyRole) {
+  return respondCallable({ requestId, action, actingRole })
 }
 
 export function subscribeLicenceRequest(
@@ -129,11 +131,12 @@ export interface SignAgreementInput {
   signatureType: 'typed' | 'drawn'
   signatureReference: string
   authorityConfirmed: boolean
+  actingRole: LicencePartyRole
 }
 
 export const signAgreement = callable<SignAgreementInput, { ok: boolean; bothAccepted: boolean }>('signAgreement')
 
-export const voidAgreement = callable<{ agreementId: string; reason?: string }, { ok: boolean }>('voidAgreement')
+export const voidAgreement = callable<{ agreementId: string; reason?: string; actingRole: LicencePartyRole }, { ok: boolean }>('voidAgreement')
 
 export interface OfferTermsInput {
   priceMinor: number
@@ -154,16 +157,16 @@ export interface OfferTermsInput {
   offerExpiresAt?: string | null
 }
 
-export const sendOffer = callable<{ requestId: string } & OfferTermsInput, { offerId: string }>('sendOffer')
-export const counterOffer = callable<{ requestId: string } & OfferTermsInput, { offerId: string }>('counterOffer')
-export const acceptOffer = callable<{ requestId: string }, { agreementId: string }>('acceptOffer')
-export const acceptExistingDeal = callable<{ requestId: string }, { agreementId: string }>('acceptExistingDeal')
-export const rejectOffer = callable<{ requestId: string; reason?: string }, { ok: boolean }>('rejectOffer')
-export const withdrawOffer = callable<{ requestId: string }, { ok: boolean }>('withdrawOffer')
+export const sendOffer = callable<{ requestId: string; actingRole: LicencePartyRole } & OfferTermsInput, { offerId: string }>('sendOffer')
+export const counterOffer = callable<{ requestId: string; actingRole: LicencePartyRole } & OfferTermsInput, { offerId: string }>('counterOffer')
+export const acceptOffer = callable<{ requestId: string; actingRole: LicencePartyRole }, { agreementId: string }>('acceptOffer')
+export const acceptExistingDeal = callable<{ requestId: string; actingRole: LicencePartyRole }, { agreementId: string }>('acceptExistingDeal')
+export const rejectOffer = callable<{ requestId: string; reason?: string; actingRole: LicencePartyRole }, { ok: boolean }>('rejectOffer')
+export const withdrawOffer = callable<{ requestId: string; actingRole: LicencePartyRole }, { ok: boolean }>('withdrawOffer')
 
 /** Uploaded before calling signAgreement, matching copyrightEvidence's upload-then-reference ordering. */
-export async function uploadDrawnSignature(agreementId: string, uid: string, blob: Blob): Promise<string> {
-  const path = `licenceSignatures/${agreementId}/${uid}.png`
+export async function uploadDrawnSignature(agreementId: string, uid: string, actingRole: LicencePartyRole, blob: Blob): Promise<string> {
+  const path = `licenceSignatures/${agreementId}/${actingRole}-${uid}.png`
   const snap = await uploadBytes(ref(storage, path), blob)
   return getDownloadURL(snap.ref)
 }
@@ -232,11 +235,11 @@ export function subscribeOffer(
 }
 
 export const createLicencePaymentSession = callable<
-  { agreementId: string; successUrl: string; cancelUrl: string },
+  { agreementId: string; successUrl: string; cancelUrl: string; actingRole: LicencePartyRole },
   { url: string }
 >('createLicencePaymentSession')
 
-export const getSecureDownloadUrl = callable<{ agreementId: string }, { url: string; expiresInSeconds: number }>(
+export const getSecureDownloadUrl = callable<{ agreementId: string; actingRole: LicencePartyRole }, { url: string; expiresInSeconds: number }>(
   'getSecureDownloadUrl',
 )
 

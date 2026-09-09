@@ -6,6 +6,7 @@ import { db } from '../admin.js'
 import { requireActiveUser } from '../roles.js'
 import { writeSystemMessage } from '../messaging/messages.js'
 import { writeRequestEvent } from './events.js'
+import { resolveLicencePartyRole } from './party.js'
 
 /** Deterministic fingerprint of the agreed terms — a signature records the exact contentHash it was given for, so any (impossible, since writes are server-only) tampering after signing would be independently detectable. */
 export function computeContentHash(terms: AgreementTerms): string {
@@ -126,7 +127,7 @@ export const signAgreement = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
-  const { agreementId, agreementVersion, contentHash, agreedToTerms, legalName, signatureType, signatureReference, authorityConfirmed } = request.data ?? {}
+  const { agreementId, agreementVersion, contentHash, agreedToTerms, legalName, signatureType, signatureReference, authorityConfirmed, actingRole: requestedRole } = request.data ?? {}
   if (!agreementId || typeof agreementId !== 'string') throw new HttpsError('invalid-argument', 'agreementId is required.')
   if (agreedToTerms !== true) throw new HttpsError('invalid-argument', 'You must confirm you agree to the terms.')
   if (!legalName || typeof legalName !== 'string' || !legalName.trim()) {
@@ -186,11 +187,10 @@ export const signAgreement = onCall(async (request) => {
     }
   }
 
-  const isArtist = agreement.artistId === uid
-  const isDj = agreement.djId === uid
-  if (!isArtist && !isDj) throw new HttpsError('permission-denied', 'Not a party to this agreement.')
-  if (isArtist && agreement.artistAcceptedAt) throw new HttpsError('failed-precondition', 'Already signed.')
-  if (isDj && agreement.djAcceptedAt) throw new HttpsError('failed-precondition', 'Already signed.')
+  const actingRole = resolveLicencePartyRole(agreement, uid, requestedRole)
+  const isArtist = actingRole === 'artist'
+  if (isArtist && agreement.artistAcceptedAt) throw new HttpsError('failed-precondition', 'The artist has already signed.')
+  if (!isArtist && agreement.djAcceptedAt) throw new HttpsError('failed-precondition', 'The DJ has already signed.')
 
   const requestRef = db.collection('licenceRequests').doc(agreement.licenceRequestId)
   const requestSnap = await requestRef.get()
@@ -198,14 +198,14 @@ export const signAgreement = onCall(async (request) => {
   const conversationRef = conversationId ? db.collection('conversations').doc(conversationId) : null
 
   const now = FieldValue.serverTimestamp()
-  const acceptanceLogRef = db.collection('licenceAgreementAcceptances').doc(`${agreementId}_${uid}`)
+  const acceptanceLogRef = db.collection('licenceAgreementAcceptances').doc(`${agreementId}_${actingRole}_${uid}`)
 
   const update: Record<string, unknown> = { updatedAt: now, status: isArtist ? 'artist_signed' : 'dj_signed' }
   if (isArtist) {
     update.artistAcceptedAt = now
     update.artistLegalName = legalName.trim()
   }
-  if (isDj) {
+  if (!isArtist) {
     update.djAcceptedAt = now
     update.djLegalName = legalName.trim()
   }
@@ -222,8 +222,8 @@ export const signAgreement = onCall(async (request) => {
     agreementId,
     userId: uid,
     signerUserId: uid,
-    role: isArtist ? 'artist' : 'dj',
-    signerRole: isArtist ? 'artist' : 'dj',
+    role: actingRole,
+    signerRole: actingRole,
     legalName: legalName.trim(),
     signatureType,
     signatureReference,
@@ -241,7 +241,7 @@ export const signAgreement = onCall(async (request) => {
   writeRequestEvent(batch, requestRef, {
     type: isArtist ? 'artist_signed' : 'dj_signed',
     actorId: uid,
-    actorRole: isArtist ? 'artist' : 'dj',
+    actorRole: actingRole,
     summary: `${isArtist ? 'Artist' : 'DJ'} signed the agreement.`,
     agreementId,
   })
@@ -274,7 +274,7 @@ export const signAgreement = onCall(async (request) => {
         type: 'payment_required',
         title: 'Agreement signed — payment required',
         body: 'Both parties signed. Complete payment to unlock the download.',
-        linkTo: `/agreements/${agreementId}`,
+        linkTo: `/agreements/${agreementId}?as=dj`,
         read: false,
         createdAt: now,
       })
@@ -285,7 +285,7 @@ export const signAgreement = onCall(async (request) => {
           type: 'dj_signed',
           title: 'DJ signed — awaiting payment',
           body: 'Both parties have now signed. The licence activates once the DJ completes payment.',
-          linkTo: `/agreements/${agreementId}`,
+          linkTo: `/agreements/${agreementId}?as=artist`,
           read: false,
           createdAt: now,
         })
@@ -297,7 +297,7 @@ export const signAgreement = onCall(async (request) => {
         type: 'download_unlocked',
         title: 'Agreement signed — download unlocked',
         body: 'Both parties signed. The full-quality track is now available to download.',
-        linkTo: `/agreements/${agreementId}`,
+        linkTo: `/agreements/${agreementId}?as=${isArtist ? 'dj' : 'artist'}`,
         read: false,
         createdAt: now,
       })
@@ -319,7 +319,7 @@ export const signAgreement = onCall(async (request) => {
       type: 'agreement_ready',
       title: `${isArtist ? 'Artist' : 'DJ'} signed the contract`,
       body: 'Review the final terms and add your signature to continue.',
-      linkTo: `/agreements/${agreementId}`,
+      linkTo: `/agreements/${agreementId}?as=${isArtist ? 'dj' : 'artist'}`,
       read: false,
       createdAt: now,
     })
@@ -343,7 +343,7 @@ export const voidAgreement = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
-  const { agreementId, reason } = request.data ?? {}
+  const { agreementId, reason, actingRole: requestedRole } = request.data ?? {}
   if (!agreementId || typeof agreementId !== 'string') throw new HttpsError('invalid-argument', 'agreementId is required.')
 
   const agreementRef = db.collection('licenceAgreements').doc(agreementId)
@@ -351,9 +351,8 @@ export const voidAgreement = onCall(async (request) => {
   if (!snap.exists) throw new HttpsError('not-found', 'Agreement not found.')
   const agreement = snap.data()!
 
-  const isArtist = agreement.artistId === uid
-  const isDj = agreement.djId === uid
-  if (!isArtist && !isDj) throw new HttpsError('permission-denied', 'Not a party to this agreement.')
+  const actingRole = resolveLicencePartyRole(agreement, uid, requestedRole)
+  const isArtist = actingRole === 'artist'
   if (agreement.legalHold) throw new HttpsError('failed-precondition', 'This agreement is under legal hold.')
   if (!['active', 'awaiting_payment'].includes(agreement.status)) {
     throw new HttpsError('failed-precondition', 'Only an active or awaiting-payment agreement can be voided.')
@@ -375,7 +374,7 @@ export const voidAgreement = onCall(async (request) => {
   })
   batch.update(requestRef, { status: 'cancelled', updatedAt: now })
   writeRequestEvent(batch, requestRef, {
-    type: 'agreement_voided', actorId: uid, actorRole: isArtist ? 'artist' : 'dj',
+    type: 'agreement_voided', actorId: uid, actorRole: actingRole,
     summary: `${isArtist ? 'Artist' : 'DJ'} voided the agreement.`, agreementId,
   })
 
@@ -385,7 +384,7 @@ export const voidAgreement = onCall(async (request) => {
     type: 'agreement_voided',
     title: 'Licence agreement voided',
     body: `${isArtist ? 'The artist' : 'The DJ'} voided this licence agreement. Any download access has been revoked.`,
-    linkTo: `/agreements/${agreementId}`,
+    linkTo: `/agreements/${agreementId}?as=${isArtist ? 'dj' : 'artist'}`,
     read: false,
     createdAt: now,
   })

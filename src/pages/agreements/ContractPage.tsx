@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft, CreditCard, Download, PenLine, Printer } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { createLicencePaymentSession, getSecureDownloadUrl, subscribeAgreement } from '@/services/licenceService'
@@ -35,6 +35,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function ContractPage() {
   const { agreementId } = useParams<{ agreementId: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { firebaseUser } = useAuth()
   const [agreement, setAgreement] = useState<LicenceAgreementDoc | null | undefined>(undefined)
   const [track, setTrack] = useState<TrackDoc | null>(null)
@@ -61,9 +62,15 @@ export function ContractPage() {
   if (agreement === undefined) return <LoadingState label="Loading contract…" />
   if (agreement === null || !firebaseUser) return <EmptyState title="Contract not found" />
 
-  const isParty = agreement.artistId === firebaseUser.uid || agreement.djId === firebaseUser.uid
-  if (!isParty) return <EmptyState title="You don't have access to this contract" />
-  const isDj = agreement.djId === firebaseUser.uid
+  const belongsToArtist = agreement.artistId === firebaseUser.uid
+  const belongsToDj = agreement.djId === firebaseUser.uid
+  if (!belongsToArtist && !belongsToDj) return <EmptyState title="You don't have access to this contract" />
+  const isDualRoleAgreement = belongsToArtist && belongsToDj
+  const requestedRole = searchParams.get('as')
+  const actingRole = isDualRoleAgreement
+    ? requestedRole === 'dj' ? 'dj' : 'artist'
+    : belongsToArtist ? 'artist' : 'dj'
+  const isDj = actingRole === 'dj'
   const hasSigned = isDj ? Boolean(agreement.djAcceptedAt) : Boolean(agreement.artistAcceptedAt)
   const isSignable = ['pending', 'ready_for_signature', 'artist_signed', 'dj_signed'].includes(agreement.status)
 
@@ -74,8 +81,9 @@ export function ContractPage() {
       const origin = window.location.origin
       const { url } = await createLicencePaymentSession({
         agreementId: agreement!.agreementId,
-        successUrl: `${origin}/agreements/${agreement!.agreementId}?payment=success`,
-        cancelUrl: `${origin}/agreements/${agreement!.agreementId}?payment=cancelled`,
+        actingRole,
+        successUrl: `${origin}/agreements/${agreement!.agreementId}?as=dj&payment=success`,
+        cancelUrl: `${origin}/agreements/${agreement!.agreementId}?as=dj&payment=cancelled`,
       })
       window.location.href = url
     } catch (error) {
@@ -88,7 +96,7 @@ export function ContractPage() {
     setBusy(true)
     setActionError(null)
     try {
-      const { url } = await getSecureDownloadUrl({ agreementId: agreement!.agreementId })
+      const { url } = await getSecureDownloadUrl({ agreementId: agreement!.agreementId, actingRole })
       window.location.href = url
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Could not prepare the download.')
@@ -101,7 +109,7 @@ export function ContractPage() {
     <div className="mx-auto max-w-2xl px-4 py-8 print:px-0 print:py-0">
       <style>{`@media print { nav, header, .no-print { display: none !important; } }`}</style>
       <div className="mb-6 flex items-center justify-between no-print">
-        <Link to="/agreements" className="flex items-center gap-2 text-sm text-ink-2 hover:text-ink-0">
+        <Link to={isDj ? '/dj/requests' : '/dashboard/artist/dj-requests'} className="flex items-center gap-2 text-sm text-ink-2 hover:text-ink-0">
           <ArrowLeft className="h-4 w-4" /> My Agreements
         </Link>
         <Button size="sm" variant="secondary" onClick={() => window.print()}>
@@ -109,6 +117,17 @@ export function ContractPage() {
           Download PDF
         </Button>
       </div>
+
+      {isDualRoleAgreement ? (
+        <div className="mb-5 rounded-2xl border border-brand-400/30 bg-brand-500/[0.06] p-4 no-print">
+          <p className="text-sm font-semibold text-ink-0">Complete both sides of this contract</p>
+          <p className="mt-1 text-xs text-ink-2">Switch sides to add the artist signature, the DJ signature, then make payment as the DJ.</p>
+          <div className="mt-3 flex gap-2">
+            <Button size="sm" variant={actingRole === 'artist' ? 'primary' : 'secondary'} onClick={() => setSearchParams({ as: 'artist' })}>Artist side</Button>
+            <Button size="sm" variant={actingRole === 'dj' ? 'primary' : 'secondary'} onClick={() => setSearchParams({ as: 'dj' })}>DJ side</Button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="rounded-2xl border border-surface-border bg-surface-1 p-6 print:border-0 print:bg-transparent print:p-0 sm:p-8">
         <p className="text-xs font-semibold uppercase tracking-wide text-ink-3">DJ Licence Agreement</p>
@@ -239,6 +258,7 @@ export function ContractPage() {
           agreementVersion={agreement.agreementVersion}
           contentHash={agreement.contentHash ?? ''}
           uid={firebaseUser.uid}
+          actingRole={actingRole}
           onClose={() => setShowSignModal(false)}
           onSigned={() => setShowSignModal(false)}
         />

@@ -64,7 +64,7 @@ export function DJRequestsPage() {
     setBusyRequestId(requestId)
     setError(null)
     try {
-      await respondToLicenceRequest(requestId, 'reject')
+      await respondToLicenceRequest(requestId, 'reject', 'artist')
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not decline this request.')
     } finally {
@@ -76,7 +76,7 @@ export function DJRequestsPage() {
     setBusyRequestId(requestId)
     setError(null)
     try {
-      await acceptExistingDeal({ requestId })
+      await acceptExistingDeal({ requestId, actingRole: 'artist' })
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not accept this deal.')
     } finally {
@@ -130,13 +130,13 @@ export function DJRequestsPage() {
                         ) : null}
                       </div>
 
-                      <Link to={`/dj-requests/${request.requestId}`} className="w-fit text-xs font-medium text-brand-400 hover:text-brand-300">
+                      <Link to={`/dj-requests/${request.requestId}?as=artist`} className="w-fit text-xs font-medium text-brand-400 hover:text-brand-300">
                         View request details & activity
                       </Link>
 
                       {request.currentAgreementId ? (
                         <Link
-                          to={`/agreements/${request.currentAgreementId}`}
+                          to={`/agreements/${request.currentAgreementId}?as=artist`}
                           className="inline-flex w-fit items-center gap-2 rounded-full bg-brand-500 px-4 py-2 text-sm font-semibold text-surface-0 hover:bg-brand-400"
                         >
                           <FileSignature className="h-4 w-4" /> Review & sign contract
@@ -145,7 +145,7 @@ export function DJRequestsPage() {
                         <OfferCard
                           offerId={request.currentOfferId}
                           requestId={request.requestId}
-                          uid={firebaseUser!.uid}
+                          actingRole="artist"
                           onCounter={(offer) => setOfferModal({ requestId: request.requestId, mode: 'counter', previousOffer: offer, sourceDeal: null })}
                           onSendNew={() => setOfferModal({ requestId: request.requestId, mode: 'send', previousOffer: null, sourceDeal })}
                         />
@@ -192,6 +192,7 @@ export function DJRequestsPage() {
           mode={offerModal.mode}
           previousOffer={offerModal.previousOffer}
           sourceDeal={offerModal.sourceDeal}
+          actingRole="artist"
           onClose={() => setOfferModal(null)}
         />
       ) : null}

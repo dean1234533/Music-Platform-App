@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/common/Button'
-import { subscribeOffer, acceptOffer, rejectOffer, withdrawOffer } from '@/services/licenceService'
+import { subscribeOffer, acceptOffer, rejectOffer, withdrawOffer, type LicencePartyRole } from '@/services/licenceService'
 import { formatCurrency } from '@/utils/format'
 import type { LicenceOfferDoc } from '@/types/licence'
 
 export function OfferCard({
   offerId,
   requestId,
-  uid,
+  actingRole,
   onCounter,
   onSendNew,
 }: {
   offerId: string
   requestId: string
-  uid: string
+  actingRole: LicencePartyRole
   onCounter: (offer: LicenceOfferDoc) => void
   /** Shown only once this offer has expired and belongs to the current user — lets the artist replace it with a fresh offer. */
   onSendNew?: () => void
@@ -26,7 +26,7 @@ export function OfferCard({
 
   if (!offer) return null
 
-  const isOwnOffer = offer.createdBy === uid
+  const isOwnOffer = offer.createdByRole === actingRole
   const isExpired = offer.status === 'expired' || (offer.status === 'pending' && offer.offerExpiresAt != null && offer.offerExpiresAt.toMillis() < Date.now())
   const canAct = offer.status === 'pending' && !isOwnOffer && !isExpired
 
@@ -34,7 +34,7 @@ export function OfferCard({
     setBusy(true)
     setError(null)
     try {
-      await acceptOffer({ requestId })
+      await acceptOffer({ requestId, actingRole })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not accept this offer.')
     } finally {
@@ -45,7 +45,7 @@ export function OfferCard({
   async function handleWithdraw() {
     setBusy(true)
     try {
-      await withdrawOffer({ requestId })
+      await withdrawOffer({ requestId, actingRole })
     } finally {
       setBusy(false)
     }
@@ -55,7 +55,7 @@ export function OfferCard({
     setBusy(true)
     setError(null)
     try {
-      await rejectOffer({ requestId })
+      await rejectOffer({ requestId, actingRole })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not decline this offer.')
     } finally {

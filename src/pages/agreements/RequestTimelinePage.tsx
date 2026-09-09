@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Check, Clock, FileSignature, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import {
@@ -35,6 +35,7 @@ import type { DjDealDoc } from '@/types/deal'
 export function RequestTimelinePage() {
   const { requestId } = useParams<{ requestId: string }>()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { firebaseUser } = useAuth()
   const [licenceRequest, setLicenceRequest] = useState<LicenceRequestDoc | null | undefined>(undefined)
   const [offers, setOffers] = useState<LicenceOfferDoc[]>([])
@@ -94,15 +95,22 @@ export function RequestTimelinePage() {
   if (licenceRequest === undefined) return <LoadingState label="Loading request…" />
   if (licenceRequest === null || !firebaseUser) return <EmptyState title="Request not found" />
 
-  const isArtist = licenceRequest.artistId === firebaseUser.uid
-  const isDj = licenceRequest.djId === firebaseUser.uid
-  if (!isArtist && !isDj) return <EmptyState title="You don't have access to this request" />
+  const belongsToArtist = licenceRequest.artistId === firebaseUser.uid
+  const belongsToDj = licenceRequest.djId === firebaseUser.uid
+  if (!belongsToArtist && !belongsToDj) return <EmptyState title="You don't have access to this request" />
+  const isDualRoleRequest = belongsToArtist && belongsToDj
+  const requestedRole = searchParams.get('as')
+  const actingRole = isDualRoleRequest
+    ? requestedRole === 'dj' ? 'dj' : 'artist'
+    : belongsToArtist ? 'artist' : 'dj'
+  const isArtist = actingRole === 'artist'
+  const isDj = actingRole === 'dj'
 
   async function cancelOrReject() {
     setBusy(true)
     setActionError(null)
     try {
-      await respondToLicenceRequest(requestId!, isDj ? 'cancel' : 'reject')
+      await respondToLicenceRequest(requestId!, isDj ? 'cancel' : 'reject', actingRole)
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Could not update this request.')
     } finally {
@@ -114,7 +122,7 @@ export function RequestTimelinePage() {
     setBusy(true)
     setActionError(null)
     try {
-      await acceptExistingDeal({ requestId: requestId! })
+      await acceptExistingDeal({ requestId: requestId!, actingRole })
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Could not accept this deal.')
     } finally {
@@ -137,6 +145,17 @@ export function RequestTimelinePage() {
       <button onClick={() => navigate(-1)} className="flex w-fit items-center gap-2 text-sm text-ink-2 hover:text-ink-0">
         <ArrowLeft className="h-4 w-4" /> Back
       </button>
+
+      {isDualRoleRequest ? (
+        <div className="rounded-2xl border border-brand-400/30 bg-brand-500/[0.06] p-4">
+          <p className="text-sm font-semibold text-ink-0">Choose which side you are completing</p>
+          <p className="mt-1 text-xs text-ink-2">This test account is both the artist and the DJ. Each side must respond and sign separately.</p>
+          <div className="mt-3 flex gap-2">
+            <Button size="sm" variant={isArtist ? 'primary' : 'secondary'} onClick={() => setSearchParams({ as: 'artist' })}>Artist side</Button>
+            <Button size="sm" variant={isDj ? 'primary' : 'secondary'} onClick={() => setSearchParams({ as: 'dj' })}>DJ side</Button>
+          </div>
+        </div>
+      ) : null}
 
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-3">DJ licence request</p>
@@ -167,7 +186,7 @@ export function RequestTimelinePage() {
         <section>
           <h2 className="mb-3 text-sm font-semibold text-ink-0">Contract</h2>
           <Link
-            to={`/agreements/${licenceRequest.currentAgreementId}`}
+            to={`/agreements/${licenceRequest.currentAgreementId}?as=${actingRole}`}
             className="inline-flex w-fit items-center gap-2 rounded-full bg-brand-500 px-4 py-2 text-sm font-semibold text-surface-0 hover:bg-brand-400"
           >
             <FileSignature className="h-4 w-4" /> View & sign contract
@@ -179,7 +198,7 @@ export function RequestTimelinePage() {
           <OfferCard
             offerId={licenceRequest.currentOfferId}
             requestId={licenceRequest.requestId}
-            uid={firebaseUser.uid}
+            actingRole={actingRole}
             onCounter={(offer) => setCounterTarget(offer)}
             onSendNew={isArtist ? () => setShowSendOffer(true) : undefined}
           />
@@ -245,10 +264,10 @@ export function RequestTimelinePage() {
       ) : null}
 
       {counterTarget ? (
-        <OfferFormModal requestId={licenceRequest.requestId} mode="counter" previousOffer={counterTarget} onClose={() => setCounterTarget(null)} />
+        <OfferFormModal requestId={licenceRequest.requestId} mode="counter" previousOffer={counterTarget} actingRole={actingRole} onClose={() => setCounterTarget(null)} />
       ) : null}
       {showSendOffer ? (
-        <OfferFormModal requestId={licenceRequest.requestId} mode="send" previousOffer={null} sourceDeal={sourceDeal} onClose={() => setShowSendOffer(false)} />
+        <OfferFormModal requestId={licenceRequest.requestId} mode="send" previousOffer={null} sourceDeal={sourceDeal} actingRole={actingRole} onClose={() => setShowSendOffer(false)} />
       ) : null}
     </div>
   )
