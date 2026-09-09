@@ -120,7 +120,7 @@ export function OfferFormModal({
           <Label>Permitted use</Label>
           <Input value={terms.permittedUse} onChange={(e) => setTerms((t) => ({ ...t, permittedUse: e.target.value }))} placeholder="e.g. Non-commercial DJ sets" />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <Label>Territory</Label>
             <Input value={terms.territory} onChange={(e) => setTerms((t) => ({ ...t, territory: e.target.value }))} placeholder="e.g. Worldwide" />
@@ -130,7 +130,7 @@ export function OfferFormModal({
             <Input type="date" value={terms.startDate} onChange={(e) => setTerms((t) => ({ ...t, startDate: e.target.value }))} />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <Label>Expiry date (optional)</Label>
             <Input type="date" value={terms.expiryDate ?? ''} onChange={(e) => setTerms((t) => ({ ...t, expiryDate: e.target.value || null }))} />

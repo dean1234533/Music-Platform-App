@@ -124,7 +124,7 @@ export function RequestTimelinePage() {
 
       <section>
         <h2 className="mb-3 text-sm font-semibold text-ink-0">Original request</h2>
-        <dl className="grid grid-cols-2 gap-3 rounded-2xl border border-surface-border bg-surface-1 p-4 text-sm">
+        <dl className="grid grid-cols-1 gap-3 rounded-2xl border border-surface-border bg-surface-1 p-4 text-sm sm:grid-cols-2">
           <Field label="Intended use" value={licenceRequest.intendedUse.replaceAll('_', ' ')} />
           <Field label="Territory" value={licenceRequest.territory ?? '—'} />
           <Field label="Venue" value={licenceRequest.venue || '—'} />

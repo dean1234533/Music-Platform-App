@@ -121,7 +121,7 @@ export function DjDealsPage() {
         </div>
 
         {needsPrice ? (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <Label>{form.priceType === 'starting_from' ? 'Starting price' : 'Price'}</Label>
               <Input type="number" min={0} step="0.01" value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} />

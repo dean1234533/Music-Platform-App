@@ -334,7 +334,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <div className="mt-6">
       <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-3">{title}</h2>
-      <dl className="grid grid-cols-2 gap-3 text-sm">{children}</dl>
+      <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{children}</dl>
     </div>
   )
 }

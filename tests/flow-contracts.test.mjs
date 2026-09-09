@@ -265,6 +265,21 @@ test('an active contract past its own licence expiryDate transitions to expired 
   assert.match(index, /expireActiveContracts/)
 })
 
+test('negotiation and contract forms stack to one column on phone widths instead of squeezing two-up', () => {
+  // grid-cols-2 with no sm: prefix forces two columns even at 320-375px, which crushes an
+  // Input+currency-<select> pair (e.g. price fields) into an unusable ~140px each. Every
+  // form/field grid in the offer, deal-creation, and contract-review UI must be responsive.
+  for (const path of [
+    'src/components/licence/OfferFormModal.tsx',
+    'src/pages/artist/dashboard/DjDealsPage.tsx',
+    'src/pages/agreements/RequestTimelinePage.tsx',
+    'src/pages/agreements/ContractPage.tsx',
+  ]) {
+    const src = read(path)
+    assert.doesNotMatch(src, /className="grid grid-cols-2 gap-3"/, `${path}: a field-pair grid is not responsive`)
+  }
+})
+
 test('the contract page states the DJ receives only the listed rights, not ownership', () => {
   const contract = read('src/pages/agreements/ContractPage.tsx')
   assert.match(contract, /no ownership, resale,\s*\n\s*redistribution, remix, synchronisation, publishing, or master-recording rights/)
