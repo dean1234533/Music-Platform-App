@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft, CreditCard, Download, PenLine, Printer } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { createLicencePaymentSession, getSecureDownloadUrl, subscribeAgreement } from '@/services/licenceService'
+import { createLicencePaymentSession, getSecureDownloadUrl, getSignatureImageUrls, subscribeAgreement } from '@/services/licenceService'
 import { submitReport } from '@/services/moderationService'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { getTrack } from '@/services/trackService'
@@ -35,6 +35,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function ContractPage() {
   const { agreementId } = useParams<{ agreementId: string }>()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { firebaseUser } = useAuth()
   const [agreement, setAgreement] = useState<LicenceAgreementDoc | null | undefined>(undefined)
@@ -44,6 +45,7 @@ export function ContractPage() {
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [showReportModal, setShowReportModal] = useState(false)
+  const [signatureImages, setSignatureImages] = useState<Record<'artist' | 'dj', string | null>>({ artist: null, dj: null })
   const artist = useArtistSummary(agreement?.artistId ?? null)
 
   useEffect(() => {
@@ -55,6 +57,16 @@ export function ContractPage() {
     if (!agreement) return
     void getTrack(agreement.trackId).then(setTrack)
   }, [agreement])
+
+  useEffect(() => {
+    if (!agreementId || !(agreement?.artistAcceptedAt || agreement?.djAcceptedAt)) return
+    void getSignatureImageUrls({ agreementId }).then(({ signatures }) => {
+      setSignatureImages({
+        artist: signatures.find((s) => s.role === 'artist')?.url ?? null,
+        dj: signatures.find((s) => s.role === 'dj')?.url ?? null,
+      })
+    })
+  }, [agreementId, agreement?.artistAcceptedAt, agreement?.djAcceptedAt])
 
   if (agreement === undefined && loadError) {
     return <ErrorState title="Something went wrong" description="Couldn't load this page. Try refreshing." />
@@ -109,9 +121,14 @@ export function ContractPage() {
     <div className="mx-auto max-w-2xl px-4 py-8 print:px-0 print:py-0">
       <style>{`@media print { nav, header, .no-print { display: none !important; } }`}</style>
       <div className="mb-6 flex items-center justify-between no-print">
-        <Link to={isDj ? '/dj/requests' : '/dashboard/artist/dj-requests'} className="flex items-center gap-2 text-sm text-ink-2 hover:text-ink-0">
-          <ArrowLeft className="h-4 w-4" /> My Agreements
-        </Link>
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-ink-2 hover:text-ink-0">
+            <ArrowLeft className="h-4 w-4" /> Back
+          </button>
+          <Link to={isDj ? '/dj/requests' : '/dashboard/artist/dj-requests'} className="text-sm text-ink-2 hover:text-ink-0">
+            My Agreements
+          </Link>
+        </div>
         <Button size="sm" variant="secondary" onClick={() => window.print()}>
           <Printer className="h-4 w-4" />
           Download PDF
@@ -186,12 +203,14 @@ export function ContractPage() {
             name={agreement.artistLegalName || agreement.artistNameSnapshot || artist?.name || 'Not yet signed'}
             userId={agreement.artistId}
             signedAt={agreement.artistAcceptedAt}
+            signatureImageUrl={signatureImages.artist}
           />
           <Party
             label="DJ"
             name={agreement.djLegalName || agreement.djNameSnapshot || 'Not yet signed'}
             userId={agreement.djId}
             signedAt={agreement.djAcceptedAt}
+            signatureImageUrl={signatureImages.dj}
           />
         </div>
 
@@ -346,13 +365,32 @@ function ReportAgreementModal({ agreementId, onClose }: { agreementId: string; o
   )
 }
 
-function Party({ label, name, userId, signedAt }: { label: string; name: string; userId: string; signedAt: unknown }) {
+function Party({
+  label,
+  name,
+  userId,
+  signedAt,
+  signatureImageUrl,
+}: {
+  label: string
+  name: string
+  userId: string
+  signedAt: unknown
+  signatureImageUrl: string | null
+}) {
   return (
     <div className="rounded-xl border border-surface-border bg-surface-2 p-4">
       <p className="text-xs text-ink-3">{label}</p>
       <p className="text-sm font-medium text-ink-0">{name}</p>
       <p className="mt-1 text-xs text-ink-3">ID: {userId}</p>
       <p className="mt-1 text-xs text-ink-3">{signedAt ? 'Signed' : 'Not yet signed'}</p>
+      {signatureImageUrl ? (
+        <img
+          src={signatureImageUrl}
+          alt={`${label} signature`}
+          className="mt-2 h-14 w-full max-w-[220px] rounded-md border border-surface-border bg-white object-contain object-left p-1"
+        />
+      ) : null}
     </div>
   )
 }
