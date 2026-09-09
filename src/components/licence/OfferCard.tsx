@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/common/Button'
-import { subscribeOffer, acceptOffer, withdrawOffer, respondToLicenceRequest } from '@/services/licenceService'
+import { subscribeOffer, acceptOffer, rejectOffer, withdrawOffer } from '@/services/licenceService'
 import { formatCurrency } from '@/utils/format'
 import type { LicenceOfferDoc } from '@/types/licence'
 
@@ -29,7 +29,6 @@ export function OfferCard({
   const isOwnOffer = offer.createdBy === uid
   const isExpired = offer.status === 'expired' || (offer.status === 'pending' && offer.offerExpiresAt != null && offer.offerExpiresAt.toMillis() < Date.now())
   const canAct = offer.status === 'pending' && !isOwnOffer && !isExpired
-  const rejectingRoleAction = offer.createdByRole === 'artist' ? 'cancel' : 'reject'
 
   async function handleAccept() {
     setBusy(true)
@@ -56,9 +55,7 @@ export function OfferCard({
     setBusy(true)
     setError(null)
     try {
-      // The receiving party is whichever role did not create this offer — the artist "reject"s,
-      // the DJ "cancel"s, but both end the negotiation the same way from here.
-      await respondToLicenceRequest(requestId, rejectingRoleAction)
+      await rejectOffer({ requestId })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not decline this offer.')
     } finally {

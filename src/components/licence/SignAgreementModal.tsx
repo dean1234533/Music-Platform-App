@@ -7,11 +7,15 @@ import { signAgreement, uploadDrawnSignature } from '@/services/licenceService'
 
 export function SignAgreementModal({
   agreementId,
+  agreementVersion,
+  contentHash,
   uid,
   onClose,
   onSigned,
 }: {
   agreementId: string
+  agreementVersion: number
+  contentHash: string
   uid: string
   onClose: () => void
   onSigned: () => void
@@ -36,6 +40,8 @@ export function SignAgreementModal({
         signatureType === 'typed' ? legalName.trim() : await uploadDrawnSignature(agreementId, uid, drawnBlob!)
       await signAgreement({
         agreementId,
+        agreementVersion,
+        contentHash,
         agreedToTerms: true,
         legalName: legalName.trim(),
         signatureType,

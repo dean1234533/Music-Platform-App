@@ -5,6 +5,7 @@ import { db } from '../admin.js'
 import { requireActiveUser } from '../roles.js'
 import { writeSystemMessage } from '../messaging/messages.js'
 import { writeAgreementVersion, type AgreementTerms } from './agreements.js'
+import { writeRequestEvent } from './events.js'
 
 interface OfferTermsInput {
   priceMinor: number
@@ -108,6 +109,9 @@ export const sendOffer = onCall(async (request) => {
 
   batch.set(offerRef, buildOfferDoc(offerRef.id, requestId, licenceRequest, uid, 'artist', terms, reissueVersion, null))
   batch.update(requestRef, { status: 'offer_sent', currentOfferId: offerRef.id, updatedAt: FieldValue.serverTimestamp() })
+  writeRequestEvent(batch, requestRef, {
+    type: 'offer_sent', actorId: uid, actorRole: 'artist', summary: 'Artist sent revised terms.', offerId: offerRef.id,
+  })
   if (conversationRef) writeSystemMessage(batch, conversationRef, uid, 'offer_card', 'Artist sent an offer.', { offerId: offerRef.id })
   batch.set(db.collection('notifications').doc(), {
     userId: licenceRequest.djId,
@@ -159,6 +163,10 @@ export const counterOffer = onCall(async (request) => {
     buildOfferDoc(offerRef.id, requestId, licenceRequest, uid, isArtist ? 'artist' : 'dj', terms, previous.version + 1, null),
   )
   batch.update(requestRef, { status: 'counter_offer', currentOfferId: offerRef.id, updatedAt: FieldValue.serverTimestamp() })
+  writeRequestEvent(batch, requestRef, {
+    type: 'counter_offer', actorId: uid, actorRole: isArtist ? 'artist' : 'dj',
+    summary: `${isArtist ? 'Artist' : 'DJ'} sent a counter-offer.`, offerId: offerRef.id,
+  })
   if (conversationRef) {
     writeSystemMessage(batch, conversationRef, uid, 'offer_card', `${isArtist ? 'Artist' : 'DJ'} sent a counter-offer.`, {
       offerId: offerRef.id,
@@ -195,6 +203,9 @@ export const acceptOffer = onCall(async (request) => {
   if (!offerSnap.exists) throw new HttpsError('not-found', 'Offer not found.')
   const offer = offerSnap.data()!
   if (offer.status !== 'pending') throw new HttpsError('failed-precondition', 'This offer is no longer pending.')
+  if (offer.requestId !== requestId || offer.artistId !== licenceRequest.artistId || offer.djId !== licenceRequest.djId || offer.trackId !== licenceRequest.trackId) {
+    throw new HttpsError('failed-precondition', 'Offer and request do not match.')
+  }
   const acceptOfferExpiresAt = offer.offerExpiresAt as Timestamp | null | undefined
   if (acceptOfferExpiresAt != null && acceptOfferExpiresAt.toMillis() < Date.now()) {
     await offerRef.update({ status: 'expired' })
@@ -232,7 +243,12 @@ export const acceptOffer = onCall(async (request) => {
     : null
   const batch = db.batch()
   batch.update(offerRef, { status: 'accepted' })
-  const { agreementRef } = await writeAgreementVersion(batch, requestRef, licenceRequest, terms)
+  const { agreementRef } = await writeAgreementVersion(batch, requestRef, licenceRequest, terms, { acceptedOfferId: offerRef.id })
+  writeRequestEvent(batch, requestRef, {
+    type: 'offer_accepted', actorId: uid, actorRole: isArtist ? 'artist' : 'dj',
+    summary: `${isArtist ? 'Artist' : 'DJ'} accepted offer v${offer.version}. Contract generated.`,
+    offerId: offerRef.id, agreementId: agreementRef.id,
+  })
 
   if (conversationRef) {
     writeSystemMessage(batch, conversationRef, uid, 'offer_card', 'Offer accepted.', { offerId: offerRef.id })
@@ -253,6 +269,43 @@ export const acceptOffer = onCall(async (request) => {
 
   await batch.commit()
   return { agreementId: agreementRef.id }
+})
+
+/** Receiving party rejects the latest pending offer; history remains preserved and no contract is created. */
+export const rejectOffer = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
+  const uid = request.auth.uid
+  const { requestId, reason } = request.data ?? {}
+  const { requestRef, licenceRequest, isArtist } = await loadNegotiableRequest(requestId, uid)
+  if (!licenceRequest.currentOfferId) throw new HttpsError('failed-precondition', 'No offer to reject.')
+  const offerRef = db.collection('licenceOffers').doc(licenceRequest.currentOfferId)
+  const offerSnap = await offerRef.get()
+  if (!offerSnap.exists) throw new HttpsError('not-found', 'Offer not found.')
+  const offer = offerSnap.data()!
+  if (offer.status !== 'pending') throw new HttpsError('failed-precondition', 'This offer is no longer pending.')
+  if (offer.createdBy === uid) throw new HttpsError('failed-precondition', 'You cannot reject your own offer.')
+  const expiresAt = offer.offerExpiresAt as Timestamp | null | undefined
+  if (expiresAt && expiresAt.toMillis() < Date.now()) throw new HttpsError('failed-precondition', 'This offer has expired.')
+
+  const batch = db.batch()
+  batch.update(offerRef, {
+    status: 'rejected',
+    rejectedAt: FieldValue.serverTimestamp(),
+    rejectionReason: typeof reason === 'string' ? reason.slice(0, 500) : null,
+  })
+  batch.update(requestRef, { status: 'rejected', updatedAt: FieldValue.serverTimestamp() })
+  writeRequestEvent(batch, requestRef, {
+    type: 'offer_rejected', actorId: uid, actorRole: isArtist ? 'artist' : 'dj',
+    summary: `${isArtist ? 'Artist' : 'DJ'} rejected offer v${offer.version}.`, offerId: offerRef.id,
+  })
+  batch.set(db.collection('notifications').doc(), {
+    userId: isArtist ? licenceRequest.djId : licenceRequest.artistId,
+    type: 'offer_rejected', title: 'Offer rejected', body: 'The latest DJ licence offer was rejected.',
+    linkTo: `/dj-requests/${requestId}`, read: false, createdAt: FieldValue.serverTimestamp(),
+  })
+  await batch.commit()
+  return { ok: true }
 })
 
 /** The offer's own creator can withdraw it while still pending. */
@@ -278,6 +331,10 @@ export const withdrawOffer = onCall(async (request) => {
   const batch = db.batch()
   batch.update(offerRef, { status: 'withdrawn' })
   batch.update(requestRef, { status: 'negotiating', currentOfferId: FieldValue.delete(), updatedAt: FieldValue.serverTimestamp() })
+  writeRequestEvent(batch, requestRef, {
+    type: 'offer_withdrawn', actorId: uid, actorRole: offer.createdByRole,
+    summary: `${offer.createdByRole === 'artist' ? 'Artist' : 'DJ'} withdrew the offer.`, offerId: offerRef.id,
+  })
   if (conversationRef) writeSystemMessage(batch, conversationRef, uid, 'system', 'The offer was withdrawn.', { offerId: offerRef.id })
 
   await batch.commit()

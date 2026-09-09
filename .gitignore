@@ -12,6 +12,7 @@ dist
 dist-ssr
 functions/lib
 *.local
+*.tsbuildinfo
 
 # Firebase
 .firebase/

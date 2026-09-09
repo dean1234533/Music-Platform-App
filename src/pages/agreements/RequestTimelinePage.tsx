@@ -3,10 +3,12 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Check, Clock, FileSignature, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import {
+  acceptExistingDeal,
   respondToLicenceRequest,
   subscribeAgreement,
   subscribeLicenceRequest,
   subscribeOffersForRequest,
+  subscribeRequestEvents,
 } from '@/services/licenceService'
 import { getUserProfile } from '@/services/userService'
 import { getTrack } from '@/services/trackService'
@@ -17,7 +19,7 @@ import { Button } from '@/components/common/Button'
 import { OfferCard } from '@/components/licence/OfferCard'
 import { OfferFormModal } from '@/components/licence/OfferFormModal'
 import { formatCurrency } from '@/utils/format'
-import type { LicenceAgreementDoc, LicenceOfferDoc, LicenceRequestDoc } from '@/types/licence'
+import type { LicenceAgreementDoc, LicenceOfferDoc, LicenceRequestDoc, LicenceRequestEventDoc } from '@/types/licence'
 import type { TrackDoc } from '@/types/track'
 import type { DjDealDoc } from '@/types/deal'
 
@@ -36,6 +38,7 @@ export function RequestTimelinePage() {
   const { firebaseUser } = useAuth()
   const [licenceRequest, setLicenceRequest] = useState<LicenceRequestDoc | null | undefined>(undefined)
   const [offers, setOffers] = useState<LicenceOfferDoc[]>([])
+  const [requestEvents, setRequestEvents] = useState<LicenceRequestEventDoc[]>([])
   const [agreement, setAgreement] = useState<LicenceAgreementDoc | null>(null)
   const [track, setTrack] = useState<TrackDoc | null>(null)
   const [djName, setDjName] = useState<string>('DJ')
@@ -57,6 +60,11 @@ export function RequestTimelinePage() {
     if (!requestId || !firebaseUser) return
     return subscribeOffersForRequest(requestId, firebaseUser.uid, setOffers)
   }, [requestId, firebaseUser])
+
+  useEffect(() => {
+    if (!requestId) return
+    return subscribeRequestEvents(requestId, setRequestEvents)
+  }, [requestId])
 
   useEffect(() => {
     if (!licenceRequest?.currentAgreementId) {
@@ -102,7 +110,27 @@ export function RequestTimelinePage() {
     }
   }
 
-  const events = buildTimelineEvents(licenceRequest, offers, agreement, track?.title ?? 'this track', djName, artist?.name ?? 'the artist')
+  async function acceptSelectedDeal() {
+    setBusy(true)
+    setActionError(null)
+    try {
+      await acceptExistingDeal({ requestId: requestId! })
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not accept this deal.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const events = requestEvents.map((event) => ({
+    label: event.summary,
+    date: formatEventDate(event.createdAt),
+    icon: event.type.includes('rejected') || event.type.includes('cancelled') || event.type.includes('voided')
+      ? <X className="h-3.5 w-3.5" />
+      : event.type.includes('submitted') || event.type.includes('offer')
+        ? <Clock className="h-3.5 w-3.5" />
+        : <Check className="h-3.5 w-3.5" />,
+  }))
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-8">
@@ -118,7 +146,7 @@ export function RequestTimelinePage() {
         </p>
       </div>
 
-      <NextActionBanner licenceRequest={licenceRequest} agreement={agreement} isArtist={isArtist} />
+      <NextActionBanner licenceRequest={licenceRequest} agreement={agreement} currentOffer={offers.at(-1) ?? null} isArtist={isArtist} />
 
       {actionError ? <p className="rounded-xl border border-danger-500/25 bg-danger-500/5 px-4 py-3 text-sm text-danger-500">{actionError}</p> : null}
 
@@ -131,6 +159,7 @@ export function RequestTimelinePage() {
           <Field label="Event date" value={licenceRequest.expectedDate || '—'} />
           <Field label="Recording requested" value={licenceRequest.recordingIntention ? 'Yes' : 'No'} />
           <Field label="Streaming requested" value={licenceRequest.streamingIntention ? 'Yes' : 'No'} />
+          <Field label="Selected deal" value={licenceRequest.selectedDealSnapshot?.name ?? sourceDeal?.name ?? 'Custom terms'} />
         </dl>
       </section>
 
@@ -156,9 +185,14 @@ export function RequestTimelinePage() {
           />
         </section>
       ) : isArtist ? (
-        <section>
-          <Button size="sm" onClick={() => setShowSendOffer(true)}>
-            Send terms
+        <section className="flex flex-wrap gap-2">
+          {licenceRequest.status === 'submitted' && ['free', 'fixed'].includes(licenceRequest.selectedDealSnapshot?.priceType ?? sourceDeal?.priceType ?? '') ? (
+            <Button size="sm" loading={busy} onClick={() => void acceptSelectedDeal()}>
+              Accept existing deal
+            </Button>
+          ) : null}
+          <Button size="sm" variant="secondary" onClick={() => setShowSendOffer(true)}>
+            {licenceRequest.dealId ? 'Send revised offer' : 'Send terms'}
           </Button>
         </section>
       ) : null}
@@ -188,8 +222,8 @@ export function RequestTimelinePage() {
       <section>
         <h2 className="mb-3 text-sm font-semibold text-ink-0">Activity timeline</h2>
         <ol className="flex flex-col gap-3">
-          {events.map((event, i) => (
-            <li key={i} className="flex items-start gap-3 text-sm">
+          {events.length === 0 ? <li className="text-sm text-ink-2">Activity will appear here as the request progresses.</li> : events.map((event, i) => (
+            <li key={requestEvents[i]?.eventId ?? i} className="flex items-start gap-3 text-sm">
               <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-3 text-ink-2">
                 {event.icon}
               </span>
@@ -233,10 +267,12 @@ function Field({ label, value }: { label: string; value: string }) {
 function NextActionBanner({
   licenceRequest,
   agreement,
+  currentOffer,
   isArtist,
 }: {
   licenceRequest: LicenceRequestDoc
   agreement: LicenceAgreementDoc | null
+  currentOffer: LicenceOfferDoc | null
   isArtist: boolean
 }) {
   let message: string | null = null
@@ -244,10 +280,11 @@ function NextActionBanner({
 
   if (agreement) {
     const hasSigned = isArtist ? Boolean(agreement.artistAcceptedAt) : Boolean(agreement.djAcceptedAt)
-    if (agreement.status === 'pending' && !hasSigned) {
+    const signable = ['pending', 'ready_for_signature', 'artist_signed', 'dj_signed'].includes(agreement.status)
+    if (signable && !hasSigned) {
       message = 'Your action required — sign the agreement.'
       urgent = true
-    } else if (agreement.status === 'pending') {
+    } else if (signable) {
       message = `Waiting for the ${isArtist ? 'DJ' : 'artist'} to sign.`
     } else if (agreement.status === 'awaiting_payment' && !isArtist) {
       message = `Payment required — pay ${formatCurrency(agreement.licenceFeeMinor, agreement.currency)} to activate the licence.`
@@ -263,16 +300,12 @@ function NextActionBanner({
     message = isArtist ? 'Your action required — review this request and send terms.' : 'Waiting for the artist to review your request.'
     urgent = isArtist
   } else if (['offer_sent', 'counter_offer'].includes(licenceRequest.status)) {
-    const lastOfferByArtist = licenceRequest.status === 'offer_sent'
-    // offer_sent means the artist just sent one (DJ's turn); counter_offer means whoever last countered is waiting on the other.
-    message = isArtist
-      ? lastOfferByArtist
-        ? 'Waiting for the DJ to respond to your offer.'
-        : 'Your action required — respond to the DJ’s counter-offer.'
-      : lastOfferByArtist
-        ? 'Your action required — respond to the artist’s offer.'
-        : 'Waiting for the artist to respond to your counter-offer.'
-    urgent = (isArtist && !lastOfferByArtist) || (!isArtist && lastOfferByArtist)
+    const lastOfferByArtist = currentOffer?.createdByRole === 'artist'
+    const myTurn = isArtist ? !lastOfferByArtist : lastOfferByArtist
+    message = myTurn
+      ? `Your action required — respond to the ${isArtist ? 'DJ’s' : 'artist’s'} offer.`
+      : `Waiting for the ${isArtist ? 'DJ' : 'artist'} to respond to your offer.`
+    urgent = myTurn
   } else if (licenceRequest.status === 'rejected') {
     message = 'This request was rejected.'
   } else if (licenceRequest.status === 'cancelled') {
@@ -290,72 +323,8 @@ function NextActionBanner({
   )
 }
 
-interface TimelineEvent {
-  label: string
-  date: string
-  icon: React.ReactNode
-}
-
 function formatEventDate(value: unknown): string {
   const ts = value as { toDate?: () => Date } | null
   if (!ts?.toDate) return ''
   return ts.toDate().toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-}
-
-/** Builds the read-only activity feed purely from real backend records — the request doc, offers, and agreement. Nothing here is user-editable. */
-function buildTimelineEvents(
-  req: LicenceRequestDoc,
-  offers: LicenceOfferDoc[],
-  agreement: LicenceAgreementDoc | null,
-  trackTitle: string,
-  djName: string,
-  artistName: string,
-): TimelineEvent[] {
-  const events: TimelineEvent[] = [
-    {
-      label: req.dealId ? `${djName} accepted an artist deal for "${trackTitle}"` : `${djName} requested access to "${trackTitle}"`,
-      date: formatEventDate(req.createdAt),
-      icon: <Clock className="h-3.5 w-3.5" />,
-    },
-  ]
-
-  for (const offer of offers) {
-    const who = offer.createdByRole === 'artist' ? artistName : djName
-    const verb = offer.version === 1 ? 'sent an offer' : 'sent a counter-offer'
-    events.push({
-      label: `${who} ${verb}: ${offer.priceMinor > 0 ? formatCurrency(offer.priceMinor, offer.currency) : 'Free'}`,
-      date: formatEventDate(offer.createdAt),
-      icon: <FileSignature className="h-3.5 w-3.5" />,
-    })
-    if (offer.status === 'accepted') {
-      events.push({ label: `Offer v${offer.version} accepted — contract generated`, date: formatEventDate(offer.createdAt), icon: <Check className="h-3.5 w-3.5" /> })
-    }
-    if (offer.status === 'withdrawn') {
-      events.push({ label: `Offer v${offer.version} withdrawn`, date: '', icon: <X className="h-3.5 w-3.5" /> })
-    }
-  }
-
-  if (agreement) {
-    if (agreement.artistAcceptedAt) {
-      events.push({ label: 'Artist signed the agreement', date: formatEventDate(agreement.artistAcceptedAt), icon: <Check className="h-3.5 w-3.5" /> })
-    }
-    if (agreement.djAcceptedAt) {
-      events.push({ label: 'DJ signed the agreement', date: formatEventDate(agreement.djAcceptedAt), icon: <Check className="h-3.5 w-3.5" /> })
-    }
-    if (agreement.paidAt) {
-      events.push({ label: 'Payment completed', date: formatEventDate(agreement.paidAt), icon: <Check className="h-3.5 w-3.5" /> })
-    }
-    if (agreement.status === 'active') {
-      events.push({ label: 'Licence activated — track unlocked', date: formatEventDate(agreement.finalisedAt), icon: <Check className="h-3.5 w-3.5" /> })
-    }
-    if (agreement.status === 'void') {
-      events.push({ label: 'Agreement voided', date: '', icon: <X className="h-3.5 w-3.5" /> })
-    }
-  }
-
-  if (req.status === 'rejected') events.push({ label: 'Request rejected', date: formatEventDate(req.updatedAt), icon: <X className="h-3.5 w-3.5" /> })
-  if (req.status === 'cancelled') events.push({ label: 'Request cancelled', date: formatEventDate(req.updatedAt), icon: <X className="h-3.5 w-3.5" /> })
-  if (req.status === 'expired') events.push({ label: 'Request expired', date: formatEventDate(req.updatedAt), icon: <X className="h-3.5 w-3.5" /> })
-
-  return events
 }

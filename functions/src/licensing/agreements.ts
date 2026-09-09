@@ -5,6 +5,7 @@ import type { WriteBatch, DocumentReference, DocumentData } from 'firebase-admin
 import { db } from '../admin.js'
 import { requireActiveUser } from '../roles.js'
 import { writeSystemMessage } from '../messaging/messages.js'
+import { writeRequestEvent } from './events.js'
 
 /** Deterministic fingerprint of the agreed terms — a signature records the exact contentHash it was given for, so any (impossible, since writes are server-only) tampering after signing would be independently detectable. */
 export function computeContentHash(terms: AgreementTerms): string {
@@ -49,49 +50,44 @@ export async function writeAgreementVersion(
   requestRef: DocumentReference,
   licenceRequest: DocumentData,
   terms: AgreementTerms,
+  source: { acceptedOfferId?: string | null; sourceDealId?: string | null } = {},
 ): Promise<{ agreementRef: DocumentReference; version: number; editedInPlace: boolean }> {
   let version = 1
   let previousRef: DocumentReference | null = null
-  let editInPlaceRef: DocumentReference | null = null
 
   if (licenceRequest.currentAgreementId) {
     previousRef = db.collection('licenceAgreements').doc(licenceRequest.currentAgreementId)
     const previousSnap = await previousRef.get()
     if (previousSnap.exists) {
       const previous = previousSnap.data()!
-      if (!previous.artistAcceptedAt && !previous.djAcceptedAt) {
-        editInPlaceRef = previousRef
-        version = previous.agreementVersion
-      } else {
-        version = previous.agreementVersion + 1
-      }
+      version = previous.agreementVersion + 1
     }
   }
 
   const contentHash = computeContentHash(terms)
 
-  if (editInPlaceRef) {
-    batch.update(editInPlaceRef, { ...terms, contentHash, updatedAt: FieldValue.serverTimestamp() })
-    batch.update(requestRef, { status: 'agreement_ready', currentAgreementId: editInPlaceRef.id, updatedAt: FieldValue.serverTimestamp() })
-    return { agreementRef: editInPlaceRef, version, editedInPlace: true }
-  }
-
   const agreementRef = db.collection('licenceAgreements').doc()
   if (previousRef) {
-    batch.update(previousRef, { status: 'superseded', updatedAt: FieldValue.serverTimestamp() })
+    batch.update(previousRef, { status: 'void', downloadRevoked: true, updatedAt: FieldValue.serverTimestamp() })
   }
 
   batch.set(agreementRef, {
     agreementId: agreementRef.id,
+    requestId: requestRef.id,
     licenceRequestId: requestRef.id,
     artistId: licenceRequest.artistId,
     djId: licenceRequest.djId,
     trackId: licenceRequest.trackId,
     trackVersion: 1,
+    acceptedOfferId: source.acceptedOfferId ?? null,
+    sourceDealId: source.sourceDealId ?? null,
+    trackTitleSnapshot: licenceRequest.trackTitleSnapshot ?? 'Track',
+    artistNameSnapshot: licenceRequest.artistNameSnapshot ?? 'Artist',
+    djNameSnapshot: licenceRequest.djNameSnapshot ?? 'DJ',
     ...terms,
     contentHash,
     agreementVersion: version,
-    status: 'pending',
+    status: 'ready_for_signature',
     artistAcceptedAt: null,
     djAcceptedAt: null,
     artistLegalName: null,
@@ -113,79 +109,11 @@ export async function writeAgreementVersion(
   return { agreementRef, version, editedInPlace: false }
 }
 
-interface ProposeAgreementInput {
-  requestId: string
-  permittedUse: string
-  territory: string
-  startDate: string
-  expiryDate: string | null
-  licenceFeeMinor: number
-  currency: string
-  attributionRequirements: string
-  recordingPermission: boolean
-  streamingPermission: boolean
-  commercialUse: boolean
-  redistributionAllowed: boolean
-  resaleAllowed: boolean
-  additionalTerms: string
-}
-
-/**
- * Legacy freeform "artist edits terms directly" path — kept working but no
- * longer surfaced in the UI, which now goes through the offer/counter-offer
- * flow (sendOffer/counterOffer/acceptOffer in offers.ts) that funnels into
- * the same writeAgreementVersion() helper above.
- */
+/** Retired callable retained only to give older clients a safe, explicit error. */
 export const proposeAgreement = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   await requireActiveUser(request.auth.uid)
-  const input = request.data as ProposeAgreementInput
-  if (!input?.requestId) throw new HttpsError('invalid-argument', 'requestId is required.')
-
-  const requestRef = db.collection('licenceRequests').doc(input.requestId)
-  const requestSnap = await requestRef.get()
-  if (!requestSnap.exists) throw new HttpsError('not-found', 'Licence request not found.')
-  const licenceRequest = requestSnap.data()!
-
-  if (licenceRequest.artistId !== request.auth.uid) {
-    throw new HttpsError('permission-denied', 'Only the artist can propose licence terms.')
-  }
-  if (['approved', 'rejected', 'cancelled', 'expired'].includes(licenceRequest.status)) {
-    throw new HttpsError('failed-precondition', 'This request is already finalised.')
-  }
-
-  const batch = db.batch()
-  const { agreementRef, version } = await writeAgreementVersion(batch, requestRef, licenceRequest, {
-    permittedUse: input.permittedUse,
-    territory: input.territory,
-    startDate: input.startDate,
-    expiryDate: input.expiryDate,
-    licenceFeeMinor: input.licenceFeeMinor,
-    currency: input.currency,
-    attributionRequirements: input.attributionRequirements,
-    recordingPermission: input.recordingPermission,
-    streamingPermission: input.streamingPermission,
-    promotionalMixPermission: false,
-    commercialUse: input.commercialUse,
-    redistributionAllowed: input.redistributionAllowed,
-    resaleAllowed: input.resaleAllowed,
-    remixAllowed: false,
-    additionalTerms: input.additionalTerms,
-    rightsHolderDeclaration: true,
-  })
-
-  batch.set(db.collection('notifications').doc(), {
-    userId: licenceRequest.djId,
-    type: 'agreement_ready',
-    title: 'Licence agreement ready',
-    body: 'The artist sent you licence terms to review.',
-    linkTo: '/dj/requests',
-    read: false,
-    createdAt: FieldValue.serverTimestamp(),
-  })
-
-  await batch.commit()
-  return { agreementId: agreementRef.id, agreementVersion: version }
+  throw new HttpsError('failed-precondition', 'Use the structured offer and counter-offer flow to create an agreement.')
 })
 
 /**
@@ -198,7 +126,7 @@ export const signAgreement = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
-  const { agreementId, agreedToTerms, legalName, signatureType, signatureReference, authorityConfirmed } = request.data ?? {}
+  const { agreementId, agreementVersion, contentHash, agreedToTerms, legalName, signatureType, signatureReference, authorityConfirmed } = request.data ?? {}
   if (!agreementId || typeof agreementId !== 'string') throw new HttpsError('invalid-argument', 'agreementId is required.')
   if (agreedToTerms !== true) throw new HttpsError('invalid-argument', 'You must confirm you agree to the terms.')
   if (!legalName || typeof legalName !== 'string' || !legalName.trim()) {
@@ -219,8 +147,11 @@ export const signAgreement = onCall(async (request) => {
   if (!snap.exists) throw new HttpsError('not-found', 'Agreement not found.')
   const agreement = snap.data()!
 
-  if (agreement.status !== 'pending') {
+  if (!['pending', 'ready_for_signature', 'artist_signed', 'dj_signed'].includes(agreement.status)) {
     throw new HttpsError('failed-precondition', 'This agreement is no longer awaiting signatures.')
+  }
+  if (agreementVersion !== agreement.agreementVersion || contentHash !== agreement.contentHash) {
+    throw new HttpsError('failed-precondition', 'The agreement changed before signing. Reload and review the current version.')
   }
 
   // Integrity check: recompute the content hash from the agreement's current
@@ -267,9 +198,9 @@ export const signAgreement = onCall(async (request) => {
   const conversationRef = conversationId ? db.collection('conversations').doc(conversationId) : null
 
   const now = FieldValue.serverTimestamp()
-  const acceptanceLogRef = db.collection('licenceAgreementAcceptances').doc()
+  const acceptanceLogRef = db.collection('licenceAgreementAcceptances').doc(`${agreementId}_${uid}`)
 
-  const update: Record<string, unknown> = { updatedAt: now }
+  const update: Record<string, unknown> = { updatedAt: now, status: isArtist ? 'artist_signed' : 'dj_signed' }
   if (isArtist) {
     update.artistAcceptedAt = now
     update.artistLegalName = legalName.trim()
@@ -285,22 +216,34 @@ export const signAgreement = onCall(async (request) => {
 
   const batch = db.batch()
   batch.update(agreementRef, update)
-  batch.set(acceptanceLogRef, {
+  batch.create(acceptanceLogRef, {
     acceptanceId: acceptanceLogRef.id,
+    signatureId: acceptanceLogRef.id,
     agreementId,
     userId: uid,
+    signerUserId: uid,
     role: isArtist ? 'artist' : 'dj',
+    signerRole: isArtist ? 'artist' : 'dj',
     legalName: legalName.trim(),
     signatureType,
     signatureReference,
     authorityConfirmed: true,
     agreementVersion: agreement.agreementVersion,
     agreementContentHash: agreement.contentHash ?? null,
+    contentHash: agreement.contentHash ?? null,
     // Best-effort — v2 onCall exposes rawRequest, but it may be absent in
     // some execution contexts (e.g. the emulator); never fail signing over it.
     ipAddress: request.rawRequest?.ip ?? null,
     userAgent: request.rawRequest?.get?.('user-agent') ?? null,
     acceptedAt: now,
+    signedAt: now,
+  })
+  writeRequestEvent(batch, requestRef, {
+    type: isArtist ? 'artist_signed' : 'dj_signed',
+    actorId: uid,
+    actorRole: isArtist ? 'artist' : 'dj',
+    summary: `${isArtist ? 'Artist' : 'DJ'} signed the agreement.`,
+    agreementId,
   })
 
   if (conversationRef) {
@@ -315,6 +258,13 @@ export const signAgreement = onCall(async (request) => {
     batch.update(requestRef, {
       status: requiresPayment ? 'awaiting_payment' : 'approved',
       updatedAt: now,
+    })
+    writeRequestEvent(batch, requestRef, {
+      type: requiresPayment ? 'payment_required' : 'licence_active',
+      actorId: null,
+      actorRole: 'system',
+      summary: requiresPayment ? 'Both parties signed. Payment is required.' : 'Both parties signed. The licence is active.',
+      agreementId,
     })
     if (requiresPayment) {
       // Payment is always the DJ's action, regardless of which party's signature just completed
@@ -424,6 +374,10 @@ export const voidAgreement = onCall(async (request) => {
     voidReason: typeof reason === 'string' ? reason.slice(0, 500) : null,
   })
   batch.update(requestRef, { status: 'cancelled', updatedAt: now })
+  writeRequestEvent(batch, requestRef, {
+    type: 'agreement_voided', actorId: uid, actorRole: isArtist ? 'artist' : 'dj',
+    summary: `${isArtist ? 'Artist' : 'DJ'} voided the agreement.`, agreementId,
+  })
 
   const notifyId = isArtist ? agreement.djId : agreement.artistId
   batch.set(db.collection('notifications').doc(), {

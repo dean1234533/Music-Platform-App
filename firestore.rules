@@ -405,6 +405,15 @@ service cloud.firestore {
     match /licenceRequests/{docId} {
       allow read: if isSignedIn() && (resource.data.djId == request.auth.uid || resource.data.artistId == request.auth.uid || isAdmin());
       allow write: if false;
+
+      match /events/{eventId} {
+        allow read: if isSignedIn() && (
+          get(/databases/$(database)/documents/licenceRequests/$(docId)).data.djId == request.auth.uid ||
+          get(/databases/$(database)/documents/licenceRequests/$(docId)).data.artistId == request.auth.uid ||
+          isAdmin()
+        );
+        allow write: if false;
+      }
     }
     match /licenceAgreements/{docId} {
       allow read: if isSignedIn() && (resource.data.djId == request.auth.uid || resource.data.artistId == request.auth.uid || isAdmin());

@@ -15,6 +15,7 @@ export type LicenceRequestStatus =
   | 'negotiating'
   | 'offer_sent'
   | 'counter_offer'
+  | 'accepted'
   | 'agreement_ready'
   | 'awaiting_signatures'
   | 'awaiting_payment'
@@ -37,6 +38,28 @@ export interface LicenceRequestDoc {
   message: string
   /** Set when the DJ requested a specific artist-created deal rather than a fully custom negotiation. */
   dealId?: string | null
+  trackTitleSnapshot?: string
+  artistNameSnapshot?: string
+  djNameSnapshot?: string
+  selectedDealSnapshot?: {
+    dealId?: string | null
+    name: string
+    description: string
+    priceType: 'free' | 'fixed' | 'starting_from' | 'negotiable' | 'custom_quote'
+    priceMinor: number
+    currency: string
+    permittedUse: string
+    territory: string
+    durationDays: number | null
+    recordingPermission: boolean
+    streamingPermission: boolean
+    promotionalMixPermission: boolean
+    remixPermission: boolean
+    redistributionPermission: boolean
+    resalePermission: boolean
+    attributionRequirements: string
+    additionalTerms: string
+  } | null
   requestedStartDate?: string | null
   requestedEndDate?: string | null
   recordingIntention?: boolean
@@ -95,6 +118,10 @@ export interface DownloadLogDoc {
 
 export type AgreementStatus =
   | 'pending'
+  | 'ready_for_signature'
+  | 'artist_signed'
+  | 'dj_signed'
+  | 'fully_signed'
   | 'awaiting_payment'
   | 'active'
   | 'expired'
@@ -104,11 +131,17 @@ export type AgreementStatus =
 
 export interface LicenceAgreementDoc {
   agreementId: string
+  requestId?: string
   licenceRequestId: string
   artistId: string
   djId: string
   trackId: string
   trackVersion: number
+  acceptedOfferId?: string | null
+  sourceDealId?: string | null
+  trackTitleSnapshot?: string
+  artistNameSnapshot?: string
+  djNameSnapshot?: string
   permittedUse: string
   territory: string
   startDate: string
@@ -143,6 +176,18 @@ export interface LicenceAgreementDoc {
   legalHold?: boolean
   createdAt: Timestamp | null
   finalisedAt: Timestamp | null
+}
+
+export interface LicenceRequestEventDoc {
+  eventId: string
+  requestId: string
+  type: string
+  actorId: string | null
+  actorRole: 'artist' | 'dj' | 'system'
+  summary: string
+  agreementId?: string | null
+  offerId?: string | null
+  createdAt: Timestamp | null
 }
 
 export interface LicenceAgreementAcceptanceDoc {

@@ -11,7 +11,7 @@ import type { AgreementStatus, LicenceAgreementDoc } from '@/types/licence'
 
 /** One tab can span several raw statuses — e.g. "Void / Cancelled" covers both terminal non-fulfilment states. */
 const TABS: { label: string; statuses: AgreementStatus[] }[] = [
-  { label: 'Awaiting Signature', statuses: ['pending'] },
+  { label: 'Awaiting Signature', statuses: ['pending', 'ready_for_signature', 'artist_signed', 'dj_signed', 'fully_signed'] },
   { label: 'Awaiting Payment', statuses: ['awaiting_payment'] },
   { label: 'Active', statuses: ['active'] },
   { label: 'Expired', statuses: ['expired'] },
@@ -114,7 +114,7 @@ export function MyAgreementsPage() {
                 const bothSigned = Boolean(agreement.artistAcceptedAt && agreement.djAcceptedAt)
                 const thisPartyHasSigned = isDj ? Boolean(agreement.djAcceptedAt) : Boolean(agreement.artistAcceptedAt)
                 let actionLabel = 'View agreement'
-                if (agreement.status === 'pending' && !thisPartyHasSigned) actionLabel = 'Sign agreement'
+                if (['pending', 'ready_for_signature', 'artist_signed', 'dj_signed'].includes(agreement.status) && !thisPartyHasSigned) actionLabel = 'Sign agreement'
                 else if (agreement.status === 'awaiting_payment' && isDj) actionLabel = 'Pay licence fee'
                 else if (agreement.status === 'active') actionLabel = isDj ? 'View & download track' : 'View agreement'
 

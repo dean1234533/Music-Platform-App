@@ -2,7 +2,7 @@ import { and, collection, doc, getDocs, onSnapshot, or, orderBy, query, where } 
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { db, storage } from '@/lib/firebase'
 import { callable } from '@/lib/callable'
-import type { DownloadLogDoc, IntendedUse, LicenceAgreementDoc, LicenceOfferDoc, LicenceRequestDoc } from '@/types/licence'
+import type { DownloadLogDoc, IntendedUse, LicenceAgreementDoc, LicenceOfferDoc, LicenceRequestDoc, LicenceRequestEventDoc } from '@/types/licence'
 
 export interface SubmitLicenceRequestInput {
   trackId: string
@@ -122,6 +122,8 @@ export const proposeAgreement = callable<ProposeAgreementInput, { agreementId: s
 
 export interface SignAgreementInput {
   agreementId: string
+  agreementVersion: number
+  contentHash: string
   agreedToTerms: boolean
   legalName: string
   signatureType: 'typed' | 'drawn'
@@ -155,6 +157,8 @@ export interface OfferTermsInput {
 export const sendOffer = callable<{ requestId: string } & OfferTermsInput, { offerId: string }>('sendOffer')
 export const counterOffer = callable<{ requestId: string } & OfferTermsInput, { offerId: string }>('counterOffer')
 export const acceptOffer = callable<{ requestId: string }, { agreementId: string }>('acceptOffer')
+export const acceptExistingDeal = callable<{ requestId: string }, { agreementId: string }>('acceptExistingDeal')
+export const rejectOffer = callable<{ requestId: string; reason?: string }, { ok: boolean }>('rejectOffer')
 export const withdrawOffer = callable<{ requestId: string }, { ok: boolean }>('withdrawOffer')
 
 /** Uploaded before calling signAgreement, matching copyrightEvidence's upload-then-reference ordering. */
@@ -189,6 +193,22 @@ export function subscribeOffersForRequest(
     (snap) => onChange(snap.docs.map((d) => d.data() as LicenceOfferDoc)),
     (error) => {
       console.error('[subscribeOffersForRequest] listener error:', error)
+      onError?.(error)
+    },
+  )
+}
+
+export function subscribeRequestEvents(
+  requestId: string,
+  onChange: (events: LicenceRequestEventDoc[]) => void,
+  onError?: (error: Error) => void,
+) {
+  const q = query(collection(db, 'licenceRequests', requestId, 'events'), orderBy('createdAt', 'asc'))
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map((d) => d.data() as LicenceRequestEventDoc)),
+    (error) => {
+      console.error('[subscribeRequestEvents] listener error:', error)
       onError?.(error)
     },
   )

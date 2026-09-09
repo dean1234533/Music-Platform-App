@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FileSignature, SlidersHorizontal } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { respondToLicenceRequest, subscribeRequestsForArtist } from '@/services/licenceService'
+import { acceptExistingDeal, respondToLicenceRequest, subscribeRequestsForArtist } from '@/services/licenceService'
 import { getTrack } from '@/services/trackService'
 import { getDealsByIds } from '@/services/dealService'
 import { Button } from '@/components/common/Button'
@@ -72,6 +72,18 @@ export function DJRequestsPage() {
     }
   }
 
+  async function acceptPublishedDeal(requestId: string) {
+    setBusyRequestId(requestId)
+    setError(null)
+    try {
+      await acceptExistingDeal({ requestId })
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not accept this deal.')
+    } finally {
+      setBusyRequestId(null)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -97,6 +109,8 @@ export function DJRequestsPage() {
                 <div className="grid gap-3 lg:grid-cols-2">
                   {items.map((request) => {
                     const sourceDeal = request.dealId ? (deals[request.dealId] ?? null) : null
+                    const selectedPriceType = request.selectedDealSnapshot?.priceType ?? sourceDeal?.priceType
+                    const canAcceptPublishedDeal = request.status === 'submitted' && Boolean(request.dealId) && ['free', 'fixed'].includes(selectedPriceType ?? '')
                     return (
                     <article key={request.requestId} className="flex flex-col gap-4 rounded-2xl border border-surface-border bg-surface-1 p-4">
                       <div className="flex items-start justify-between gap-4">
@@ -137,11 +151,16 @@ export function DJRequestsPage() {
                         />
                       ) : request.status === 'submitted' ? (
                         <div className="flex flex-wrap gap-2">
+                          {canAcceptPublishedDeal ? (
+                            <Button size="sm" loading={busyRequestId === request.requestId} onClick={() => void acceptPublishedDeal(request.requestId)}>
+                              Accept existing deal
+                            </Button>
+                          ) : null}
                           <Button
                             size="sm"
                             onClick={() => setOfferModal({ requestId: request.requestId, mode: 'send', previousOffer: null, sourceDeal })}
                           >
-                            <SlidersHorizontal className="h-4 w-4" /> {sourceDeal ? 'Set final terms' : 'Approve & set contract terms'}
+                            <SlidersHorizontal className="h-4 w-4" /> {sourceDeal ? 'Send revised offer' : 'Approve & set contract terms'}
                           </Button>
                           <Button
                             size="sm"

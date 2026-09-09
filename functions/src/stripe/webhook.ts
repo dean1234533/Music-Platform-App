@@ -7,6 +7,7 @@ import { getPlatformSettings } from '../platformSettings.js'
 import { getStripe, stripeSecretKey, stripeWebhookSecret } from './client.js'
 import { mapSubscriptionStatus } from '../entitlements.js'
 import { writeSystemMessage } from '../messaging/messages.js'
+import { writeRequestEvent } from '../licensing/events.js'
 
 const SUPPORTED_SUBSCRIPTION_ROLES = new Set(['fan', 'artist'])
 
@@ -337,6 +338,13 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       revenueBasis: 'net_after_tax_and_processing',
     })
     tx.update(requestRef, { status: 'approved', updatedAt: FieldValue.serverTimestamp() })
+    writeRequestEvent(tx, requestRef, {
+      type: 'payment_completed',
+      actorId: null,
+      actorRole: 'system',
+      summary: 'Payment completed. The licence is active and the track is ready to download.',
+      agreementId,
+    })
     if (conversationRef) {
       writeSystemMessage(tx, conversationRef, agreement.djId, 'payment_status', 'Payment completed — track access unlocked.', {
         agreementId,

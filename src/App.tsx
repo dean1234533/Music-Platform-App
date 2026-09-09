@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Navigate, Routes, Route, useParams } from 'react-router-dom'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { PlayerProvider } from '@/contexts/PlayerContext'
 import { ToastProvider } from '@/contexts/ToastContext'
@@ -13,6 +13,11 @@ import { LoadingState } from '@/components/common/StateViews'
 // downloads up front regardless of which of these ~50 pages (many
 // role-gated, most people never touching most of them) they'll ever visit.
 const LandingPage = lazy(() => import('@/pages/marketing/LandingPage').then((m) => ({ default: m.LandingPage })))
+
+function LegacyRequestRedirect() {
+  const { requestId } = useParams<{ requestId: string }>()
+  return <Navigate to={requestId ? `/dj-requests/${requestId}` : '/agreements'} replace />
+}
 const PricingPage = lazy(() => import('@/pages/marketing/PricingPage').then((m) => ({ default: m.PricingPage })))
 const ForDjsPage = lazy(() => import('@/pages/marketing/ForDjsPage').then((m) => ({ default: m.ForDjsPage })))
 const ForArtistsPage = lazy(() => import('@/pages/marketing/ForArtistsPage').then((m) => ({ default: m.ForArtistsPage })))
@@ -139,7 +144,7 @@ function App() {
             <Route path="/djs/:djId" element={<DJPublicProfilePage />} />
             <Route path="/artist/:slug/track/:trackId" element={<TrackPage />} />
             <Route path="/track/:trackId" element={<TrackPage />} />
-            <Route path="/requests/:requestId" element={<Navigate to="/agreements" replace />} />
+            <Route path="/requests/:requestId" element={<LegacyRequestRedirect />} />
             <Route
               path="/dj-requests/:requestId"
               element={

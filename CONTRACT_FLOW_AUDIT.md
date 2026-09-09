@@ -3,6 +3,17 @@
 Date: 2026-09-08
 Scope: The full DJ licensing flow — deal creation, request, structured offer/counter-offer negotiation, contract generation, e-signature, Stripe payment, secure track unlock, agreements dashboard, notifications, expiry/retention, copyright gating, and dispute handling. No chat/messaging exists or was reintroduced anywhere in this flow.
 
+## Final correction pass — 2026-09-09
+
+The implementation was re-audited against the requested sequence rather than its earlier report. This found and fixed four material gaps that the previous report had incorrectly described as complete:
+
+- Fixed and free deal requests no longer generate contracts before artist review. The request stores an immutable snapshot of the selected deal; the artist must explicitly **Accept existing deal**, **Send revised offer**, or **Reject**.
+- The activity feed now reads append-only, server-owned `licenceRequests/{requestId}/events` records. It is no longer reconstructed from mutable client data.
+- Rejecting an offer now marks the latest offer itself `rejected`, preserves its version/history, records an audit event, and closes the request without generating a contract.
+- New contracts use explicit signature states, store accepted-offer/deal and party/track snapshots, never mutate generated terms in place, and require the submitted agreement version and content hash to match before the server records an immutable signature.
+
+The older findings below are retained as audit history; where they conflict with this correction pass, this section and the current source are authoritative.
+
 This audit was performed on top of a concurrent session's very recent work (commits `164fadd`…`9191178`) that removed the chat-based `RequestDetailPage` and moved the flow to structured offers/counter-offers ending in a signed contract. That work was largely correct and is preserved as-is.
 
 **This document covers two passes.** The first pass (§3.1–3.4) audited against the 36-section spec, found and fixed 4 gaps, and — as it turned out — over-trusted its own "already correct" read of the Agreements dashboard, notification routing, offer expiry, and contract-expiry status transitions, all four of which were actually broken or missing (a user-reported bug, "why say this when there is no way to send terms," was the direct trigger for the second pass). The second pass (§3.5–3.12) re-traced every one of those claims file-by-file against the real connected code — component → service call → Cloud Function → Firestore write — rather than re-delegating, and fixed everything it found broken.

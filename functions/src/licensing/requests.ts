@@ -3,7 +3,8 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
 import { requireActiveUser, userHasRole } from '../roles.js'
 import { enforceRateLimit } from '../rateLimit.js'
-import { computeContentHash, type AgreementTerms } from './agreements.js'
+import { writeAgreementVersion, type AgreementTerms } from './agreements.js'
+import { writeRequestEvent } from './events.js'
 
 const INTENDED_USES = [
   'live_club_performance',
@@ -17,9 +18,9 @@ const INTENDED_USES = [
 
 /**
  * Kicks off the DJ loop: DJ requests access to a DJ-promoted track. Creates
- * the licenceRequest (source of truth for status). A selected fixed/free
- * artist deal is also frozen into an agreement immediately; a custom access
- * request waits for the artist to set the final contract terms.
+ * the licenceRequest (source of truth for status). Every request waits for an
+ * explicit artist decision. A published deal is snapshotted onto the request
+ * so later edits to that reusable template cannot silently change this deal.
  */
 export const submitLicenceRequest = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
@@ -96,35 +97,6 @@ export const submitLicenceRequest = onCall(async (request) => {
     }
   }
 
-  const isPresetDeal = Boolean(deal && ['free', 'fixed'].includes(deal.priceType))
-  const agreementRef = isPresetDeal ? db.collection('licenceAgreements').doc() : null
-  const nowDate = new Date().toISOString().slice(0, 10)
-  const startDate = requestedStartDate || nowDate
-  const expiryDate = deal?.durationDays
-    ? new Date(new Date(`${startDate}T00:00:00.000Z`).getTime() + deal.durationDays * 86_400_000).toISOString().slice(0, 10)
-    : requestedEndDate || null
-
-  const agreementTerms: AgreementTerms | null = deal && isPresetDeal
-    ? {
-        permittedUse: deal.permittedUse,
-        territory: deal.territory,
-        startDate,
-        expiryDate,
-        licenceFeeMinor: deal.priceType === 'fixed' ? deal.priceMinor ?? 0 : 0,
-        currency: deal.currency ?? 'gbp',
-        attributionRequirements: deal.attributionRequirements ?? '',
-        recordingPermission: Boolean(deal.recordingPermission),
-        streamingPermission: Boolean(deal.streamingPermission),
-        promotionalMixPermission: Boolean(deal.promotionalMixPermission),
-        commercialUse: true,
-        redistributionAllowed: Boolean(deal.redistributionAllowed),
-        resaleAllowed: Boolean(deal.resaleAllowed),
-        remixAllowed: Boolean(deal.remixAllowed),
-        additionalTerms: deal.additionalTerms ?? '',
-        rightsHolderDeclaration: true,
-      }
-    : null
-
   await db.runTransaction(async (tx) => {
     const djSnap = await tx.get(djProfileRef)
     const djData = djSnap.data() ?? {}
@@ -156,51 +128,116 @@ export const submitLicenceRequest = onCall(async (request) => {
       requestedEndDate: requestedEndDate ?? null,
       recordingIntention: Boolean(recordingIntention),
       streamingIntention: Boolean(streamingIntention),
-      status: agreementRef ? 'agreement_ready' : 'submitted',
-      currentAgreementId: agreementRef?.id ?? null,
+      status: 'submitted',
+      currentAgreementId: null,
+      trackTitleSnapshot: track.title ?? 'Track',
+      artistNameSnapshot: (artistSnap.data()?.name as string) || 'Artist',
+      djNameSnapshot: djName,
+      selectedDealSnapshot: deal
+        ? {
+            dealId,
+            name: deal.name ?? 'DJ deal',
+            description: deal.description ?? '',
+            priceType: deal.priceType,
+            priceMinor: deal.priceMinor ?? 0,
+            currency: deal.currency ?? 'gbp',
+            permittedUse: deal.permittedUse ?? '',
+            territory: deal.territory ?? '',
+            durationDays: deal.durationDays ?? null,
+            recordingPermission: Boolean(deal.recordingPermission),
+            streamingPermission: Boolean(deal.streamingPermission),
+            promotionalMixPermission: Boolean(deal.promotionalMixPermission),
+            remixPermission: Boolean(deal.remixAllowed),
+            redistributionPermission: Boolean(deal.redistributionAllowed),
+            resalePermission: Boolean(deal.resaleAllowed),
+            attributionRequirements: deal.attributionRequirements ?? '',
+            additionalTerms: deal.additionalTerms ?? '',
+          }
+        : null,
       legalHold: false,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     })
-    if (agreementRef && agreementTerms) {
-      tx.set(agreementRef, {
-        agreementId: agreementRef.id,
-        licenceRequestId: requestRef.id,
-        artistId,
-        djId,
-        trackId,
-        trackVersion: 1,
-        ...agreementTerms,
-        contentHash: computeContentHash(agreementTerms),
-        agreementVersion: 1,
-        status: 'pending',
-        artistAcceptedAt: null,
-        djAcceptedAt: null,
-        artistLegalName: null,
-        djLegalName: null,
-        paidAt: null,
-        downloadRevoked: false,
-        downloadCount: 0,
-        legalHold: false,
-        sourceDealId: dealId,
-        createdAt: FieldValue.serverTimestamp(),
-        finalisedAt: null,
-      })
-    }
+    writeRequestEvent(tx, requestRef, {
+      type: 'request_submitted',
+      actorId: djId,
+      actorRole: 'dj',
+      summary: deal ? `${djName} requested “${deal.name ?? 'DJ deal'}”.` : `${djName} requested custom terms.`,
+    })
     tx.set(db.collection('notifications').doc(), {
       userId: artistId,
-      type: agreementRef ? 'agreement_ready' : 'dj_request',
-      title: agreementRef ? 'Deal accepted' : 'New DJ request',
-      body: agreementRef
-        ? `${djName} accepted your deal for "${track.title}". The contract is ready for both parties to sign.`
-        : `${djName} requested access to "${track.title}". Review the request and set the contract terms.`,
-      linkTo: `/dashboard/artist/dj-requests`,
+      type: 'dj_request',
+      title: 'New DJ request',
+      body: `${djName} requested access to "${track.title}". Review the selected deal or send revised terms.`,
+      linkTo: `/dj-requests/${requestRef.id}`,
       read: false,
       createdAt: FieldValue.serverTimestamp(),
     })
   })
 
-  return { requestId: requestRef.id, agreementId: agreementRef?.id ?? null }
+  return { requestId: requestRef.id, agreementId: null }
+})
+
+/** Artist accepts the exact reusable deal snapshot the DJ selected. */
+export const acceptExistingDeal = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
+  const { requestId } = request.data ?? {}
+  if (!requestId || typeof requestId !== 'string') throw new HttpsError('invalid-argument', 'requestId is required.')
+
+  const requestRef = db.collection('licenceRequests').doc(requestId)
+  const requestSnap = await requestRef.get()
+  if (!requestSnap.exists) throw new HttpsError('not-found', 'Request not found.')
+  const licenceRequest = requestSnap.data()!
+  if (licenceRequest.artistId !== request.auth.uid) throw new HttpsError('permission-denied', 'Only the artist can accept this deal.')
+  if (!['submitted', 'artist_review'].includes(licenceRequest.status)) {
+    throw new HttpsError('failed-precondition', 'This request is no longer awaiting artist review.')
+  }
+  const deal = licenceRequest.selectedDealSnapshot
+  if (!deal || !['free', 'fixed'].includes(deal.priceType)) {
+    throw new HttpsError('failed-precondition', 'This request needs a structured final offer instead.')
+  }
+  const trackSnap = await db.collection('tracks').doc(licenceRequest.trackId).get()
+  const track = trackSnap.data()
+  if (!track || track.takenDown === true || (track.restrictedCapabilities ?? []).includes('dj_licensing')) {
+    throw new HttpsError('failed-precondition', 'This track is not available for a new contract.')
+  }
+  const startDate = licenceRequest.requestedStartDate || new Date().toISOString().slice(0, 10)
+  const expiryDate = deal.durationDays
+    ? new Date(new Date(`${startDate}T00:00:00.000Z`).getTime() + deal.durationDays * 86_400_000).toISOString().slice(0, 10)
+    : licenceRequest.requestedEndDate || null
+  const terms: AgreementTerms = {
+    permittedUse: deal.permittedUse,
+    territory: deal.territory,
+    startDate,
+    expiryDate,
+    licenceFeeMinor: deal.priceType === 'fixed' ? deal.priceMinor ?? 0 : 0,
+    currency: deal.currency ?? 'gbp',
+    attributionRequirements: deal.attributionRequirements ?? '',
+    recordingPermission: Boolean(deal.recordingPermission),
+    streamingPermission: Boolean(deal.streamingPermission),
+    promotionalMixPermission: Boolean(deal.promotionalMixPermission),
+    commercialUse: true,
+    redistributionAllowed: Boolean(deal.redistributionPermission),
+    resaleAllowed: Boolean(deal.resalePermission),
+    remixAllowed: Boolean(deal.remixPermission),
+    additionalTerms: deal.additionalTerms ?? '',
+    rightsHolderDeclaration: true,
+  }
+  const batch = db.batch()
+  const { agreementRef } = await writeAgreementVersion(batch, requestRef, licenceRequest, terms, { sourceDealId: deal.dealId ?? null })
+  writeRequestEvent(batch, requestRef, {
+    type: 'deal_accepted', actorId: request.auth.uid, actorRole: 'artist',
+    summary: `Artist accepted “${deal.name}”. Contract generated.`, agreementId: agreementRef.id,
+  })
+  batch.set(db.collection('notifications').doc(), {
+    userId: licenceRequest.djId,
+    type: 'agreement_ready', title: 'Deal accepted — contract ready',
+    body: 'The artist accepted the selected deal. Review and sign the locked contract.',
+    linkTo: `/agreements/${agreementRef.id}`, read: false, createdAt: FieldValue.serverTimestamp(),
+  })
+  await batch.commit()
+  return { agreementId: agreementRef.id }
 })
 
 const ARTIST_ACTIONS = ['start_negotiation', 'reject'] as const
@@ -235,21 +272,25 @@ export const respondToLicenceRequest = onCall(async (request) => {
     throw new HttpsError('failed-precondition', 'This request is already finalised.')
   }
 
-  await ref.update({ status: nextStatus, updatedAt: FieldValue.serverTimestamp() })
-
   const notifyUserId = isArtist ? data.djId : data.artistId
-  // linkTo must match whichever role is being notified — the artist's request list lives at a
-  // different path than the DJ's, and this notification can go to either depending on who acted.
-  const notifyIsArtist = notifyUserId === data.artistId
-  await db.collection('notifications').add({
+  const batch = db.batch()
+  batch.update(ref, { status: nextStatus, updatedAt: FieldValue.serverTimestamp() })
+  writeRequestEvent(batch, ref, {
+    type: nextStatus,
+    actorId: uid,
+    actorRole: isArtist ? 'artist' : 'dj',
+    summary: nextStatus === 'rejected' ? 'Artist rejected the request.' : 'DJ cancelled the request.',
+  })
+  batch.set(db.collection('notifications').doc(), {
     userId: notifyUserId,
     type: nextStatus === 'rejected' ? 'request_rejected' : 'request_cancelled',
     title: nextStatus === 'rejected' ? 'Request declined' : 'Request cancelled',
     body: `Your DJ request status changed to "${nextStatus}".`,
-    linkTo: notifyIsArtist ? '/dashboard/artist/dj-requests' : '/dj/requests',
+    linkTo: `/dj-requests/${requestId}`,
     read: false,
     createdAt: FieldValue.serverTimestamp(),
   })
+  await batch.commit()
 
   return { status: nextStatus }
 })

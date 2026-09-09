@@ -21,6 +21,10 @@ function formatDate(value: string | null): string {
 
 const STATUS_LABEL: Record<string, string> = {
   pending: 'Awaiting signatures',
+  ready_for_signature: 'Ready for signature',
+  artist_signed: 'Artist signed',
+  dj_signed: 'DJ signed',
+  fully_signed: 'Fully signed',
   awaiting_payment: 'Awaiting payment',
   active: 'Active',
   expired: 'Expired',
@@ -61,6 +65,7 @@ export function ContractPage() {
   if (!isParty) return <EmptyState title="You don't have access to this contract" />
   const isDj = agreement.djId === firebaseUser.uid
   const hasSigned = isDj ? Boolean(agreement.djAcceptedAt) : Boolean(agreement.artistAcceptedAt)
+  const isSignable = ['pending', 'ready_for_signature', 'artist_signed', 'dj_signed'].includes(agreement.status)
 
   async function handlePay() {
     setBusy(true)
@@ -108,7 +113,7 @@ export function ContractPage() {
       <div className="rounded-2xl border border-surface-border bg-surface-1 p-6 print:border-0 print:bg-transparent print:p-0 sm:p-8">
         <p className="text-xs font-semibold uppercase tracking-wide text-ink-3">DJ Licence Agreement</p>
         <h1 className="mt-1 text-2xl font-semibold text-ink-0">
-          {track?.title ?? 'Track'} — v{agreement.agreementVersion}
+          {agreement.trackTitleSnapshot ?? track?.title ?? 'Track'} — v{agreement.agreementVersion}
         </h1>
         <p className="mt-1 text-xs text-ink-3">Agreement ID: {agreement.agreementId}</p>
         <p className="mt-1 text-xs text-ink-3">
@@ -116,7 +121,7 @@ export function ContractPage() {
         </p>
 
         <div className="mt-5 rounded-xl border border-brand-400/20 bg-brand-500/[0.06] p-4 no-print">
-          {agreement.status === 'pending' && !hasSigned ? (
+          {isSignable && !hasSigned ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-semibold text-ink-0">Review and sign this contract</p>
@@ -126,7 +131,7 @@ export function ContractPage() {
                 <PenLine className="h-4 w-4" /> Sign agreement
               </Button>
             </div>
-          ) : agreement.status === 'pending' ? (
+          ) : isSignable ? (
             <p className="text-sm text-ink-1">You have signed. Waiting for the other party to sign.</p>
           ) : agreement.status === 'awaiting_payment' && isDj ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -159,13 +164,13 @@ export function ContractPage() {
         <div className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
           <Party
             label="Artist"
-            name={agreement.artistLegalName || artist?.name || 'Not yet signed'}
+            name={agreement.artistLegalName || agreement.artistNameSnapshot || artist?.name || 'Not yet signed'}
             userId={agreement.artistId}
             signedAt={agreement.artistAcceptedAt}
           />
           <Party
             label="DJ"
-            name={agreement.djLegalName || 'Not yet signed'}
+            name={agreement.djLegalName || agreement.djNameSnapshot || 'Not yet signed'}
             userId={agreement.djId}
             signedAt={agreement.djAcceptedAt}
           />
@@ -231,6 +236,8 @@ export function ContractPage() {
       {showSignModal ? (
         <SignAgreementModal
           agreementId={agreement.agreementId}
+          agreementVersion={agreement.agreementVersion}
+          contentHash={agreement.contentHash ?? ''}
           uid={firebaseUser.uid}
           onClose={() => setShowSignModal(false)}
           onSigned={() => setShowSignModal(false)}
