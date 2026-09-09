@@ -276,6 +276,7 @@ export interface DjTrackFilters {
  * Per-track deal settings override the older promotion/licence switches.
  */
 export function isTrackAcceptingDjRequests(track: TrackDoc): boolean {
+  if (track.takenDown || track.restrictedCapabilities?.includes('dj_licensing')) return false
   if (track.djDealSettings) return track.djDealSettings.acceptDjRequests
   return track.djPromotion && track.djLicenceMode !== 'not_available'
 }

@@ -31,6 +31,7 @@ export { submitVerificationRequest, reviewVerificationRequest } from './admin/ve
 export { submitCopyrightClaim, reviewCopyrightClaim, submitArtistResponse, submitCounterNotice, getCopyrightEvidenceUrls } from './admin/copyright.js'
 export { adminSetUserSuspension, adminSetTrackTakedown, adminDeleteStory } from './admin/moderation.js'
 export { submitReport, adminResolveReport } from './admin/reports.js'
+export { adminChangeArtistSlug } from './admin/artistSlug.js'
 export { adminUpsertSubscriptionPlan, adminUpdatePlatformSettings } from './admin/settings.js'
 
 // Free creator workflows and fan supporter subscriptions.

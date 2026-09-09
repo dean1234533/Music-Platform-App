@@ -21,6 +21,9 @@ firestore-debug.log
 ui-debug.log
 *-debug.log
 
+# Cloudflare
+.wrangler/
+
 # Environment
 .env
 .env.local

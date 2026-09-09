@@ -2,11 +2,15 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { adminResolveReport, adminSetLegalHold, listCopyrightClaims, listOpenReports, reviewCopyrightClaim } from '@/services/adminService'
 import { getCopyrightEvidenceUrls } from '@/services/moderationService'
+import { getArtistProfile } from '@/services/artistService'
+import { getTrack } from '@/services/trackService'
 import { Button } from '@/components/common/Button'
 import { TextArea } from '@/components/common/Input'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import type { CopyrightClaimDoc, CopyrightClaimStatus, ReportDoc } from '@/types/moderation'
 import type { RestrictedCapability } from '@/types/track'
+
+type ReportSubject = { label: string; href: string } | null
 
 const RESTRICTABLE_CAPABILITIES: RestrictedCapability[] = ['dj_licensing', 'discovery', 'streaming']
 const CAPABILITY_LABEL: Record<RestrictedCapability, string> = {
@@ -41,6 +45,33 @@ export function AdminReportsPage() {
     void listOpenReports().then(setReports)
     void listCopyrightClaims().then(setClaims)
   }, [])
+
+  // A report on its own is just a raw targetId — an admin can't actually
+  // moderate "artist ABC123" without knowing who that is. Resolve each
+  // artist/track report to a real, clickable subject once, same fix as the
+  // earlier admin-verification gap (a raw uid isn't something to act on).
+  const [subjects, setSubjects] = useState<Record<string, ReportSubject | undefined>>({})
+  useEffect(() => {
+    if (!reports) return
+    for (const report of reports) {
+      if (subjects[report.reportId] !== undefined) continue
+      if (report.targetType === 'artist') {
+        void getArtistProfile(report.targetId).then((artist) => {
+          setSubjects((prev) => ({ ...prev, [report.reportId]: artist ? { label: artist.name, href: `/artist/${artist.slug}` } : null }))
+        })
+      } else if (report.targetType === 'track') {
+        void getTrack(report.targetId).then(async (track) => {
+          if (!track) {
+            setSubjects((prev) => ({ ...prev, [report.reportId]: null }))
+            return
+          }
+          const artist = await getArtistProfile(track.artistId)
+          const href = artist ? `/artist/${artist.slug}/track/${track.trackSlug ?? track.trackId}` : `/track/${track.trackId}`
+          setSubjects((prev) => ({ ...prev, [report.reportId]: { label: track.title, href } }))
+        })
+      }
+    }
+  }, [reports])
 
   function draftFor(claimId: string): ClaimDraft {
     return drafts[claimId] ?? { adminNote: '', restrictedCapabilities: [] }
@@ -240,6 +271,17 @@ export function AdminReportsPage() {
                     <Link to={`/agreements/${report.targetId}`} className="text-xs text-brand-400 hover:underline">
                       View agreement {report.targetId}
                     </Link>
+                  ) : null}
+                  {(report.targetType === 'artist' || report.targetType === 'track') ? (
+                    subjects[report.reportId] === undefined ? (
+                      <p className="text-xs text-ink-3">Loading subject…</p>
+                    ) : subjects[report.reportId] === null ? (
+                      <p className="text-xs text-ink-3">Subject not found — may already have been removed.</p>
+                    ) : (
+                      <Link to={subjects[report.reportId]!.href} className="text-xs text-brand-400 hover:underline">
+                        View {report.targetType}: {subjects[report.reportId]!.label} →
+                      </Link>
+                    )
                   ) : null}
                 </div>
                 <div className="flex flex-wrap justify-end gap-2">

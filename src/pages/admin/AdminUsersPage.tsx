@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { adminDeleteAccount, adminSetUserSuspension, listUsers } from '@/services/adminService'
+import { adminChangeArtistSlug, adminDeleteAccount, adminSetUserSuspension, listUsers } from '@/services/adminService'
+import { getArtistProfile } from '@/services/artistService'
+import { slugify } from '@/utils/slug'
 import { Button } from '@/components/common/Button'
 import { Input, Label } from '@/components/common/Input'
 import { LoadingState } from '@/components/common/StateViews'
@@ -9,6 +11,7 @@ export function AdminUsersPage() {
   const [users, setUsers] = useState<UserProfile[] | null>(null)
   const [busyUid, setBusyUid] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<UserProfile | null>(null)
+  const [slugTarget, setSlugTarget] = useState<UserProfile | null>(null)
 
   useEffect(() => {
     void listUsers().then(setUsers)
@@ -50,6 +53,11 @@ export function AdminUsersPage() {
               >
                 {user.suspended ? 'Unsuspend' : 'Suspend'}
               </Button>
+              {user.roles.includes('artist') ? (
+                <Button size="sm" variant="secondary" onClick={() => setSlugTarget(user)}>
+                  Change artist URL
+                </Button>
+              ) : null}
               <Button size="sm" variant="danger" onClick={() => setDeleteTarget(user)}>
                 Delete account
               </Button>
@@ -61,6 +69,73 @@ export function AdminUsersPage() {
       {deleteTarget ? (
         <AdminDeleteAccountModal user={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={handleDeleted} />
       ) : null}
+      {slugTarget ? <AdminChangeSlugModal user={slugTarget} onClose={() => setSlugTarget(null)} /> : null}
+    </div>
+  )
+}
+
+function AdminChangeSlugModal({ user, onClose }: { user: UserProfile; onClose: () => void }) {
+  const [currentSlug, setCurrentSlug] = useState<string | null | undefined>(undefined)
+  const [newSlug, setNewSlug] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [done, setDone] = useState(false)
+
+  useEffect(() => {
+    void getArtistProfile(user.uid).then((profile) => setCurrentSlug(profile?.slug ?? null))
+  }, [user.uid])
+
+  async function handleChange() {
+    setBusy(true)
+    setError(null)
+    try {
+      await adminChangeArtistSlug({ artistId: user.uid, newSlug: slugify(newSlug) })
+      setDone(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not change this artist\'s URL.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-t-2xl border border-surface-border bg-surface-1 p-6 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-semibold text-ink-0">Change artist URL</h2>
+        {done ? (
+          <>
+            <p className="mt-2 text-sm text-support-400">
+              Done. The old URL now redirects to the new one, and any earlier URL this artist has used redirects
+              straight to it too.
+            </p>
+            <div className="mt-4 flex justify-end">
+              <Button size="sm" onClick={onClose}>Close</Button>
+            </div>
+          </>
+        ) : currentSlug === undefined ? (
+          <LoadingState />
+        ) : (
+          <>
+            <p className="mt-2 text-sm text-ink-1">
+              Current URL for <span className="font-medium text-ink-0">{user.displayName ?? user.email}</span>:{' '}
+              <span className="font-medium text-ink-0">/artist/{currentSlug ?? '(none)'}</span>. The old URL will
+              keep working as a permanent redirect — reserve this for genuine cases like a resolved impersonation
+              report, not routine rebranding.
+            </p>
+            <div className="mt-4">
+              <Label>New URL slug</Label>
+              <Input value={newSlug} onChange={(e) => setNewSlug(e.target.value)} placeholder="new-artist-name" />
+            </div>
+            {error ? <p className="mt-2 text-sm text-danger-500">{error}</p> : null}
+            <div className="mt-4 flex justify-end gap-2">
+              <Button size="sm" variant="secondary" onClick={onClose}>Cancel</Button>
+              <Button size="sm" loading={busy} disabled={!slugify(newSlug)} onClick={() => void handleChange()}>
+                Change URL
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }

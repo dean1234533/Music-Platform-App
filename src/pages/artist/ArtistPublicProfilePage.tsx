@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, BadgeCheck, Disc3, MapPin, Radio } from 'lucide-react'
+import { ArrowLeft, BadgeCheck, Disc3, Flag, MapPin, Radio } from 'lucide-react'
+import { ReportArtistModal } from '@/components/track/ReportArtistModal'
 import { getArtistIdForSlug, subscribeArtistProfile, subscribePublicArtistTracks } from '@/services/artistService'
 import { recordProfileView } from '@/services/analyticsService'
 import { subscribePublicArtistPosts } from '@/services/artistPostService'
@@ -47,6 +48,7 @@ export function ArtistPublicProfilePage() {
   const [offerClaims, setOfferClaims] = useState<FanOfferClaimDoc[]>([])
   const [pendingOfferId, setPendingOfferId] = useState<string | null>(null)
   const [loadError, setLoadError] = useState(false)
+  const [showReport, setShowReport] = useState(false)
 
   useEffect(() => {
     if (!slug) return
@@ -125,6 +127,13 @@ export function ArtistPublicProfilePage() {
     hasRecordedView.current = true
     void recordProfileView(artistId, searchParams.get('ref'))
   }, [artistId, searchParams])
+
+  // An old slug still resolves (getArtistIdForSlug follows the redirect),
+  // but the address bar should settle on the current canonical one.
+  useEffect(() => {
+    if (!artist || !slug || artist.slug === slug) return
+    navigate(`/artist/${artist.slug}${window.location.search}`, { replace: true })
+  }, [artist, slug, navigate])
 
   if (artistId === undefined) return <LoadingState label="Loading artist…" />
   if (artistId === null) return <ErrorState title="Artist not found" description="This artist URL doesn't exist." />
@@ -238,6 +247,16 @@ export function ArtistPublicProfilePage() {
               title={artist.name}
               text={`Check out ${artist.name} on BackTheVibes`}
             />
+            {firebaseUser ? (
+              <button
+                type="button"
+                onClick={() => setShowReport(true)}
+                aria-label="Report this artist profile"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-ink-3 transition hover:border-white/20 hover:text-ink-1"
+              >
+                <Flag className="h-4 w-4" />
+              </button>
+            ) : null}
           </div>
           </div>
         </section>
@@ -355,6 +374,7 @@ export function ArtistPublicProfilePage() {
           onClose={() => setViewerGroup(null)}
         />
       ) : null}
+      {showReport ? <ReportArtistModal artistId={artist.artistId} onClose={() => setShowReport(false)} /> : null}
     </div>
   )
 }

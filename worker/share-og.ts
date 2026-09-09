@@ -111,8 +111,8 @@ function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;')
 }
 
-function renderMetaHtml(opts: { title: string; description: string; image: string | null; url: string }): string {
-  const { title, description, image, url } = opts
+function renderMetaHtml(opts: { title: string; description: string; image: string | null; url: string; jsonLd?: object }): string {
+  const { title, description, image, url, jsonLd } = opts
   const safeTitle = escapeHtml(title)
   const safeDescription = escapeHtml(description)
   const safeImage = image ? escapeHtml(image) : ''
@@ -133,6 +133,7 @@ ${safeImage ? `<meta property="og:image" content="${safeImage}" />` : ''}
 <meta name="twitter:title" content="${safeTitle}" />
 <meta name="twitter:description" content="${safeDescription}" />
 ${safeImage ? `<meta name="twitter:image" content="${safeImage}" />` : ''}
+${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>` : ''}
 <meta http-equiv="refresh" content="0;url=${escapeHtml(url)}" />
 </head>
 <body>
@@ -191,9 +192,20 @@ function contentResponse(html: string): Response {
 
 // --- Route handling -----------------------------------------------------------
 
-async function buildArtistCard(projectId: string, slug: string, url: string): Promise<Response | null> {
+// A slug change (adminChangeArtistSlug) repoints every slug the artist has
+// ever used at the current canonical one, so one hop is always enough.
+async function resolveArtistId(projectId: string, slug: string): Promise<string | undefined> {
   const slugDoc = await fetchFirestoreDoc(projectId, `artistSlugs/${slug}`)
-  const artistId = slugDoc?.artistId as string | undefined
+  if (!slugDoc) return undefined
+  if (typeof slugDoc.redirectTo === 'string') {
+    const target = await fetchFirestoreDoc(projectId, `artistSlugs/${slugDoc.redirectTo}`)
+    return target?.artistId as string | undefined
+  }
+  return slugDoc.artistId as string | undefined
+}
+
+async function buildArtistCard(projectId: string, slug: string, url: string): Promise<Response | null> {
+  const artistId = await resolveArtistId(projectId, slug)
   if (!artistId) return null
   const artist = await fetchFirestoreDoc(projectId, `artistProfiles/${artistId}`)
   if (!artist) return null
@@ -203,13 +215,20 @@ async function buildArtistCard(projectId: string, slug: string, url: string): Pr
     description: (artist.bio as string) || `Listen to ${artist.name as string} on BackTheVibes — independent music, direct support.`,
     image: (artist.coverURL as string | null) ?? (artist.photoURL as string | null) ?? null,
     url,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'MusicGroup',
+      name: artist.name as string,
+      url,
+      ...(artist.photoURL ? { image: artist.photoURL as string } : {}),
+      ...(artist.genres && (artist.genres as string[]).length > 0 ? { genre: artist.genres as string[] } : {}),
+    },
   })
   return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })
 }
 
 async function buildTrackCard(projectId: string, slug: string, trackParam: string, url: string): Promise<Response | null> {
-  const slugDoc = await fetchFirestoreDoc(projectId, `artistSlugs/${slug}`)
-  const artistId = slugDoc?.artistId as string | undefined
+  const artistId = await resolveArtistId(projectId, slug)
   if (!artistId) return null
 
   // trackParam is either a clean trackSlug (new share links) or a raw
@@ -233,6 +252,15 @@ async function buildTrackCard(projectId: string, slug: string, trackParam: strin
     description: `Listen to "${track.title as string}" by ${artistName} on BackTheVibes.`,
     image: (track.artworkURL as string | null) ?? (artist?.photoURL as string | null) ?? null,
     url,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'MusicRecording',
+      name: track.title as string,
+      url,
+      byArtist: { '@type': 'MusicGroup', name: artistName },
+      ...(track.genre ? { genre: track.genre as string } : {}),
+      ...(track.artworkURL ? { image: track.artworkURL as string } : {}),
+    },
   })
   return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })
 }

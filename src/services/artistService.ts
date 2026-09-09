@@ -101,10 +101,20 @@ export async function createArtistProfile(
   })
 }
 
+/**
+ * Follows a slug-change redirect (adminChangeArtistSlug repoints every slug
+ * an artist has ever used at the current canonical one, so this is always
+ * at most one extra hop, never a chain to walk).
+ */
 export async function getArtistIdForSlug(slug: string): Promise<string | null> {
   const snap = await getDoc(slugRef(slug))
   if (!snap.exists()) return null
-  return (snap.data().artistId as string) ?? null
+  const data = snap.data()
+  if (typeof data.redirectTo === 'string') {
+    const target = await getDoc(slugRef(data.redirectTo))
+    return target.exists() ? ((target.data().artistId as string) ?? null) : null
+  }
+  return (data.artistId as string) ?? null
 }
 
 export async function getArtistProfile(artistId: string): Promise<ArtistProfile | null> {

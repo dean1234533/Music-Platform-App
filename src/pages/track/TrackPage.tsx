@@ -74,18 +74,19 @@ export function TrackPage() {
     void recordTrackView(resolvedTrackId, searchParams.get('ref'))
   }, [resolvedTrackId, searchParams])
 
-  // Upgrade the flat /track/:trackId address bar to the canonical nested
-  // /artist/:slug/track/:trackSlug form once the artist resolves — flat
-  // links already out in the wild (and the OG worker) keep working either way.
+  // Settle the address bar on the canonical /artist/:slug/track/:trackSlug
+  // form once the artist resolves — covers both the flat /track/:trackId
+  // link and an old artist slug from before a slug change (resolution
+  // above already followed the redirect, so the page works either way;
+  // this just keeps the URL itself current).
   useEffect(() => {
     if (!artist || !track) return
-    if (window.location.pathname === `/track/${track.trackId}`) {
-      const dest = track.trackSlug
-        ? `/artist/${artist.slug}/track/${track.trackSlug}`
-        : `/artist/${artist.slug}/track/${track.trackId}`
-      navigate(dest, { replace: true })
-    }
-  }, [artist, track, navigate])
+    const onFlatUrl = window.location.pathname === `/track/${track.trackId}`
+    const onStaleSlug = slug !== undefined && slug !== artist.slug
+    if (!onFlatUrl && !onStaleSlug) return
+    const trackParam = track.trackSlug ?? track.trackId
+    navigate(`/artist/${artist.slug}/track/${trackParam}`, { replace: true })
+  }, [artist, track, slug, navigate])
 
   if (resolvedTrackId === null) return <EmptyState title="Track not found" />
   if (track === undefined && loadError) {
@@ -93,9 +94,27 @@ export function TrackPage() {
   }
   if (track === undefined) return <LoadingState label="Loading track…" />
   if (track === null) return <EmptyState title="Track not found" />
+  if (track.takenDown) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10">
+        <EmptyState
+          title="This track is no longer available"
+          description="The artist has taken this track down."
+          action={
+            artist ? (
+              <Link to={`/artist/${artist.slug}`} className="text-sm font-medium text-brand-400 hover:underline">
+                View {artist.name}'s profile →
+              </Link>
+            ) : null
+          }
+        />
+      </div>
+    )
+  }
 
   const isCurrent = currentTrack?.trackId === track.trackId
   const acceptsDjRequests = isTrackAcceptingDjRequests(track)
+  const streamingRestricted = track.restrictedCapabilities?.includes('streaming') ?? false
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-10">
@@ -114,10 +133,12 @@ export function TrackPage() {
               {artist.name}
             </Link>
           ) : null}
+          {streamingRestricted ? <p className="text-xs font-medium text-danger-500">Streaming is temporarily restricted while this track is under review.</p> : null}
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => (isCurrent ? togglePlay() : playTrack(track))}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-500 text-white hover:bg-brand-600"
+              onClick={() => !streamingRestricted && (isCurrent ? togglePlay() : playTrack(track))}
+              disabled={streamingRestricted}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-500 text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-ink-3"
             >
               {isCurrent && isPlaying ? <Pause className="h-5 w-5" fill="currentColor" /> : <Play className="h-5 w-5 translate-x-0.5" fill="currentColor" />}
             </button>

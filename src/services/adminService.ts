@@ -41,6 +41,9 @@ export const adminSetUserSuspension = callable<{ userId: string; suspended: bool
   'adminSetUserSuspension',
 )
 export const adminDeleteAccount = callable<{ userId: string }, { ok: boolean }>('adminDeleteAccount')
+export const adminChangeArtistSlug = callable<{ artistId: string; newSlug: string }, { ok: boolean; oldSlug: string; newSlug: string }>(
+  'adminChangeArtistSlug',
+)
 export const adminSetTrackTakedown = callable<{ trackId: string; takenDown: boolean }, { ok: boolean }>(
   'adminSetTrackTakedown',
 )

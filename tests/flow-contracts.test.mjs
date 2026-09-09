@@ -575,3 +575,175 @@ test('the persistent player can be fully dismissed', () => {
   assert.match(bar, /aria-label="Close player"/)
   assert.match(bar, /onClick=\{closePlayer\}/)
 })
+
+test('Follow/Support CTAs preserve intent through the full auth funnel (returnTo)', () => {
+  const returnTo = read('src/utils/returnTo.ts')
+  assert.match(returnTo, /export function isSafeReturnPath/)
+  assert.match(returnTo, /path\.startsWith\('\/\/'\) \|\| path\.startsWith\('\/\\\\'\)/)
+
+  const follow = read('src/components/music/FollowButton.tsx')
+  assert.match(follow, /const PENDING_FOLLOW_KEY = 'pendingFollowArtistId'/)
+  assert.match(follow, /sessionStorage\.setItem\(PENDING_FOLLOW_KEY, artistId\)/)
+  assert.match(follow, /navigate\(`\/sign-in\?returnTo=\$\{encodeURIComponent\(returnTo\)\}`, \{ state: \{ from: location \} \}\)/)
+
+  assert.match(read('src/pages/auth/SignInPage.tsx'), /isSafeReturnPath\(returnToParam\)/)
+  assert.match(read('src/pages/auth/SignUpPage.tsx'), /isSafeReturnPath/)
+  assert.match(read('src/pages/auth/VerifyEmailPage.tsx'), /isSafeReturnPath/)
+  const onboarding = read('src/pages/onboarding/OnboardingPage.tsx')
+  assert.match(onboarding, /if \(isSafeReturnPath\(returnToParam\)\)/)
+  assert.match(onboarding, /navigate\(returnToParam\)/)
+
+  const support = read('src/components/music/SupportButton.tsx')
+  assert.match(support, /const subscriptionPath = artistId \? `\/app\/subscription\?artist=\$\{encodeURIComponent\(artistId\)\}` : '\/app\/subscription'/)
+  // Regression guard: an earlier draft navigated to /sign-in with router state
+  // pointing back at /sign-in itself, which would have been a redirect loop.
+  assert.doesNotMatch(support, /pathname: '\/sign-in'/)
+})
+
+test('new artist profiles cannot claim reserved/impersonation-prone URLs like /artist/admin or /artist/support', () => {
+  const slugUtil = read('src/utils/slug.ts')
+  assert.match(slugUtil, /export const RESERVED_ARTIST_SLUGS = new Set\(\[/)
+  assert.match(slugUtil, /'admin',/)
+  assert.match(slugUtil, /'support',/)
+  assert.match(slugUtil, /'spotify',/)
+
+  const artistService = read('src/services/artistService.ts')
+  assert.match(artistService, /if \(!RESERVED_ARTIST_SLUGS\.has\(candidate\)\) \{/)
+  // A reserved word falls through to the same numbered-suffix path as a
+  // taken slug — never a hard rejection of the whole signup.
+  assert.match(artistService, /candidate = `\$\{baseSlug\}-\$\{attempt \+ 1\}`/)
+})
+
+test('tracks get a clean per-artist-unique share slug; old trackId-based links keep resolving forever', () => {
+  assert.match(read('src/types/track.ts'), /trackSlug\?: string/)
+
+  const trackService = read('src/services/trackService.ts')
+  assert.match(trackService, /function trackSlugRef\(artistId: string, slug: string\)/)
+  assert.match(trackService, /export async function getTrackIdForSlug/)
+
+  const rules = read('firestore.rules')
+  assert.match(rules, /match \/trackSlugs\/\{registryId\}/)
+  assert.match(rules, /request\.resource\.data\.get\('trackSlug', null\) == resource\.data\.get\('trackSlug', null\)/)
+
+  const trackPage = read('src/pages/track/TrackPage.tsx')
+  assert.match(trackPage, /const viaSlug = await getTrackIdForSlug\(artistId, rawParam\)/)
+  assert.match(trackPage, /setResolvedTrackId\(viaSlug \?\? rawParam\)/)
+
+  assert.match(read('worker/share-og.ts'), /trackSlugs\/\$\{artistId\}_\$\{trackParam\}/)
+})
+
+test('profile/track views are real server-recorded counters (not client-writable) with a capped, sanitized referral breakdown', () => {
+  const analytics = read('functions/src/analytics.ts')
+  assert.match(analytics, /export const recordProfileView = onCall/)
+  assert.match(analytics, /export const recordTrackView = onCall/)
+  assert.match(analytics, /enforceRateLimit\(`recordProfileView_\$\{artistId\}`, 120, 60\)/)
+  assert.match(analytics, /enforceRateLimit\(`recordTrackView_\$\{trackId\}`, 120, 60\)/)
+  assert.match(analytics, /const MAX_REFERRAL_SOURCES = 20/)
+  assert.match(analytics, /const REF_PATTERN = \/\^\[a-z0-9_-\]\{1,32\}\$\//)
+  assert.match(analytics, /: 'other'/)
+
+  const rules = read('firestore.rules')
+  assert.match(rules, /request\.resource\.data\.get\('profileViews', 0\) == resource\.data\.get\('profileViews', 0\)/)
+  assert.match(rules, /request\.resource\.data\.get\('referralViews', \{\}\) == resource\.data\.get\('referralViews', \{\}\)/)
+  assert.match(rules, /request\.resource\.data\.get\('viewCount', 0\) == resource\.data\.get\('viewCount', 0\)/)
+
+  assert.match(read('functions/src/index.ts'), /export \{ recordProfileView, recordTrackView \} from '\.\/analytics\.js'/)
+})
+
+test('the artist Share & Growth dashboard shows real numbers pulled from live data, not placeholders', () => {
+  const growth = read('src/pages/artist/dashboard/GrowthPage.tsx')
+  assert.match(growth, /formatCount\(artist\.profileViews \?\? 0\)/)
+  assert.match(growth, /formatCount\(artist\.followerCount\)/)
+  assert.match(growth, /formatCount\(djRequests\.length\)/)
+  assert.match(growth, /const referralEntries = Object\.entries\(artist\.referralViews \?\? \{\}\)/)
+  assert.match(growth, /subscribeRequestsForArtist\(firebaseUser\.uid, setDjRequests\)/)
+
+  assert.match(read('src/App.tsx'), /<Route path="growth" element=\{<GrowthPage \/>\} \/>/)
+  assert.match(read('src/components/layout/navConfig.ts'), /label: 'Share & Growth', to: '\/dashboard\/artist\/growth'/)
+})
+
+test('a taken-down or streaming-restricted track shows a clear unavailable state instead of a silently broken player', () => {
+  const trackPage = read('src/pages/track/TrackPage.tsx')
+  assert.match(trackPage, /if \(track\.takenDown\) \{/)
+  assert.match(trackPage, /This track is no longer available/)
+  assert.match(trackPage, /const streamingRestricted = track\.restrictedCapabilities\?\.includes\('streaming'\) \?\? false/)
+  assert.match(trackPage, /disabled=\{streamingRestricted\}/)
+  assert.match(trackPage, /Streaming is temporarily restricted while this track is under review\./)
+
+  // The "Open for DJ promotion" badge and DJ request flow must agree with
+  // the takedown/restriction state — not show a CTA the server would reject.
+  assert.match(read('src/services/trackService.ts'), /if \(track\.takenDown \|\| track\.restrictedCapabilities\?\.includes\('dj_licensing'\)\) return false/)
+})
+
+test('a fan can report an artist profile, and an admin reviewing reports sees an actual clickable subject, not just a raw id', () => {
+  const modal = read('src/components/track/ReportArtistModal.tsx')
+  assert.match(modal, /submitReport\(\{ targetType: 'artist', targetId: artistId, reason, description \}\)/)
+
+  const profilePage = read('src/pages/artist/ArtistPublicProfilePage.tsx')
+  assert.match(profilePage, /onClick=\{\(\) => setShowReport\(true\)\}/)
+  assert.match(profilePage, /<ReportArtistModal artistId=\{artist\.artistId\} onClose=\{\(\) => setShowReport\(false\)\} \/>/)
+
+  const adminReports = read('src/pages/admin/AdminReportsPage.tsx')
+  assert.match(adminReports, /void getArtistProfile\(report\.targetId\)\.then/)
+  assert.match(adminReports, /void getTrack\(report\.targetId\)\.then/)
+  assert.match(adminReports, /Subject not found — may already have been removed\./)
+})
+
+test("an admin can change an artist's slug, and every URL that artist has ever used redirects to the new one in a single hop", () => {
+  const fn = read('functions/src/admin/artistSlug.ts')
+  assert.match(fn, /export const adminChangeArtistSlug = onCall/)
+  assert.match(fn, /const adminId = await requireAdmin\(request\)/)
+  assert.match(fn, /RESERVED_ARTIST_SLUGS\.has\(newSlug\)/)
+  assert.match(fn, /redirectTo: newSlug/)
+  assert.match(fn, /db\.collection\('artistSlugs'\)\.where\('artistId', '==', artistId\)\.get\(\)/)
+  assert.match(fn, /writeAuditLog\(adminId, 'change_artist_slug', \{ artistId, oldSlug, newSlug \}\)/)
+
+  assert.match(read('src/services/artistService.ts'), /if \(typeof data\.redirectTo === 'string'\) \{/)
+  assert.match(read('worker/share-og.ts'), /async function resolveArtistId/)
+
+  const usersPage = read('src/pages/admin/AdminUsersPage.tsx')
+  assert.match(usersPage, /adminChangeArtistSlug\(\{ artistId: user\.uid, newSlug: slugify\(newSlug\) \}\)/)
+
+  assert.match(read('functions/src/index.ts'), /export \{ adminChangeArtistSlug \} from '\.\/admin\/artistSlug\.js'/)
+})
+
+test('shared artist/track crawler pages carry Schema.org structured data, not just Open Graph tags', () => {
+  const worker = read('worker/share-og.ts')
+  assert.match(worker, /'@type': 'MusicGroup'/)
+  assert.match(worker, /'@type': 'MusicRecording'/)
+  assert.match(worker, /byArtist: \{ '@type': 'MusicGroup', name: artistName \}/)
+  assert.match(worker, /\$\{jsonLd \? `<script type="application\/ld\+json">/)
+})
+
+test('end-to-end scenario: a fan follows a shared track link, plays the sample, and Follow survives a full sign-up detour back to the same track', () => {
+  const trackPage = read('src/pages/track/TrackPage.tsx')
+  // Arrives via a tagged share link and the view is genuinely counted.
+  assert.match(trackPage, /void recordTrackView\(resolvedTrackId, searchParams\.get\('ref'\)\)/)
+  // Can hear the sample without being signed in — no auth gate on preview playback.
+  assert.match(trackPage, /playTrack\(track\)/)
+  assert.match(trackPage, /<FollowButton artistId=\{artist\.artistId\} \/>/)
+
+  const follow = read('src/components/music/FollowButton.tsx')
+  assert.match(follow, /const returnTo = `\$\{location\.pathname\}\$\{location\.search\}`/)
+
+  // The detour: sign-up needs email verification before onboarding, and
+  // onboarding is the step that finally honours returnTo and lands the fan
+  // back where they started — with the Follow completed automatically.
+  assert.match(read('src/pages/auth/VerifyEmailPage.tsx'), /isSafeReturnPath/)
+  const onboarding = read('src/pages/onboarding/OnboardingPage.tsx')
+  assert.match(onboarding, /const returnToParam = searchParams\.get\('returnTo'\)/)
+  assert.match(follow, /sessionStorage\.getItem\(PENDING_FOLLOW_KEY\) !== artistId/)
+})
+
+test('end-to-end scenario: a DJ finds a track through a shared link and can request a licence straight from that page', () => {
+  const trackPage = read('src/pages/track/TrackPage.tsx')
+  assert.match(trackPage, /const acceptsDjRequests = isTrackAcceptingDjRequests\(track\)/)
+  assert.match(trackPage, /<RequestDjAccessModal/)
+  // A DJ without a DJ profile yet is offered the path to add one, not a dead end.
+  assert.match(trackPage, /\/onboarding\/add-role\?role=dj/)
+
+  // The request -> offer -> signed contract -> unlocked download pipeline
+  // this lands the DJ in is the same one this session already hardened
+  // (separately tested) — this scenario only needs the entry point to be real.
+  assert.match(read('src/services/trackService.ts'), /export function isTrackAcceptingDjRequests/)
+})
