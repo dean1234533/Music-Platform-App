@@ -405,13 +405,16 @@ test('My Agreements opens on the first tab that actually has something in it, no
   assert.doesNotMatch(page, /useState\(0\)/)
 })
 
-test('downloading the licensed track does not navigate away from the contract page (user-reported)', () => {
-  // window.location.href = url would replace the whole tab with the raw file, losing the
-  // contract page (and its Back button) entirely once the download starts.
+test('downloading the licensed track forces an actual download instead of opening an inline player (user-reported, screenshot)', () => {
+  // Without responseDisposition: attachment, Storage serves the file with its real audio/*
+  // content-type — the browser renders its native inline player instead of downloading, and
+  // window.open('_blank') just moves that dead-end to a second tab with no way back. Forcing
+  // the download at the server means the current page never navigates away at all.
+  const downloads = read('functions/src/licensing/downloads.ts')
+  assert.match(downloads, /responseDisposition: `attachment; filename="\$\{safeTitle\}\.\$\{extension\}"`/)
   const contract = read('src/pages/agreements/ContractPage.tsx')
-  const handleDownloadBody = contract.slice(contract.indexOf('async function handleDownload'), contract.indexOf('async function handleDownload') + 600)
-  assert.doesNotMatch(handleDownloadBody, /window\.location\.href = url/)
-  assert.match(handleDownloadBody, /window\.open\(url, '_blank', 'noopener,noreferrer'\)/)
+  const handleDownloadBody = contract.slice(contract.indexOf('async function handleDownload'), contract.indexOf('async function handleDownload') + 800)
+  assert.match(handleDownloadBody, /window\.location\.href = url/)
 })
 
 test('drawn signatures export on an opaque white background and degrade gracefully if the image fails to load (user-reported)', () => {

@@ -109,10 +109,12 @@ export function ContractPage() {
     setActionError(null)
     try {
       const { url } = await getSecureDownloadUrl({ agreementId: agreement!.agreementId, actingRole })
-      // window.location.href would navigate this whole tab away to the raw file, losing this
-      // page (and its Back button) entirely — open it in a new tab instead so the contract
-      // page stays put.
-      window.open(url, '_blank', 'noopener,noreferrer')
+      // The signed URL now carries responseDisposition: attachment (see getSecureDownloadUrl),
+      // so the browser treats this as a file download rather than a page navigation — the
+      // current page is never actually unloaded, unlike a plain audio/* response, which either
+      // replaces the tab with a native inline player (window.location.href) or opens one in a
+      // new tab with no way back to this page (window.open).
+      window.location.href = url
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Could not prepare the download.')
     } finally {

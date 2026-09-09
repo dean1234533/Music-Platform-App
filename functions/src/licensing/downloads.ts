@@ -70,9 +70,16 @@ export const getSecureDownloadUrl = onCall(async (request) => {
   const [exists] = await file.exists()
   if (!exists) throw new HttpsError('not-found', 'Original file is unavailable.')
 
+  // Without responseDisposition, the browser opens the audio inline (its native player UI) since
+  // Storage serves the object with its real audio/* content-type — no download happens, and
+  // navigating there loses whichever page sent the DJ there. Telling the browser to treat this
+  // response as an attachment makes it download instead, without ever leaving the current page.
+  const extension = ((track.originalAudioPath as string).split('.').pop() || 'mp3').toLowerCase()
+  const safeTitle = String(track.title ?? 'track').replace(/[^\w -]+/g, '').trim().slice(0, 80) || 'track'
   const [url] = await file.getSignedUrl({
     action: 'read',
     expires: Date.now() + SIGNED_URL_TTL_MS,
+    responseDisposition: `attachment; filename="${safeTitle}.${extension}"`,
   })
 
   await Promise.all([
