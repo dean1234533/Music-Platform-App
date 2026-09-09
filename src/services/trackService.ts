@@ -130,6 +130,9 @@ export interface CreateTrackInput {
   djPromoTier: 'all' | 'pro_plus_only'
   /** Optional release embargo. */
   embargoUntil: Date | null
+  /** Only meaningful when visibility === 'early_access'. */
+  followerReleaseAt: Date | null
+  publicReleaseAt: Date | null
   rightsMetadata: TrackDoc['rightsMetadata']
 }
 
@@ -191,6 +194,8 @@ export async function createTrack(
     djFixedPrice: input.djFixedPrice,
     djPromoTier: input.djPromoTier,
     embargoUntil: input.embargoUntil ? Timestamp.fromDate(input.embargoUntil) : null,
+    followerReleaseAt: input.followerReleaseAt ? Timestamp.fromDate(input.followerReleaseAt) : null,
+    publicReleaseAt: input.publicReleaseAt ? Timestamp.fromDate(input.publicReleaseAt) : null,
     playCount: 0,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

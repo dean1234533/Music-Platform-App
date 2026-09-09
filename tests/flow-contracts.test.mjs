@@ -887,3 +887,30 @@ test('the public artist profile shows locked followers/supporters/early-access t
   assert.match(profile, /const hasLockedTracks = publicTracks\.some/)
   assert.match(profile, /locked=\{/)
 })
+
+test('early access tracks: supporters get the full track immediately, followers/public unlock automatically on a server-timestamp date, not the caller\'s clock (spec scenario: third test track)', () => {
+  const fn = read('functions/src/tracks.ts')
+  // Public release date is checked before the signed-in guard, so it also
+  // applies to an anonymous visitor once it passes — not just accounts.
+  assert.match(fn, /if \(track\.visibility === 'early_access'\) \{\s*\/\/ The public-release date/)
+  assert.match(fn, /const publicAt = \(track\.publicReleaseAt as FirebaseFirestore\.Timestamp \| null \| undefined\)\?\.toMillis\(\)/)
+  assert.match(fn, /if \(publicAt !== undefined && Date\.now\(\) >= publicAt\) return true/)
+  // Supporters unlock unconditionally; followers need both the relationship and the date.
+  assert.match(fn, /if \(await isActiveSupporter\(uid, track\.artistId\)\) return true/)
+  assert.match(fn, /const followerAt = \(track\.followerReleaseAt as FirebaseFirestore\.Timestamp \| null \| undefined\)\?\.toMillis\(\)/)
+  assert.match(fn, /if \(followerAt !== undefined && Date\.now\(\) >= followerAt\) \{/)
+
+  assert.match(read('src/types/track.ts'), /followerReleaseAt\?: Timestamp \| null/)
+  assert.match(read('src/types/track.ts'), /publicReleaseAt\?: Timestamp \| null/)
+
+  const upload = read('src/pages/artist/dashboard/UploadTrackPage.tsx')
+  assert.match(upload, /visibility === 'early_access' \? \(/)
+  assert.match(upload, /Field label="Followers get full access on"/)
+  assert.match(upload, /followerReleaseAt: visibility === 'early_access' && followerReleaseDate \? new Date\(followerReleaseDate\) : null/)
+  // The artist sees exactly what each audience gets before publishing — never a fabricated/generic summary.
+  assert.match(upload, /const ACCESS_SUMMARY: Record<TrackVisibility/)
+
+  const access = read('src/utils/trackAccess.ts')
+  assert.match(access, /if \(track\.visibility === 'early_access'\) \{/)
+  assert.match(access, /if \(viewer\.isSupporting\) return \{ fullAccess: true/)
+})

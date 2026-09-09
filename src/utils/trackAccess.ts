@@ -35,7 +35,7 @@ export function describeTrackAccess(
   if (track.visibility === 'public') {
     return { fullAccess: true, playLabel: 'Play Full Track', lockedMessage: null }
   }
-  if (track.visibility === 'followers' || track.visibility === 'early_access') {
+  if (track.visibility === 'followers') {
     return viewer.isFollowing
       ? { fullAccess: true, playLabel: 'Play Full Track', lockedMessage: null }
       : { fullAccess: false, playLabel: 'Play Preview', lockedMessage: "You've reached the end of the preview. Follow to hear the full track." }
@@ -44,6 +44,26 @@ export function describeTrackAccess(
     return viewer.isSupporting
       ? { fullAccess: true, playLabel: 'Play Full Track', lockedMessage: null }
       : { fullAccess: false, playLabel: 'Play Preview', lockedMessage: 'Support this artist to unlock the full track and exclusive releases.' }
+  }
+  if (track.visibility === 'early_access') {
+    if (viewer.isSupporting) return { fullAccess: true, playLabel: 'Play Full Track', lockedMessage: null }
+    const now = Date.now()
+    if (track.publicReleaseAt && now >= track.publicReleaseAt.toMillis()) {
+      return { fullAccess: true, playLabel: 'Play Full Track', lockedMessage: null }
+    }
+    if (viewer.isFollowing && track.followerReleaseAt && now >= track.followerReleaseAt.toMillis()) {
+      return { fullAccess: true, playLabel: 'Play Full Track', lockedMessage: null }
+    }
+    const releaseCopy = track.followerReleaseAt
+      ? ` Full track for followers from ${new Date(track.followerReleaseAt.toMillis()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.`
+      : ''
+    return {
+      fullAccess: false,
+      playLabel: 'Play Preview',
+      lockedMessage: viewer.isFollowing
+        ? `This is an early access release.${releaseCopy}`
+        : `Support this artist to hear this early access release now.${releaseCopy} Otherwise, follow to unlock it when it's released.`,
+    }
   }
   // dj_only / private: preview-only (or no preview at all) for a non-owner, non-admin viewer — no follow/support CTA applies.
   return { fullAccess: false, playLabel: 'Play Preview', lockedMessage: null }

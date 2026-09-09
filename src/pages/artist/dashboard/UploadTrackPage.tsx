@@ -27,6 +27,20 @@ const VISIBILITY_OPTIONS: { value: TrackVisibility; label: string }[] = [
   { value: 'private', label: 'Private' },
 ]
 
+const previewCopy = (sec: number) => `${sec}-second preview`
+const notAvailable = () => 'Not available'
+const fullTrack = () => 'Full track'
+
+/** What each audience actually gets, shown to the artist before they publish — never fabricated, mirrors the exact server-side ladder in canPreviewTrack/canStreamFullTrack. */
+const ACCESS_SUMMARY: Record<TrackVisibility, { public: (sec: number) => string; followers: (sec: number) => string; supporters: (sec: number) => string }> = {
+  public: { public: fullTrack, followers: fullTrack, supporters: fullTrack },
+  followers: { public: previewCopy, followers: fullTrack, supporters: fullTrack },
+  supporters: { public: previewCopy, followers: previewCopy, supporters: fullTrack },
+  early_access: { public: previewCopy, followers: () => 'Full track from your scheduled date', supporters: () => 'Full track now' },
+  dj_only: { public: notAvailable, followers: notAvailable, supporters: notAvailable },
+  private: { public: notAvailable, followers: notAvailable, supporters: notAvailable },
+}
+
 const LICENCE_OPTIONS: { value: LicenceMode; label: string }[] = [
   { value: 'not_available', label: 'Not available for DJ use' },
   { value: 'free', label: 'Free' },
@@ -74,6 +88,8 @@ export function UploadTrackPage() {
   const [djLicenceMode, setDjLicenceMode] = useState<LicenceMode>('not_available')
   const [djFixedPrice, setDjFixedPrice] = useState('')
   const [embargoDate, setEmbargoDate] = useState('')
+  const [followerReleaseDate, setFollowerReleaseDate] = useState('')
+  const [publicReleaseDate, setPublicReleaseDate] = useState('')
 
   useEffect(() => {
     if (!firebaseUser) return
@@ -250,6 +266,8 @@ export function UploadTrackPage() {
         djFixedPrice: djLicenceMode === 'fixed_price' && djFixedPrice ? Math.round(Number(djFixedPrice) * 100) : null,
         djPromoTier: 'all',
         embargoUntil: embargoDate ? new Date(embargoDate) : null,
+        followerReleaseAt: visibility === 'early_access' && followerReleaseDate ? new Date(followerReleaseDate) : null,
+        publicReleaseAt: visibility === 'early_access' && publicReleaseDate ? new Date(publicReleaseDate) : null,
         rightsMetadata,
       })
       mediaUpload.setDone()
@@ -444,7 +462,34 @@ export function UploadTrackPage() {
               </option>
             ))}
           </select>
+          <div className="mt-2 grid grid-cols-3 gap-2 rounded-lg border border-surface-border bg-surface-2 p-3 text-xs text-ink-2">
+            {(() => {
+              const summary = ACCESS_SUMMARY[visibility] ?? ACCESS_SUMMARY.public
+              return (
+                <>
+                  <div><p className="font-semibold text-ink-1">Public</p><p className="mt-0.5">{summary.public(previewDurationSec)}</p></div>
+                  <div><p className="font-semibold text-ink-1">Followers</p><p className="mt-0.5">{summary.followers(previewDurationSec)}</p></div>
+                  <div><p className="font-semibold text-ink-1">Supporters</p><p className="mt-0.5">{summary.supporters(previewDurationSec)}</p></div>
+                </>
+              )
+            })()}
+          </div>
         </Field>
+
+        {visibility === 'early_access' ? (
+          <div className="rounded-xl border border-brand-500/30 bg-brand-500/5 p-4">
+            <h2 className="mb-3 text-sm font-semibold text-ink-0">Early access schedule</h2>
+            <p className="mb-3 text-xs text-ink-2">Supporters always get the full track immediately. Set when followers (and, optionally, everyone) get it too.</p>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Followers get full access on">
+                <Input type="date" value={followerReleaseDate} onChange={(e) => setFollowerReleaseDate(e.target.value)} />
+              </Field>
+              <Field label="Public gets full access on (optional)">
+                <Input type="date" value={publicReleaseDate} onChange={(e) => setPublicReleaseDate(e.target.value)} />
+              </Field>
+            </div>
+          </div>
+        ) : null}
 
         <div className="rounded-xl border border-dj-500/30 bg-dj-500/5 p-4">
           <h2 className="mb-3 text-sm font-semibold text-ink-0">DJ access</h2>

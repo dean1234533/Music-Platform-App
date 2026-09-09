@@ -62,6 +62,10 @@ export interface TrackDoc {
   djPromoTier: 'all' | 'pro_plus_only'
   /** Hidden from DJ discovery and requests until this date passes. */
   embargoUntil: Timestamp | null
+  /** Only meaningful when visibility === 'early_access'. Supporters always get full access immediately; followers unlock once this date passes. Server-timestamp-checked, never the caller's clock. */
+  followerReleaseAt?: Timestamp | null
+  /** Only meaningful when visibility === 'early_access'. When set and passed, the track behaves as fully public — optional, defaults to never. */
+  publicReleaseAt?: Timestamp | null
   /** Preview plays — kept under its original name; every dashboard already labels this "preview"/"sample" plays. */
   playCount: number
   /** Full-length stream plays — separate counter, never summed with playCount for a "total plays" figure. */

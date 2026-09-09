@@ -42,6 +42,17 @@ async function canPreviewTrack(uid: string | null, track: FirebaseFirestore.Docu
  * subscription lapses (it only changes on the next allocation write), so
  * relationship-existence alone isn't proof of a live paid relationship.
  */
+/** A supportRelationships doc alone isn't proof of a *currently active* subscription — see canStreamFullTrack's doc comment. */
+async function isActiveSupporter(uid: string, artistId: string): Promise<boolean> {
+  const [relSnap, subSnap] = await Promise.all([
+    db.collection('supportRelationships').doc(`${uid}_${artistId}`).get(),
+    db.collection('subscriptions').doc(`${uid}_fan`).get(),
+  ])
+  if (!relSnap.exists) return false
+  const status = subSnap.data()?.status
+  return status === 'active' || status === 'trialing'
+}
+
 async function canStreamFullTrack(uid: string | null, track: FirebaseFirestore.DocumentData): Promise<boolean> {
   if (track.takenDown === true || (track.restrictedCapabilities ?? []).includes('streaming')) return false
   if (uid === track.artistId) return true
@@ -52,19 +63,32 @@ async function canStreamFullTrack(uid: string | null, track: FirebaseFirestore.D
     if (roles.includes('admin')) return true
   }
   if (track.visibility === 'public') return true
+  if (track.visibility === 'early_access') {
+    // The public-release date (if any) is checked before the auth guard
+    // below — once it passes, an early_access track behaves like a public
+    // one for anyone, signed in or not. Everything else here needs a uid.
+    const publicAt = (track.publicReleaseAt as FirebaseFirestore.Timestamp | null | undefined)?.toMillis()
+    if (publicAt !== undefined && Date.now() >= publicAt) return true
+  }
   if (!uid) return false
   if (track.visibility === 'dj_only') return roles.includes('dj')
-  if (track.visibility === 'followers' || track.visibility === 'early_access') {
+  if (track.visibility === 'followers') {
     return (await db.collection('follows').doc(`${uid}_${track.artistId}`).get()).exists
   }
   if (track.visibility === 'supporters') {
-    const [relSnap, subSnap] = await Promise.all([
-      db.collection('supportRelationships').doc(`${uid}_${track.artistId}`).get(),
-      db.collection('subscriptions').doc(`${uid}_fan`).get(),
-    ])
-    if (!relSnap.exists) return false
-    const status = subSnap.data()?.status
-    return status === 'active' || status === 'trialing'
+    return isActiveSupporter(uid, track.artistId)
+  }
+  if (track.visibility === 'early_access') {
+    // Supporters unlock immediately (spec's own worked example never varies
+    // this — "Supporters: full track now" is the point of the tier).
+    // Followers unlock on their own configured server-timestamp date, so
+    // nothing here ever trusts the caller's clock.
+    if (await isActiveSupporter(uid, track.artistId)) return true
+    const followerAt = (track.followerReleaseAt as FirebaseFirestore.Timestamp | null | undefined)?.toMillis()
+    if (followerAt !== undefined && Date.now() >= followerAt) {
+      return (await db.collection('follows').doc(`${uid}_${track.artistId}`).get()).exists
+    }
+    return false
   }
   return false
 }
