@@ -34,6 +34,10 @@ export interface ArtistProfile {
   perks: string[]
   /** Independent of djAllowRequests — whether this artist's DJ-tier Stories are visible to DJs at all. */
   storiesDjEnabled: boolean
+  /** Server-maintained (recordProfileView). Coarse rate-limited count, not a unique-visitor count — matches trackCount/playCount precision elsewhere. */
+  profileViews?: number
+  /** Server-maintained (recordProfileView). Sanitized ?ref= source -> count, capped to a bounded number of distinct sources; overflow buckets into 'other'. */
+  referralViews?: Record<string, number>
   createdAt: Timestamp | null
   updatedAt: Timestamp | null
 }

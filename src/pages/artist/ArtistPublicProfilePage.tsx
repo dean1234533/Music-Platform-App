@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, BadgeCheck, Disc3, MapPin, Radio } from 'lucide-react'
 import { getArtistIdForSlug, subscribeArtistProfile, subscribePublicArtistTracks } from '@/services/artistService'
+import { recordProfileView } from '@/services/analyticsService'
 import { subscribePublicArtistPosts } from '@/services/artistPostService'
 import { subscribeIsFollowing } from '@/services/followService'
 import { subscribeIsSupporting } from '@/services/supportService'
@@ -29,6 +30,7 @@ import type { FanOfferClaimDoc, FanOfferDoc } from '@/types/fanOffer'
 
 export function ArtistPublicProfilePage() {
   const { slug } = useParams<{ slug: string }>()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { firebaseUser, hasRole } = useAuth()
   const { notify } = useToast()
@@ -116,6 +118,13 @@ export function ArtistPublicProfilePage() {
     if (!artistId) return
     return subscribeArtistPublicHighlights(artistId, setHighlights)
   }, [artistId])
+
+  const hasRecordedView = useRef(false)
+  useEffect(() => {
+    if (!artistId || hasRecordedView.current) return
+    hasRecordedView.current = true
+    void recordProfileView(artistId, searchParams.get('ref'))
+  }, [artistId, searchParams])
 
   if (artistId === undefined) return <LoadingState label="Loading artist…" />
   if (artistId === null) return <ErrorState title="Artist not found" description="This artist URL doesn't exist." />

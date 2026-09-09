@@ -60,6 +60,7 @@ const CommunityPage = lazy(() => import('@/pages/artist/dashboard/CommunityPage'
 const ArtistFanOffersPage = lazy(() => import('@/pages/artist/dashboard/FanOffersPage').then((m) => ({ default: m.FanOffersPage })))
 const ArtistDJRequestsPage = lazy(() => import('@/pages/artist/dashboard/DJRequestsPage').then((m) => ({ default: m.DJRequestsPage })))
 const RevenuePage = lazy(() => import('@/pages/artist/dashboard/RevenuePage').then((m) => ({ default: m.RevenuePage })))
+const GrowthPage = lazy(() => import('@/pages/artist/dashboard/GrowthPage').then((m) => ({ default: m.GrowthPage })))
 const ArtistSettingsPage = lazy(() => import('@/pages/artist/dashboard/ArtistSettingsPage').then((m) => ({ default: m.ArtistSettingsPage })))
 
 const DJDashboardLayout = lazy(() => import('@/pages/dj/DJDashboardLayout').then((m) => ({ default: m.DJDashboardLayout })))
@@ -217,6 +218,7 @@ function App() {
               <Route path="dj-requests" element={<ArtistDJRequestsPage />} />
               <Route path="deals" element={<DjDealsPage />} />
               <Route path="revenue" element={<RevenuePage />} />
+              <Route path="growth" element={<GrowthPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
               <Route path="plan" element={<Navigate replace to="/dashboard/artist" />} />
               <Route path="settings" element={<ArtistSettingsPage />} />

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Play, Pause, Radio, Flag, Scale, ArrowLeft } from 'lucide-react'
 import { getTrackIdForSlug, isTrackAcceptingDjRequests, subscribeTrack } from '@/services/trackService'
 import { getArtistIdForSlug } from '@/services/artistService'
+import { recordTrackView } from '@/services/analyticsService'
 import { usePlayer } from '@/contexts/PlayerContext'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { useAuth } from '@/contexts/AuthContext'
@@ -25,6 +26,7 @@ export function TrackPage() {
   // in the wild) — resolved below. Under the flat /track/:trackId route
   // (no slug in scope) it's always a literal trackId.
   const { trackId: rawParam, slug } = useParams<{ trackId: string; slug?: string }>()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const [resolvedTrackId, setResolvedTrackId] = useState<string | null | undefined>(undefined)
   const [track, setTrack] = useState<TrackDoc | null | undefined>(undefined)
@@ -64,6 +66,13 @@ export function TrackPage() {
     if (!resolvedTrackId) return
     return subscribeTrack(resolvedTrackId, setTrack, () => setLoadError(true))
   }, [resolvedTrackId])
+
+  const hasRecordedView = useRef(false)
+  useEffect(() => {
+    if (!resolvedTrackId || hasRecordedView.current) return
+    hasRecordedView.current = true
+    void recordTrackView(resolvedTrackId, searchParams.get('ref'))
+  }, [resolvedTrackId, searchParams])
 
   // Upgrade the flat /track/:trackId address bar to the canonical nested
   // /artist/:slug/track/:trackSlug form once the artist resolves — flat

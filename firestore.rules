@@ -70,7 +70,9 @@ service cloud.firestore {
         && request.resource.data.followerCount == resource.data.followerCount
         && request.resource.data.supporterCount == resource.data.supporterCount
         && request.resource.data.verified == resource.data.verified
-        && request.resource.data.get('trackCount', 0) == resource.data.get('trackCount', 0);
+        && request.resource.data.get('trackCount', 0) == resource.data.get('trackCount', 0)
+        && request.resource.data.get('profileViews', 0) == resource.data.get('profileViews', 0)
+        && request.resource.data.get('referralViews', {}) == resource.data.get('referralViews', {});
       allow delete: if false;
     }
 
@@ -136,7 +138,8 @@ service cloud.firestore {
         && request.resource.data.get('possibleDuplicateOfTrackId', null) == resource.data.get('possibleDuplicateOfTrackId', null)
         && request.resource.data.get('restrictedCapabilities', []) == resource.data.get('restrictedCapabilities', [])
         && request.resource.data.get('legalHold', false) == resource.data.get('legalHold', false)
-        && request.resource.data.get('trackSlug', null) == resource.data.get('trackSlug', null);
+        && request.resource.data.get('trackSlug', null) == resource.data.get('trackSlug', null)
+        && request.resource.data.get('viewCount', 0) == resource.data.get('viewCount', 0);
 
       // Server callable performs licence/legal-hold checks and media cleanup.
       allow delete: if false;

@@ -30,6 +30,8 @@ export interface TrackDoc {
    * keep working forever via their raw trackId in the same route param.
    */
   trackSlug?: string
+  /** Server-maintained (recordTrackView) page-view count — distinct from playCount (actual preview playback). */
+  viewCount?: number
   albumId: string | null
   genre: string
   subgenre: string | null
