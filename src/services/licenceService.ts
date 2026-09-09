@@ -1,6 +1,6 @@
 import { and, collection, doc, getDocs, onSnapshot, or, orderBy, query, where } from 'firebase/firestore'
 import { ref, uploadBytes } from 'firebase/storage'
-import { db, storage } from '@/lib/firebase'
+import { auth, db, firebaseApp, storage } from '@/lib/firebase'
 import { callable } from '@/lib/callable'
 import type { DownloadLogDoc, IntendedUse, LicenceAgreementDoc, LicenceOfferDoc, LicenceRequestDoc, LicenceRequestEventDoc } from '@/types/licence'
 
@@ -254,9 +254,38 @@ export const createLicencePaymentSession = callable<
   { url: string }
 >('createLicencePaymentSession')
 
-export const getSecureDownloadUrl = callable<{ agreementId: string; actingRole: LicencePartyRole }, { url: string; expiresInSeconds: number }>(
-  'getSecureDownloadUrl',
-)
+/**
+ * downloadLicensedTrack is an onRequest (not onCall) function — it streams the file directly
+ * through its own HTTP response with Content-Disposition set by that function's own code,
+ * rather than handing back a Storage-signed URL. A signed URL's responseDisposition hint asking
+ * the browser to download instead of playing the audio inline isn't reliably honoured (confirmed:
+ * the browser still opened its native player), and this project's GCP identity doesn't have IAM
+ * permission to configure the bucket's CORS policy for a client-side fetch()-and-save workaround
+ * either — streaming through a function whose headers this code controls directly sidesteps both.
+ */
+export async function downloadLicensedTrack(agreementId: string, actingRole: LicencePartyRole): Promise<void> {
+  const user = auth.currentUser
+  if (!user) throw new Error('Sign in required.')
+  const idToken = await user.getIdToken()
+  const region = 'us-central1'
+  const url = `https://${region}-${firebaseApp.options.projectId}.cloudfunctions.net/downloadLicensedTrack?agreementId=${encodeURIComponent(agreementId)}&actingRole=${encodeURIComponent(actingRole)}`
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${idToken}` } })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error((body as { error?: string } | null)?.error || 'Could not prepare the download.')
+  }
+  const disposition = res.headers.get('content-disposition') ?? ''
+  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'track'
+  const blob = await res.blob()
+  const blobUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = blobUrl
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(blobUrl)
+}
 
 /** Download history for the signed-in DJ. */
 export async function listDjDownloadLogs(djId: string): Promise<DownloadLogDoc[]> {

@@ -1,98 +1,154 @@
-import { HttpsError, onCall } from 'firebase-functions/v2/https'
+import { HttpsError, onRequest } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import { getStorage } from 'firebase-admin/storage'
+import { getAuth } from 'firebase-admin/auth'
 import { db } from '../admin.js'
 import { requireActiveUser, userHasRole } from '../roles.js'
 import { resolveLicencePartyRole } from './party.js'
 
-const SIGNED_URL_TTL_MS = 5 * 60 * 1000 // 5 minutes
+const ALLOWED_ORIGINS = ['https://backthevibes.com', 'https://www.backthevibes.com', 'http://localhost:5173']
+
+function setCorsHeaders(req: { headers: Record<string, unknown> }, res: { set: (name: string, value: string) => void }) {
+  const origin = req.headers.origin as string | undefined
+  if (origin && ALLOWED_ORIGINS.includes(origin)) res.set('Access-Control-Allow-Origin', origin)
+  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS')
+  res.set('Access-Control-Allow-Headers', 'Authorization')
+  res.set('Vary', 'Origin')
+}
 
 /**
  * The only way a full-quality original ever reaches a DJ. Re-checks every
  * condition from the spec server-side — auth, role, agreement ownership,
- * track match, approval, payment, expiry, and revocation — before issuing a
- * short-lived signed URL. Storage rules independently block public/direct
- * reads of originals, so this function is the sole path to the file.
+ * track match, approval, payment, expiry, and revocation — before streaming
+ * the file. Storage rules independently block public/direct reads of
+ * originals, so this function is the sole path to the file.
+ *
+ * This is an onRequest (not onCall) HTTP function, and streams the file
+ * directly through this function's own response rather than handing back a
+ * Storage-signed URL: a signed URL's responseDisposition hint asking the
+ * browser to download rather than play the audio inline is not reliably
+ * honoured (confirmed — the browser still opened its native player), and
+ * this project's GCP identity doesn't have IAM permission to configure the
+ * bucket's CORS policy for a client-side fetch()-and-save workaround either.
+ * Streaming through a function whose own response headers this code sets
+ * directly sidesteps both problems — Content-Disposition is guaranteed, and
+ * CORS is this function's own to control.
  */
-export const getSecureDownloadUrl = onCall(async (request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
-  await requireActiveUser(request.auth.uid)
-  const djId = request.auth.uid
-  const { agreementId, actingRole: requestedRole } = request.data ?? {}
-  if (!agreementId || typeof agreementId !== 'string') {
-    throw new HttpsError('invalid-argument', 'agreementId is required.')
+export const downloadLicensedTrack = onRequest(async (req, res) => {
+  setCorsHeaders(req, res)
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('')
+    return
   }
 
-  if (!(await userHasRole(djId, 'dj'))) {
-    throw new HttpsError('permission-denied', 'A DJ profile is required to download licensed tracks.')
-  }
+  try {
+    const authHeader = req.headers.authorization
+    if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ error: 'Sign in required.' })
+      return
+    }
+    const decoded = await getAuth().verifyIdToken(authHeader.slice('Bearer '.length))
+    const djId = decoded.uid
+    await requireActiveUser(djId)
 
-  const agreementRef = db.collection('licenceAgreements').doc(agreementId)
-  const agreementSnap = await agreementRef.get()
-  if (!agreementSnap.exists) throw new HttpsError('not-found', 'Agreement not found.')
-  const agreement = agreementSnap.data()!
+    const agreementId = req.query.agreementId
+    const requestedRole = req.query.actingRole
+    if (typeof agreementId !== 'string' || !agreementId) {
+      res.status(400).json({ error: 'agreementId is required.' })
+      return
+    }
 
-  if (resolveLicencePartyRole(agreement, djId, requestedRole) !== 'dj') {
-    throw new HttpsError('permission-denied', 'This agreement does not belong to you.')
-  }
-  if (agreement.status !== 'active') {
-    throw new HttpsError('failed-precondition', 'Agreement is not active.')
-  }
-  if (agreement.legalHold) {
-    throw new HttpsError('permission-denied', 'This agreement is under legal hold.')
-  }
-  if (agreement.downloadRevoked) {
-    throw new HttpsError('permission-denied', 'Download access has been revoked.')
-  }
-  const requiresPayment = (agreement.licenceFeeMinor ?? 0) > 0
-  if (requiresPayment && !agreement.paidAt) {
-    throw new HttpsError('failed-precondition', 'Payment has not been completed.')
-  }
-  if (agreement.expiryDate) {
-    const expiry = new Date(agreement.expiryDate as string)
-    if (expiry.getTime() < Date.now()) {
-      throw new HttpsError('failed-precondition', 'This licence has expired.')
+    if (!(await userHasRole(djId, 'dj'))) {
+      res.status(403).json({ error: 'A DJ profile is required to download licensed tracks.' })
+      return
+    }
+
+    const agreementRef = db.collection('licenceAgreements').doc(agreementId)
+    const agreementSnap = await agreementRef.get()
+    if (!agreementSnap.exists) {
+      res.status(404).json({ error: 'Agreement not found.' })
+      return
+    }
+    const agreement = agreementSnap.data()!
+
+    try {
+      if (resolveLicencePartyRole(agreement, djId, typeof requestedRole === 'string' ? requestedRole : null) !== 'dj') {
+        res.status(403).json({ error: 'This agreement does not belong to you.' })
+        return
+      }
+    } catch (err) {
+      res.status(403).json({ error: err instanceof HttpsError ? err.message : 'This agreement does not belong to you.' })
+      return
+    }
+    if (agreement.status !== 'active') {
+      res.status(412).json({ error: 'Agreement is not active.' })
+      return
+    }
+    if (agreement.legalHold) {
+      res.status(403).json({ error: 'This agreement is under legal hold.' })
+      return
+    }
+    if (agreement.downloadRevoked) {
+      res.status(403).json({ error: 'Download access has been revoked.' })
+      return
+    }
+    const requiresPayment = (agreement.licenceFeeMinor ?? 0) > 0
+    if (requiresPayment && !agreement.paidAt) {
+      res.status(412).json({ error: 'Payment has not been completed.' })
+      return
+    }
+    if (agreement.expiryDate) {
+      const expiry = new Date(agreement.expiryDate as string)
+      if (expiry.getTime() < Date.now()) {
+        res.status(412).json({ error: 'This licence has expired.' })
+        return
+      }
+    }
+
+    const trackSnap = await db.collection('tracks').doc(agreement.trackId).get()
+    if (!trackSnap.exists) {
+      res.status(404).json({ error: 'Track not found.' })
+      return
+    }
+    const track = trackSnap.data()!
+    if (track.artistId !== agreement.artistId) {
+      res.status(412).json({ error: 'Track/artist mismatch on this agreement.' })
+      return
+    }
+    if (track.takenDown === true || (track.restrictedCapabilities ?? []).includes('dj_licensing')) {
+      res.status(403).json({ error: 'This track is under a copyright review — downloads are temporarily unavailable. Your signed agreement record is preserved.' })
+      return
+    }
+
+    const bucket = getStorage().bucket()
+    const file = bucket.file(track.originalAudioPath as string)
+    const [exists] = await file.exists()
+    if (!exists) {
+      res.status(404).json({ error: 'Original file is unavailable.' })
+      return
+    }
+
+    const extension = ((track.originalAudioPath as string).split('.').pop() || 'mp3').toLowerCase()
+    const safeTitle = String(track.title ?? 'track').replace(/[^\w -]+/g, '').trim().slice(0, 80) || 'track'
+
+    await Promise.all([
+      agreementRef.update({ downloadCount: FieldValue.increment(1) }),
+      db.collection('downloadLogs').add({
+        djId,
+        artistId: agreement.artistId,
+        trackId: agreement.trackId,
+        agreementId,
+        fileVersion: agreement.trackVersion ?? 1,
+        timestamp: FieldValue.serverTimestamp(),
+      }),
+    ])
+
+    res.set('Content-Disposition', `attachment; filename="${safeTitle}.${extension}"`)
+    res.set('Content-Type', 'application/octet-stream')
+    file.createReadStream().on('error', () => res.end()).pipe(res)
+  } catch (err) {
+    if (!res.headersSent) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Could not prepare the download.' })
     }
   }
-
-  const trackSnap = await db.collection('tracks').doc(agreement.trackId).get()
-  if (!trackSnap.exists) throw new HttpsError('not-found', 'Track not found.')
-  const track = trackSnap.data()!
-  if (track.artistId !== agreement.artistId) {
-    throw new HttpsError('failed-precondition', 'Track/artist mismatch on this agreement.')
-  }
-  if (track.takenDown === true || (track.restrictedCapabilities ?? []).includes('dj_licensing')) {
-    throw new HttpsError('permission-denied', 'This track is under a copyright review — downloads are temporarily unavailable. Your signed agreement record is preserved.')
-  }
-
-  const bucket = getStorage().bucket()
-  const file = bucket.file(track.originalAudioPath as string)
-  const [exists] = await file.exists()
-  if (!exists) throw new HttpsError('not-found', 'Original file is unavailable.')
-
-  // Without responseDisposition, the browser opens the audio inline (its native player UI) since
-  // Storage serves the object with its real audio/* content-type — no download happens, and
-  // navigating there loses whichever page sent the DJ there. Telling the browser to treat this
-  // response as an attachment makes it download instead, without ever leaving the current page.
-  const extension = ((track.originalAudioPath as string).split('.').pop() || 'mp3').toLowerCase()
-  const safeTitle = String(track.title ?? 'track').replace(/[^\w -]+/g, '').trim().slice(0, 80) || 'track'
-  const [url] = await file.getSignedUrl({
-    action: 'read',
-    expires: Date.now() + SIGNED_URL_TTL_MS,
-    responseDisposition: `attachment; filename="${safeTitle}.${extension}"`,
-  })
-
-  await Promise.all([
-    agreementRef.update({ downloadCount: FieldValue.increment(1) }),
-    db.collection('downloadLogs').add({
-      djId,
-      artistId: agreement.artistId,
-      trackId: agreement.trackId,
-      agreementId,
-      fileVersion: agreement.trackVersion ?? 1,
-      timestamp: FieldValue.serverTimestamp(),
-    }),
-  ])
-
-  return { url, expiresInSeconds: SIGNED_URL_TTL_MS / 1000 }
 })

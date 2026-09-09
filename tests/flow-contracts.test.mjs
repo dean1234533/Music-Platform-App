@@ -164,7 +164,7 @@ test('DJ licensing has no chat page and ends in a signed downloadable contract',
   assert.match(contract, /Sign agreement/)
   assert.match(contract, /createLicencePaymentSession/)
   assert.match(contract, /Download track/)
-  assert.match(contract, /getSecureDownloadUrl/)
+  assert.match(contract, /downloadLicensedTrack/)
 })
 
 test('account deletion cancels billing and removes supporter state', () => {
@@ -405,16 +405,24 @@ test('My Agreements opens on the first tab that actually has something in it, no
   assert.doesNotMatch(page, /useState\(0\)/)
 })
 
-test('downloading the licensed track forces an actual download instead of opening an inline player (user-reported, screenshot)', () => {
-  // Without responseDisposition: attachment, Storage serves the file with its real audio/*
-  // content-type — the browser renders its native inline player instead of downloading, and
-  // window.open('_blank') just moves that dead-end to a second tab with no way back. Forcing
-  // the download at the server means the current page never navigates away at all.
+test('downloading the licensed track forces an actual download with zero page navigation (user-reported, confirmed live: responseDisposition alone was not honoured)', () => {
+  // A Storage-signed URL's responseDisposition hint is not reliably honoured by the browser —
+  // confirmed live: the browser still opened its native audio player. This project's GCP
+  // identity also lacks IAM permission to configure the bucket's CORS policy, which a
+  // client-side fetch()-of-the-signed-URL workaround would have needed. The reliable fix
+  // streams the file through this function's own response, whose headers it sets directly, and
+  // whose CORS is this function's own to control — not GCS's.
   const downloads = read('functions/src/licensing/downloads.ts')
-  assert.match(downloads, /responseDisposition: `attachment; filename="\$\{safeTitle\}\.\$\{extension\}"`/)
+  assert.match(downloads, /export const downloadLicensedTrack = onRequest/)
+  assert.match(downloads, /res\.set\('Content-Disposition', `attachment; filename="\$\{safeTitle\}\.\$\{extension\}"`\)/)
+  assert.match(downloads, /file\.createReadStream\(\)/)
+  assert.match(downloads, /verifyIdToken/)
+  const service = read('src/services/licenceService.ts')
+  assert.match(service, /export async function downloadLicensedTrack/)
+  assert.match(service, /link\.download = filename/)
+  assert.doesNotMatch(service, /export const getSecureDownloadUrl/)
   const contract = read('src/pages/agreements/ContractPage.tsx')
-  const handleDownloadBody = contract.slice(contract.indexOf('async function handleDownload'), contract.indexOf('async function handleDownload') + 800)
-  assert.match(handleDownloadBody, /window\.location\.href = url/)
+  assert.match(contract, /await downloadLicensedTrack\(agreement!\.agreementId, actingRole\)/)
 })
 
 test('drawn signatures export on an opaque white background and degrade gracefully if the image fails to load (user-reported)', () => {

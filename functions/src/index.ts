@@ -19,7 +19,7 @@ export { sendMessage } from './messaging/messages.js'
 // Phase 4 — digital agreements, DJ licence payments, secure downloads.
 export { proposeAgreement, signAgreement, voidAgreement, getSignatureImageUrls } from './licensing/agreements.js'
 export { createLicencePaymentSession } from './stripe/licencePayment.js'
-export { getSecureDownloadUrl } from './licensing/downloads.js'
+export { downloadLicensedTrack } from './licensing/downloads.js'
 
 // Phase 5 — Stripe Connect payouts, verification, moderation, admin.
 export { createConnectOnboardingLink, createConnectDashboardLink } from './stripe/connect.js'

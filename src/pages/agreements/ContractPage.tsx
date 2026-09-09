@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft, CreditCard, Download, PenLine, Printer } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { createLicencePaymentSession, getSecureDownloadUrl, getSignatureImageUrls, subscribeAgreement } from '@/services/licenceService'
+import { createLicencePaymentSession, downloadLicensedTrack, getSignatureImageUrls, subscribeAgreement } from '@/services/licenceService'
 import { submitReport } from '@/services/moderationService'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { getTrack } from '@/services/trackService'
@@ -116,13 +116,7 @@ export function ContractPage() {
     setBusy(true)
     setActionError(null)
     try {
-      const { url } = await getSecureDownloadUrl({ agreementId: agreement!.agreementId, actingRole })
-      // The signed URL now carries responseDisposition: attachment (see getSecureDownloadUrl),
-      // so the browser treats this as a file download rather than a page navigation — the
-      // current page is never actually unloaded, unlike a plain audio/* response, which either
-      // replaces the tab with a native inline player (window.location.href) or opens one in a
-      // new tab with no way back to this page (window.open).
-      window.location.href = url
+      await downloadLicensedTrack(agreement!.agreementId, actingRole)
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Could not prepare the download.')
     } finally {
