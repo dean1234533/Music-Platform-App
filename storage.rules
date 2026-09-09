@@ -155,12 +155,10 @@ service firebase.storage {
     }
 
     // licenceSignatures/{agreementId}/{fileName} — drawn e-signature images.
-    // Nothing in the product currently displays a stored signature image
-    // back to anyone (ContractPage shows the legal name/typed signature,
-    // not the drawn PNG), so this stays write-only for now rather than
-    // building an unused read path — add a signed-URL callable here
-    // (matching getCopyrightEvidenceUrls) if/when the UI actually renders
-    // one. agreementId is an unguessable fresh ID; signAgreement validates
+    // ContractPage now renders these via getSignatureImageUrls (Admin SDK,
+    // checks the caller is a party to the agreement, returns short-lived
+    // signed URLs) rather than a client-readable rule — stays write-only
+    // here. agreementId is an unguessable fresh ID; signAgreement validates
     // the signature reference server-side before relying on it.
     match /licenceSignatures/{agreementId}/{fileName} {
       allow read: if false;

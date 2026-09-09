@@ -138,6 +138,12 @@ export const signAgreement = callable<SignAgreementInput, { ok: boolean; bothAcc
 
 export const voidAgreement = callable<{ agreementId: string; reason?: string; actingRole: LicencePartyRole }, { ok: boolean }>('voidAgreement')
 
+/** Short-lived signed URLs for any drawn signature images on this agreement — empty for a party who signed by typing their name instead. */
+export const getSignatureImageUrls = callable<
+  { agreementId: string },
+  { signatures: { role: 'artist' | 'dj'; url: string }[] }
+>('getSignatureImageUrls')
+
 export interface OfferTermsInput {
   priceMinor: number
   currency: string

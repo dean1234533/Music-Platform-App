@@ -17,7 +17,7 @@ export { sendOffer, counterOffer, acceptOffer, rejectOffer, withdrawOffer } from
 export { sendMessage } from './messaging/messages.js'
 
 // Phase 4 — digital agreements, DJ licence payments, secure downloads.
-export { proposeAgreement, signAgreement, voidAgreement } from './licensing/agreements.js'
+export { proposeAgreement, signAgreement, voidAgreement, getSignatureImageUrls } from './licensing/agreements.js'
 export { createLicencePaymentSession } from './stripe/licencePayment.js'
 export { getSecureDownloadUrl } from './licensing/downloads.js'
 

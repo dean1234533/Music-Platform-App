@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
+import { getStorage } from 'firebase-admin/storage'
 import type { WriteBatch, DocumentReference, DocumentData } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
 import { requireActiveUser } from '../roles.js'
@@ -401,4 +402,42 @@ export const voidAgreement = onCall(async (request) => {
 
   await batch.commit()
   return { ok: true }
+})
+
+/**
+ * Drawn signatures live at licenceSignatures/{agreementId}/{artist|dj}-{uid}.png with
+ * `allow read: if false` in storage.rules (see the comment there) — this is the one
+ * sanctioned way back in: any party to the agreement can see both drawn signatures (a real
+ * contract shows both parties' signatures), via short-lived signed URLs, matching the
+ * getCopyrightEvidenceUrls pattern. Typed signatures never upload a file, so this simply
+ * returns nothing for a party who signed by typing their name — the client already shows
+ * that name from licenceAgreements.artistLegalName/djLegalName.
+ */
+export const getSignatureImageUrls = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
+  const { agreementId } = request.data ?? {}
+  if (!agreementId || typeof agreementId !== 'string') throw new HttpsError('invalid-argument', 'agreementId is required.')
+
+  const snap = await db.collection('licenceAgreements').doc(agreementId).get()
+  if (!snap.exists) throw new HttpsError('not-found', 'Agreement not found.')
+  const agreement = snap.data()!
+  // Deliberately not resolveLicencePartyRole here: a dual-role account viewing either side of
+  // its own agreement should still see both signatures — this endpoint only discloses which
+  // signatures are drawn images, not anything role-specific, so "is a party at all" is enough.
+  if (agreement.artistId !== request.auth.uid && agreement.djId !== request.auth.uid) {
+    throw new HttpsError('permission-denied', 'Not a party to this agreement.')
+  }
+
+  const [files] = await getStorage().bucket().getFiles({ prefix: `licenceSignatures/${agreementId}/` })
+  const signatures = await Promise.all(
+    files.map(async (file) => {
+      const fileName = file.name.split('/').pop() ?? ''
+      const role = fileName.startsWith('artist-') ? 'artist' : fileName.startsWith('dj-') ? 'dj' : null
+      if (!role) return null
+      const [url] = await file.getSignedUrl({ action: 'read', expires: Date.now() + 10 * 60 * 1000 })
+      return { role, url }
+    }),
+  )
+  return { signatures: signatures.filter((s): s is { role: 'artist' | 'dj'; url: string } => s !== null) }
 })
