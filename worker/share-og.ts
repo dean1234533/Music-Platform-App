@@ -207,10 +207,17 @@ async function buildArtistCard(projectId: string, slug: string, url: string): Pr
   return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })
 }
 
-async function buildTrackCard(projectId: string, slug: string, trackId: string, url: string): Promise<Response | null> {
+async function buildTrackCard(projectId: string, slug: string, trackParam: string, url: string): Promise<Response | null> {
   const slugDoc = await fetchFirestoreDoc(projectId, `artistSlugs/${slug}`)
   const artistId = slugDoc?.artistId as string | undefined
   if (!artistId) return null
+
+  // trackParam is either a clean trackSlug (new share links) or a raw
+  // trackId (older links already shared) — the trackSlugs registry is
+  // keyed by artistId+slug, so a hit there wins; otherwise fall back to
+  // treating the param as a literal trackId.
+  const slugRegistryDoc = await fetchFirestoreDoc(projectId, `trackSlugs/${artistId}_${trackParam}`)
+  const trackId = (slugRegistryDoc?.trackId as string | undefined) ?? trackParam
 
   // Track docs are visibility-gated by Firestore rules — the REST API
   // enforces the same rules unauthenticated, so a non-public track 403s.

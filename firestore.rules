@@ -135,10 +135,17 @@ service cloud.firestore {
         && request.resource.data.get('hashCheckedAt', null) == resource.data.get('hashCheckedAt', null)
         && request.resource.data.get('possibleDuplicateOfTrackId', null) == resource.data.get('possibleDuplicateOfTrackId', null)
         && request.resource.data.get('restrictedCapabilities', []) == resource.data.get('restrictedCapabilities', [])
-        && request.resource.data.get('legalHold', false) == resource.data.get('legalHold', false);
+        && request.resource.data.get('legalHold', false) == resource.data.get('legalHold', false)
+        && request.resource.data.get('trackSlug', null) == resource.data.get('trackSlug', null);
 
       // Server callable performs licence/legal-hold checks and media cleanup.
       allow delete: if false;
+    }
+
+    match /trackSlugs/{registryId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.artistId == request.auth.uid;
+      allow update, delete: if false;
     }
 
     match /albums/{albumId} {

@@ -23,6 +23,13 @@ export interface TrackDoc {
   title: string
   /** Lowercased copy of `title`, kept in sync for prefix search. */
   titleLower: string
+  /**
+   * Clean per-artist-unique slug for /artist/:slug/track/:trackSlug links,
+   * reserved via the `trackSlugs` registry at creation time. Optional
+   * because tracks created before this field existed have none — those
+   * keep working forever via their raw trackId in the same route param.
+   */
+  trackSlug?: string
   albumId: string | null
   genre: string
   subgenre: string | null

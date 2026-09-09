@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Play, Pause, Radio, Flag, Scale, ArrowLeft } from 'lucide-react'
-import { isTrackAcceptingDjRequests, subscribeTrack } from '@/services/trackService'
+import { getTrackIdForSlug, isTrackAcceptingDjRequests, subscribeTrack } from '@/services/trackService'
+import { getArtistIdForSlug } from '@/services/artistService'
 import { usePlayer } from '@/contexts/PlayerContext'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { useAuth } from '@/contexts/AuthContext'
@@ -19,8 +20,13 @@ import { trackShareUrl } from '@/utils/shareLinks'
 import type { TrackDoc } from '@/types/track'
 
 export function TrackPage() {
-  const { trackId } = useParams<{ trackId: string; slug?: string }>()
+  // Under /artist/:slug/track/:trackId this param is either the clean
+  // trackSlug (new share links) or a raw trackId (older links already out
+  // in the wild) — resolved below. Under the flat /track/:trackId route
+  // (no slug in scope) it's always a literal trackId.
+  const { trackId: rawParam, slug } = useParams<{ trackId: string; slug?: string }>()
   const navigate = useNavigate()
+  const [resolvedTrackId, setResolvedTrackId] = useState<string | null | undefined>(undefined)
   const [track, setTrack] = useState<TrackDoc | null | undefined>(undefined)
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer()
   const artist = useArtistSummary(track?.artistId ?? null)
@@ -31,20 +37,48 @@ export function TrackPage() {
   const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
-    if (!trackId) return
-    return subscribeTrack(trackId, setTrack, () => setLoadError(true))
-  }, [trackId])
+    let cancelled = false
+    setResolvedTrackId(undefined)
+    async function resolve() {
+      if (!rawParam) return
+      if (!slug) {
+        if (!cancelled) setResolvedTrackId(rawParam)
+        return
+      }
+      const artistId = await getArtistIdForSlug(slug)
+      if (cancelled) return
+      if (!artistId) {
+        setResolvedTrackId(null)
+        return
+      }
+      const viaSlug = await getTrackIdForSlug(artistId, rawParam)
+      if (!cancelled) setResolvedTrackId(viaSlug ?? rawParam)
+    }
+    void resolve()
+    return () => {
+      cancelled = true
+    }
+  }, [rawParam, slug])
+
+  useEffect(() => {
+    if (!resolvedTrackId) return
+    return subscribeTrack(resolvedTrackId, setTrack, () => setLoadError(true))
+  }, [resolvedTrackId])
 
   // Upgrade the flat /track/:trackId address bar to the canonical nested
-  // /artist/:slug/track/:trackId form once the artist resolves — flat links
-  // already out in the wild (and the OG worker) keep working either way.
+  // /artist/:slug/track/:trackSlug form once the artist resolves — flat
+  // links already out in the wild (and the OG worker) keep working either way.
   useEffect(() => {
-    if (!artist || !trackId) return
-    if (window.location.pathname === `/track/${trackId}`) {
-      navigate(`/artist/${artist.slug}/track/${trackId}`, { replace: true })
+    if (!artist || !track) return
+    if (window.location.pathname === `/track/${track.trackId}`) {
+      const dest = track.trackSlug
+        ? `/artist/${artist.slug}/track/${track.trackSlug}`
+        : `/artist/${artist.slug}/track/${track.trackId}`
+      navigate(dest, { replace: true })
     }
-  }, [artist, trackId, navigate])
+  }, [artist, track, navigate])
 
+  if (resolvedTrackId === null) return <EmptyState title="Track not found" />
   if (track === undefined && loadError) {
     return <ErrorState title="Something went wrong" description="Couldn't load this page. Try refreshing." />
   }
@@ -83,7 +117,7 @@ export function TrackPage() {
             <TrackActions track={track} labels />
             {artist ? (
               <ShareButton
-                url={trackShareUrl(artist.slug, track.trackId)}
+                url={trackShareUrl(artist.slug, track.trackSlug ?? track.trackId)}
                 title={track.title}
                 text={`Listen to "${track.title}" by ${artist.name} on BackTheVibes`}
               />

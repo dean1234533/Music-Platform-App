@@ -8,6 +8,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -18,13 +19,25 @@ import { httpsCallable } from 'firebase/functions'
 import { db, functions, storage } from '@/lib/firebase'
 import type { LicenceMode, TrackCredits, TrackDoc, TrackVisibility } from '@/types/track'
 import type { TrackDjDealSettings } from '@/types/deal'
+import { slugify } from '@/utils/slug'
 
 function trackRef(trackId: string) {
   return doc(db, 'tracks', trackId)
 }
 
+/** Track slugs only need to be unique per artist, not globally — the artist's own slug already disambiguates the URL. */
+function trackSlugRef(artistId: string, slug: string) {
+  return doc(db, 'trackSlugs', `${artistId}_${slug}`)
+}
+
 export function newTrackId(): string {
   return doc(collection(db, 'tracks')).id
+}
+
+/** Read-side lookup for the nested /artist/:slug/track/:trackSlug route. */
+export async function getTrackIdForSlug(artistId: string, slug: string): Promise<string | null> {
+  const snap = await getDoc(trackSlugRef(artistId, slug))
+  return snap.exists() ? (snap.data().trackId as string) : null
 }
 
 export interface UploadedTrackAssets {
@@ -126,6 +139,25 @@ export async function createTrack(
   assets: UploadedTrackAssets,
   input: CreateTrackInput,
 ): Promise<void> {
+  const baseSlug = slugify(input.title) || trackId.slice(0, 8)
+
+  const trackSlug = await runTransaction(db, async (tx) => {
+    let candidate = baseSlug
+    let attempt = 0
+    while (attempt < 25) {
+      const existing = await tx.get(trackSlugRef(artistId, candidate))
+      if (!existing.exists()) break
+      attempt += 1
+      candidate = `${baseSlug}-${attempt + 1}`
+    }
+    // Exhausted the suffix range (25 same-titled tracks from one artist) —
+    // fall back to no slug rather than blocking the upload; the track still
+    // works fine addressed by its raw trackId.
+    if (attempt >= 25) return null
+    tx.set(trackSlugRef(artistId, candidate), { artistId, trackId })
+    return candidate
+  })
+
   const track: Omit<TrackDoc, 'createdAt' | 'updatedAt' | 'releaseDate'> & {
     createdAt: unknown
     updatedAt: unknown
@@ -135,6 +167,7 @@ export async function createTrack(
     artistId,
     title: input.title,
     titleLower: input.title.toLowerCase(),
+    ...(trackSlug ? { trackSlug } : {}),
     albumId: input.albumId,
     genre: input.genre,
     subgenre: input.subgenre,
