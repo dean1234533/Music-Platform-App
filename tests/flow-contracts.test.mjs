@@ -771,3 +771,11 @@ test('password reset, email verification, and email-change-revert links resolve 
 
   assert.match(read('src/App.tsx'), /<Route path="\/auth\/action" element=\{<AuthActionPage \/>\} \/>/)
 })
+
+test('the workspace switcher stays visible whenever there is somewhere else to go, even with only one other workspace (user-reported: stuck on the fan side with no way back to Artist)', () => {
+  const switcher = read('src/components/layout/DashboardSwitcher.tsx')
+  assert.match(switcher, /if \(!workspaces\.some\(\(w\) => !w\.isActive\(location\.pathname\)\)\) return null/)
+  // The old length-based guard hid the switcher entirely for a single-role
+  // account sitting outside its one workspace — must not regress to that.
+  assert.doesNotMatch(switcher, /workspaces\.length < 2/)
+})

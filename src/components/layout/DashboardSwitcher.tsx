@@ -35,7 +35,9 @@ export function DashboardSwitcherCompact() {
   const location = useLocation()
   const workspaces = useWorkspaces()
   const [open, setOpen] = useState(false)
-  if (workspaces.length < 2) return null
+  // Hide only when there's nowhere else to go — a single-workspace account
+  // stuck outside that workspace still needs a way back to it.
+  if (!workspaces.some((w) => !w.isActive(location.pathname))) return null
   const current = workspaces.find((w) => w.isActive(location.pathname)) ?? workspaces[0]
 
   return (
@@ -77,7 +79,9 @@ export function DashboardSwitcherCompact() {
 export function DashboardSwitcherSidebar() {
   const location = useLocation()
   const workspaces = useWorkspaces()
-  if (workspaces.length < 2) return null
+  // Hide only when there's nowhere else to go — a single-workspace account
+  // stuck outside that workspace still needs a way back to it.
+  if (!workspaces.some((w) => !w.isActive(location.pathname))) return null
 
   return (
     <div className="mb-4 flex flex-col gap-1 border-b border-white/[0.06] pb-4">
