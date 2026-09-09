@@ -1073,3 +1073,20 @@ test('new releases default to follower access with a 45-second preview', () => {
   assert.match(upload, /useState<TrackVisibility>\('followers'\)/)
   assert.match(media, /PREVIEW_DEFAULT_DURATION_SEC = 45/)
 })
+
+test('a signed-in user can report another account (e.g. a DJ), and an admin reviewing it sees who it actually is (user-reported: report-a-user had no UI at all despite the backend supporting it)', () => {
+  const modal = read('src/components/track/ReportUserModal.tsx')
+  assert.match(modal, /export function ReportUserModal/)
+  assert.match(modal, /submitReport\(\{ targetType: 'user', targetId: userId, reason, description \}\)/)
+
+  const djPage = read('src/pages/dj/DJPublicProfilePage.tsx')
+  assert.match(djPage, /onClick=\{\(\) => setShowReport\(true\)\}/)
+  assert.match(djPage, /<ReportUserModal userId=\{profile\.djId\} subjectLabel=\{profile\.name\} onClose=\{\(\) => setShowReport\(false\)\} \/>/)
+
+  const admin = read('src/pages/admin/AdminReportsPage.tsx')
+  assert.match(admin, /else if \(report\.targetType === 'user'\) \{/)
+  assert.match(admin, /void getUserProfile\(report\.targetId\)\.then/)
+  assert.match(admin, /report\.targetType === 'artist' \|\| report\.targetType === 'track' \|\| report\.targetType === 'user'/)
+  // No generic public page exists for a plain account, so a 'user' subject renders as text, not a dead/wrong link.
+  assert.match(admin, /Account: \{subjects\[report\.reportId\]!\.label\}/)
+})

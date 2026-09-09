@@ -12,13 +12,15 @@ import {
 import { getCopyrightEvidenceUrls } from '@/services/moderationService'
 import { getArtistProfile } from '@/services/artistService'
 import { getTrack } from '@/services/trackService'
+import { getUserProfile } from '@/services/userService'
 import { Button } from '@/components/common/Button'
 import { TextArea } from '@/components/common/Input'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import type { CopyrightClaimDoc, CopyrightClaimStatus, ReportDoc, SupportMessageDoc } from '@/types/moderation'
 import type { RestrictedCapability } from '@/types/track'
 
-type ReportSubject = { label: string; href: string } | null
+// href omitted for a 'user' report — there's no generic public page for a plain account to link to.
+type ReportSubject = { label: string; href?: string } | null
 
 const RESTRICTABLE_CAPABILITIES: RestrictedCapability[] = ['dj_licensing', 'discovery', 'streaming', 'sharing']
 const CAPABILITY_LABEL: Record<RestrictedCapability, string> = {
@@ -89,6 +91,13 @@ export function AdminReportsPage() {
           const artist = await getArtistProfile(track.artistId)
           const href = artist ? `/artist/${artist.slug}/track/${track.trackSlug ?? track.trackId}` : `/track/${track.trackId}`
           setSubjects((prev) => ({ ...prev, [report.reportId]: { label: track.title, href } }))
+        })
+      } else if (report.targetType === 'user') {
+        void getUserProfile(report.targetId).then((user) => {
+          setSubjects((prev) => ({
+            ...prev,
+            [report.reportId]: user ? { label: user.displayName ?? user.email ?? report.targetId } : null,
+          }))
         })
       }
     }
@@ -319,15 +328,17 @@ export function AdminReportsPage() {
                       View agreement {report.targetId}
                     </Link>
                   ) : null}
-                  {(report.targetType === 'artist' || report.targetType === 'track') ? (
+                  {(report.targetType === 'artist' || report.targetType === 'track' || report.targetType === 'user') ? (
                     subjects[report.reportId] === undefined ? (
                       <p className="text-xs text-ink-3">Loading subject…</p>
                     ) : subjects[report.reportId] === null ? (
                       <p className="text-xs text-ink-3">Subject not found — may already have been removed.</p>
-                    ) : (
-                      <Link to={subjects[report.reportId]!.href} className="text-xs text-brand-400 hover:underline">
+                    ) : subjects[report.reportId]!.href ? (
+                      <Link to={subjects[report.reportId]!.href!} className="text-xs text-brand-400 hover:underline">
                         View {report.targetType}: {subjects[report.reportId]!.label} →
                       </Link>
+                    ) : (
+                      <p className="text-xs text-ink-1">Account: {subjects[report.reportId]!.label}</p>
                     )
                   ) : null}
                 </div>

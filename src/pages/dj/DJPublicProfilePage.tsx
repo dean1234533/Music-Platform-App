@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, BadgeCheck, MapPin } from 'lucide-react'
+import { ArrowLeft, BadgeCheck, Flag, MapPin } from 'lucide-react'
 import { subscribeDJProfile } from '@/services/djService'
+import { useAuth } from '@/contexts/AuthContext'
 import { BrandMark } from '@/components/common/BrandMark'
 import { ErrorState, LoadingState } from '@/components/common/StateViews'
+import { ReportUserModal } from '@/components/track/ReportUserModal'
 import type { DJProfile } from '@/types/dj'
 
 export function DJPublicProfilePage() {
   const { djId } = useParams<{ djId: string }>()
   const navigate = useNavigate()
+  const { firebaseUser } = useAuth()
   const [profile, setProfile] = useState<DJProfile | null | undefined>(undefined)
   const [loadError, setLoadError] = useState(false)
+  const [showReport, setShowReport] = useState(false)
 
   useEffect(() => {
     if (!djId) return
@@ -48,6 +52,16 @@ export function DJPublicProfilePage() {
             <div className="flex items-center gap-2.5">
               <h1 className="truncate text-3xl font-semibold text-ink-0 sm:text-4xl">{profile.name}</h1>
               {profile.verificationStatus === 'verified' ? <BadgeCheck className="h-6 w-6 shrink-0 text-brand-400" /> : null}
+              {firebaseUser ? (
+                <button
+                  type="button"
+                  onClick={() => setShowReport(true)}
+                  aria-label="Report this DJ"
+                  className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-ink-3 transition hover:border-white/20 hover:text-ink-1"
+                >
+                  <Flag className="h-4 w-4" />
+                </button>
+              ) : null}
             </div>
             {profile.city || profile.country ? (
               <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-2">
@@ -76,6 +90,7 @@ export function DJPublicProfilePage() {
           </div>
         ) : null}
       </main>
+      {showReport ? <ReportUserModal userId={profile.djId} subjectLabel={profile.name} onClose={() => setShowReport(false)} /> : null}
     </div>
   )
 }
