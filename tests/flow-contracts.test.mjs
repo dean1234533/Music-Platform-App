@@ -338,6 +338,34 @@ test('player clears user-bound state on logout or account switch', () => {
   assert.match(player, /setQueue\(\[\]\)/)
 })
 
+test('the contract page has a real back button and shows drawn signature images', () => {
+  const contract = read('src/pages/agreements/ContractPage.tsx')
+  const service = read('src/services/licenceService.ts')
+  const agreementsFn = read('functions/src/licensing/agreements.ts')
+  assert.match(contract, /navigate\(-1\)/)
+  assert.match(contract, /getSignatureImageUrls/)
+  assert.match(contract, /signatureImageUrl/)
+  assert.match(service, /getSignatureImageUrls/)
+  assert.match(agreementsFn, /export const getSignatureImageUrls = onCall/)
+  assert.match(read('functions/src/index.ts'), /getSignatureImageUrls/)
+})
+
+test('a rejected/cancelled/expired request stops showing a live actionable offer card', () => {
+  const timeline = read('src/pages/agreements/RequestTimelinePage.tsx')
+  const djList = read('src/pages/dj/DJRequestsPage.tsx')
+  const artistList = read('src/pages/artist/dashboard/DJRequestsPage.tsx')
+  assert.match(timeline, /isTerminal \? null : licenceRequest\.currentOfferId/)
+  assert.match(djList, /\['rejected', 'cancelled', 'expired'\]\.includes\(request\.status\) \? null : request\.currentOfferId/)
+  assert.match(artistList, /\['rejected', 'expired', 'cancelled'\]\.includes\(request\.status\) \? null : request\.currentOfferId/)
+})
+
+test('a fully completed licence request reads as Active, not the internal "approved" status name', () => {
+  const djPage = read('src/pages/dj/DJRequestsPage.tsx')
+  const artistPage = read('src/pages/artist/dashboard/DJRequestsPage.tsx')
+  assert.match(djPage, /approved: 'Active'/)
+  assert.match(artistPage, /status: \['approved'\], label: 'Active'/)
+})
+
 test('the persistent player can be fully dismissed', () => {
   const player = read('src/contexts/PlayerContext.tsx')
   const bar = read('src/components/player/PlayerBar.tsx')
