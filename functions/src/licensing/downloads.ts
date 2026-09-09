@@ -127,6 +127,11 @@ export const downloadLicensedTrack = onRequest(async (req, res) => {
       res.status(404).json({ error: 'Original file is unavailable.' })
       return
     }
+    // The object's own stored contentType (set by uploadBytesResumable from the original File's
+    // real MIME type) — forcing application/octet-stream here made the browser fall back to a
+    // generic document association on download instead of recognising it as audio.
+    const [metadata] = await file.getMetadata()
+    const contentType = metadata.contentType || 'audio/mpeg'
 
     const extension = ((track.originalAudioPath as string).split('.').pop() || 'mp3').toLowerCase()
     const safeTitle = String(track.title ?? 'track').replace(/[^\w -]+/g, '').trim().slice(0, 80) || 'track'
@@ -144,7 +149,8 @@ export const downloadLicensedTrack = onRequest(async (req, res) => {
     ])
 
     res.set('Content-Disposition', `attachment; filename="${safeTitle}.${extension}"`)
-    res.set('Content-Type', 'application/octet-stream')
+    res.set('Content-Type', contentType)
+    if (metadata.size) res.set('Content-Length', String(metadata.size))
     file.createReadStream().on('error', () => res.end()).pipe(res)
   } catch (err) {
     if (!res.headersSent) {

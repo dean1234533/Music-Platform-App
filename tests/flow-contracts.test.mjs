@@ -417,6 +417,12 @@ test('downloading the licensed track forces an actual download with zero page na
   assert.match(downloads, /res\.set\('Content-Disposition', `attachment; filename="\$\{safeTitle\}\.\$\{extension\}"`\)/)
   assert.match(downloads, /file\.createReadStream\(\)/)
   assert.match(downloads, /verifyIdToken/)
+  // Forcing application/octet-stream made the browser fall back to a generic document
+  // association on download instead of recognising it as audio — the real stored contentType
+  // (set at upload time from the original file's own MIME type) must be used instead.
+  assert.doesNotMatch(downloads, /'application\/octet-stream'/)
+  assert.match(downloads, /res\.set\('Content-Type', contentType\)/)
+  assert.match(downloads, /file\.getMetadata\(\)/)
   const service = read('src/services/licenceService.ts')
   assert.match(service, /export async function downloadLicensedTrack/)
   assert.match(service, /link\.download = filename/)
