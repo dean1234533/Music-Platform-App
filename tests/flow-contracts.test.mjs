@@ -2407,3 +2407,28 @@ test('every button shows a pointer/hand cursor on desktop instead of the default
   const css = read('src/index.css')
   assert.match(css, /button:not\(:disabled\),\s*\n\[role="button"\]:not\(\[aria-disabled="true"\]\) \{\s*\n\s*cursor: pointer;\s*\n\}/)
 })
+
+test('empty public profiles get honest, neutral bio copy instead of fabricated enthusiasm, and the Website/Notable venues fields no longer invite the browser to autofill a saved email into them (user-reported: "the artist profile has this terrible place holder Dean is building their BackTheVibes profile. Follow along for new music and artist updates. also i settings it show my email as a place holder as the website as a artist and shows the same thing for Notable venues (comma separated) as a dj")', () => {
+  const artistPublic = read('src/pages/artist/ArtistPublicProfilePage.tsx')
+  assert.doesNotMatch(artistPublic, /is building their BackTheVibes profile/)
+  assert.match(artistPublic, /\{artist\.bio \|\| 'This artist hasn.t added a bio yet\.'\}/)
+
+  const djPublic = read('src/pages/dj/DJPublicProfilePage.tsx')
+  assert.doesNotMatch(djPublic, /is building their BackTheVibes profile/)
+  assert.match(djPublic, /\{profile\.bio \|\| 'This DJ hasn.t added a bio yet\.'\}/)
+
+  // No field in the current create/read/write path ever assigns email into website/venues —
+  // traced onboarding (AddRolePage has no email field at all), the profile-creation Cloud
+  // Function (socialLinks: {}, venues: [] — both start empty), and the settings pages'
+  // own read (profile.socialLinks.website / p.venues.join(', ')). The most likely real cause
+  // is the browser's own autofill offering a saved email for these generic, unhinted text
+  // inputs — added autoComplete="off" so it stops being offered, on both the field the report
+  // named and the adjacent same-risk fields (DJ real name too).
+  const artistSettings = read('src/pages/artist/dashboard/ArtistSettingsPage.tsx')
+  assert.match(artistSettings, /<Label>Website<\/Label>\s*\n\s*<Input\s*\n\s*value=\{form\.website\}\s*\n\s*onChange=\{\(e\) => setForm\(\(f\) => \(\{ \.\.\.f, website: e\.target\.value \}\)\)\}\s*\n\s*placeholder="https:\/\/…"\s*\n\s*autoComplete="off"/)
+
+  const djSettings = read('src/pages/dj/DJProfilePage.tsx')
+  assert.match(djSettings, /placeholder="Legal or professional name, if different from your DJ name"\s*\n\s*autoComplete="off"/)
+  assert.match(djSettings, /placeholder="https:\/\/…"\s*\n\s*autoComplete="off"/)
+  assert.match(djSettings, /placeholder="e\.g\. Fabric, Ministry of Sound"\s*\n\s*autoComplete="off"/)
+})

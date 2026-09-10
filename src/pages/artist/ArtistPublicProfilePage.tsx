@@ -348,7 +348,7 @@ export function ArtistPublicProfilePage() {
           <aside className="space-y-4">
             <div className="rounded-[1.5rem] border border-white/[0.08] bg-white/[0.025] p-6">
               <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-ink-3">About</p>
-              <p className="mt-4 text-base leading-7 text-ink-1">{artist.bio || `${artist.name} is building their BackTheVibes profile. Follow along for new music and artist updates.`}</p>
+              <p className="mt-4 text-base leading-7 text-ink-1">{artist.bio || 'This artist hasn’t added a bio yet.'}</p>
             </div>
             <div className="rounded-[1.5rem] border border-brand-400/15 bg-brand-400/[0.055] p-6">
               <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-brand-400">Direct support</p>

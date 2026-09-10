@@ -248,7 +248,12 @@ export function ArtistSettingsPage() {
           </div>
           <div>
             <Label>Website</Label>
-            <Input value={form.website} onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))} />
+            <Input
+              value={form.website}
+              onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
+              placeholder="https://…"
+              autoComplete="off"
+            />
           </div>
         </div>
       </section>

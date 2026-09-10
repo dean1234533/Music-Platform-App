@@ -254,6 +254,7 @@ export function DJProfilePage() {
               value={form.realName}
               onChange={(e) => setForm((f) => ({ ...f, realName: e.target.value }))}
               placeholder="Legal or professional name, if different from your DJ name"
+              autoComplete="off"
             />
           </div>
           <div>
@@ -262,6 +263,7 @@ export function DJProfilePage() {
               value={form.website}
               onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
               placeholder="https://…"
+              autoComplete="off"
             />
           </div>
         </div>
@@ -271,6 +273,7 @@ export function DJProfilePage() {
             value={form.venues}
             onChange={(e) => setForm((f) => ({ ...f, venues: e.target.value }))}
             placeholder="e.g. Fabric, Ministry of Sound"
+            autoComplete="off"
           />
         </div>
       </div>

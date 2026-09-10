@@ -119,7 +119,7 @@ export function DJPublicProfilePage() {
           <section className="rounded-[1.75rem] border border-white/[0.08] bg-gradient-to-br from-white/[0.055] to-white/[0.015] p-7 sm:p-9">
             <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-dj-400">About the DJ</p>
             <p className="mt-5 max-w-2xl text-base leading-7 text-ink-1">
-              {profile.bio || `${profile.name} is building their BackTheVibes profile. Check back for their sound, story and latest sets.`}
+              {profile.bio || 'This DJ hasn’t added a bio yet.'}
             </p>
           </section>
 
