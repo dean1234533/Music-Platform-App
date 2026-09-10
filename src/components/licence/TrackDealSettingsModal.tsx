@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Modal } from '@/components/common/Modal'
 import { Button } from '@/components/common/Button'
 import { Input, Label } from '@/components/common/Input'
@@ -71,10 +72,18 @@ export function TrackDealSettingsModal({ track, onClose }: { track: TrackDoc; on
             <p className="text-xs text-ink-3">
               DJs can send a request without choosing a deal. If manual approval is enabled, you review every request before an offer can proceed.
             </p>
+            {deals.length === 0 ? (
+              <p className="rounded-lg border border-warning-500/30 bg-warning-500/10 px-3 py-2 text-xs text-ink-1">
+                No reusable deals yet, so DJs will only see "Custom deal — talk to the artist," not real terms.{' '}
+                <Link to="/dashboard/artist/deals" className="font-medium text-brand-400 hover:underline">
+                  Create a deal first →
+                </Link>
+              </p>
+            ) : null}
             <div>
               <Label>Allowed deals</Label>
               {deals.length === 0 ? (
-                <p className="text-xs text-ink-3">No reusable deals yet — create one in DJ Deals first.</p>
+                <p className="text-xs text-ink-3">Deals you create show up here to assign.</p>
               ) : (
                 <div className="flex flex-col gap-1.5">
                   {deals.map((d) => (

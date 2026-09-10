@@ -1915,3 +1915,15 @@ test('back buttons fall back to a real destination instead of silently doing not
     assert.doesNotMatch(page, /onClick=\{\(\) => navigate\(-1\)\}/)
   }
 })
+
+test('a track with DJ requests enabled but no reusable deal assigned tells the artist why, with a direct link to fix it, instead of leaving them to discover it from the DJ side (user-reported: "dj can not see artist deal packages are live yet")', () => {
+  // Root cause confirmed live: djDeals had zero documents and the one DJ-promoted track had
+  // djDealSettings.acceptDjRequests true with allowedDealIds empty — the artist turned on
+  // "Accept DJ requests" without ever creating a reusable deal in DJ Deals first, so DealsPanel
+  // correctly rendered nothing but the generic "Custom deal" fallback. Not a query/rules bug —
+  // DealsPanel, getDealsByIds, and the djDeals rules all already behave correctly for this case.
+  const modal = read('src/components/licence/TrackDealSettingsModal.tsx')
+  assert.match(modal, /No reusable deals yet, so DJs will only see "Custom deal — talk to the artist," not real terms\./)
+  assert.match(modal, /<Link to="\/dashboard\/artist\/deals" className="font-medium text-brand-400 hover:underline">/)
+  assert.match(modal, /Create a deal first →/)
+})
