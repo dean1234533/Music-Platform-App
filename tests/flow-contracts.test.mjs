@@ -63,7 +63,9 @@ test('install banner only shows once signed in, and first-time profiles are awai
   const signIn = read('src/pages/auth/SignInPage.tsx')
   const authContext = read('src/contexts/AuthContext.tsx')
   const users = read('src/services/userService.ts')
-  assert.match(banner, /if \(!firebaseUser\) return null/)
+  assert.match(banner, /if \(!firebaseUser \|\| !isAuthenticatedRoute\(pathname\)\) return null/)
+  assert.match(banner, /isAuthenticatedRoute\(pathname\)/)
+  assert.match(banner, /pathname === prefix \|\| pathname\.startsWith/)
   assert.match(signIn, /await ensureUserDocument\(user\)/)
   // Email signup itself has no ensureUserDocument call — AuthContext's own onAuthStateChanged
   // listener calls it for every signed-in user regardless of entry point, so this isn't a gap.

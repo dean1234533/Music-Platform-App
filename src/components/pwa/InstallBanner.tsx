@@ -1,11 +1,29 @@
 import { useState } from 'react'
 import { Download, Share, X } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
 import { useInstallPrompt } from '@/hooks/useInstallPrompt'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/common/Button'
 
 const DISMISS_KEY = 'installBannerDismissedAt'
 const DISMISS_DAYS = 7
+const AUTHENTICATED_ROUTE_PREFIXES = [
+  '/app',
+  '/dashboard/artist',
+  '/dj',
+  '/agreements',
+  '/dj-requests',
+  '/support',
+  '/onboarding',
+  '/verify-email',
+  '/admin',
+]
+
+function isAuthenticatedRoute(pathname: string): boolean {
+  return AUTHENTICATED_ROUTE_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  )
+}
 
 function recentlyDismissed(): boolean {
   try {
@@ -26,19 +44,20 @@ function dismiss(): void {
 }
 
 /**
- * Only shown once signed in — the deferred `beforeinstallprompt` event is
+ * Only shown once signed in and inside an authenticated workspace — the deferred `beforeinstallprompt` event is
  * still captured at module scope before sign-in (see lib/installPrompt.ts),
  * since Chrome only fires it once and never re-fires it; this component just
- * doesn't render its UI until there's a signed-in user to show it to.
+ * doesn't render its UI until there's a signed-in user inside the app to show it to.
  * Hidden once the app is standalone and for DISMISS_DAYS after dismissal.
  */
 export function InstallBanner() {
   const { firebaseUser } = useAuth()
+  const { pathname } = useLocation()
   const { canInstall, isStandalone, isIOS, install } = useInstallPrompt()
   const [dismissed, setDismissed] = useState(recentlyDismissed)
   const [installing, setInstalling] = useState(false)
 
-  if (!firebaseUser) return null
+  if (!firebaseUser || !isAuthenticatedRoute(pathname)) return null
   if (isStandalone || dismissed) return null
   if (!canInstall && !isIOS) return null
 
