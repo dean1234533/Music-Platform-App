@@ -9,6 +9,9 @@ export const adminSetUserSuspension = onCall(async (request) => {
   if (!userId || typeof suspended !== 'boolean') {
     throw new HttpsError('invalid-argument', 'userId and suspended are required.')
   }
+  if (userId === adminId) {
+    throw new HttpsError('failed-precondition', 'You cannot suspend your own account.')
+  }
 
   await db.collection('users').doc(userId).update({
     suspended,

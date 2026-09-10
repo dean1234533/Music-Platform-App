@@ -206,6 +206,9 @@ export const adminDeleteAccount = onCall({ secrets: [stripeSecretKey] }, async (
   if (!userId || typeof userId !== 'string') {
     throw new HttpsError('invalid-argument', 'userId is required.')
   }
+  if (userId === adminId) {
+    throw new HttpsError('failed-precondition', 'Use account settings to delete your own account, not the admin tool — this prevents an admin from accidentally locking themselves out.')
+  }
 
   try {
     await performAccountDeletion(userId)

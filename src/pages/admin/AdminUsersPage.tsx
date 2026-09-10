@@ -2,20 +2,27 @@ import { useEffect, useState } from 'react'
 import { adminChangeArtistSlug, adminDeleteAccount, adminSetUserSuspension, listUsers } from '@/services/adminService'
 import { getArtistProfile } from '@/services/artistService'
 import { slugify } from '@/utils/slug'
+import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/common/Button'
 import { Input, Label } from '@/components/common/Input'
 import { LoadingState } from '@/components/common/StateViews'
 import type { UserProfile } from '@/types/user'
 
 export function AdminUsersPage() {
+  const { firebaseUser } = useAuth()
   const [users, setUsers] = useState<UserProfile[] | null>(null)
   const [busyUid, setBusyUid] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<UserProfile | null>(null)
   const [slugTarget, setSlugTarget] = useState<UserProfile | null>(null)
 
   useEffect(() => {
-    void listUsers().then(setUsers)
-  }, [])
+    // This page is for moderating other accounts — an admin's own account
+    // never appears here, so there's nothing to accidentally suspend/delete
+    // yourself with. The server (adminSetUserSuspension/adminDeleteAccount)
+    // also rejects self-targeting regardless, but this keeps the temptation
+    // off the screen entirely.
+    void listUsers().then((rows) => setUsers(rows.filter((u) => u.uid !== firebaseUser?.uid)))
+  }, [firebaseUser])
 
   async function toggleSuspension(user: UserProfile) {
     setBusyUid(user.uid)

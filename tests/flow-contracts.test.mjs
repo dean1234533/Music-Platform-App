@@ -1154,3 +1154,14 @@ test('the shared mobile navigation keeps home-indicator clearance without a doub
   assert.match(nav, /flex flex-1 translate-y-1 flex-col/)
   assert.doesNotMatch(nav, /style=\{\{ paddingBottom: 'env\(safe-area-inset-bottom\)' \}\}/)
 })
+
+test('an admin can never suspend or delete their own account (user-reported: appeared in the Users list like any other account, with working Suspend/Delete buttons on themselves)', () => {
+  const page = read('src/pages/admin/AdminUsersPage.tsx')
+  assert.match(page, /listUsers\(\)\.then\(\(rows\) => setUsers\(rows\.filter\(\(u\) => u\.uid !== firebaseUser\?\.uid\)\)\)/)
+
+  const suspension = read('functions/src/admin/moderation.ts')
+  assert.match(suspension, /if \(userId === adminId\) \{\s*throw new HttpsError\('failed-precondition', 'You cannot suspend your own account\.'\)/)
+
+  const deletion = read('functions/src/account/deleteAccount.ts')
+  assert.match(deletion, /if \(userId === adminId\) \{\s*throw new HttpsError\('failed-precondition', 'Use account settings to delete your own account/)
+})
