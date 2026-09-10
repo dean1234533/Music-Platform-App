@@ -199,27 +199,23 @@ export function ArtistPublicProfilePage() {
         </button>
       </header>
 
-      <div className="relative h-14 w-full overflow-hidden border-y border-white/[0.06] bg-surface-2 sm:h-52 lg:h-56">
-        {artist.coverURL ? (
-          <img src={artist.coverURL} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <div className="relative h-full w-full overflow-hidden bg-[radial-gradient(circle_at_72%_20%,rgba(43,78,255,.38),transparent_28rem),linear-gradient(125deg,#0b0e12_0%,#11182b_58%,#07090b_100%)]">
-            <div className="absolute -right-8 -top-20 select-none font-serif text-[20rem] leading-none text-white/[0.035] sm:text-[27rem]">{artist.name.charAt(0).toUpperCase()}</div>
-            <div className="absolute left-[8%] top-1/2 h-px w-[52%] bg-gradient-to-r from-brand-400/60 to-transparent" />
-            <div className="absolute left-[16%] top-[58%] h-px w-[38%] bg-gradient-to-r from-white/20 to-transparent" />
-          </div>
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-surface-0 via-surface-0/10 to-transparent" />
+      <div className="relative h-60 w-full overflow-hidden border-y border-white/[0.06] bg-surface-2 sm:h-72 lg:h-96">
+        <img
+          src={artist.coverURL || '/artist-profile-card-bg.png'}
+          alt=""
+          className="h-full w-full object-cover object-center"
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,7,.08)_0%,rgba(5,6,7,.16)_42%,rgba(5,6,7,.76)_100%)]" />
       </div>
 
-      <main className="relative z-10 mx-auto -mt-4 max-w-6xl px-5 sm:-mt-14 sm:px-8 lg:-mt-16 lg:px-10">
-        <section className="premium-panel relative overflow-hidden rounded-[2rem] p-5 sm:p-7 lg:p-9">
+      <main className="relative z-10 mx-auto -mt-28 max-w-6xl px-5 sm:-mt-32 sm:px-8 lg:-mt-52 lg:px-10">
+        <section className="premium-panel relative overflow-hidden rounded-[2rem] !bg-transparent p-5 backdrop-blur-md sm:p-7 lg:p-9">
           <img
             src={artist.coverURL || '/artist-profile-card-bg.png'}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover object-center sm:object-[68%_center]"
+            className="absolute inset-0 h-full w-full object-cover object-center opacity-75"
           />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,6,7,.82),rgba(5,6,7,.46)_58%,rgba(5,6,7,.58)),linear-gradient(0deg,rgba(5,6,7,.55),transparent_70%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,6,7,.72),rgba(5,6,7,.38)_58%,rgba(5,6,7,.18)),linear-gradient(0deg,rgba(5,6,7,.44),transparent_72%)]" />
           <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-end">
           <button
             type="button"
