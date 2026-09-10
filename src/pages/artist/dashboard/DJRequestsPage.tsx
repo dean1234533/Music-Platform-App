@@ -147,6 +147,9 @@ export function DJRequestsPage() {
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <h3 className="text-base font-semibold text-ink-0">{trackTitles[request.trackId] ?? 'Track'}</h3>
+                          <Link to={`/djs/${request.djId}`} className="mt-0.5 block w-fit text-xs font-medium text-brand-400 hover:underline">
+                            From {request.djNameSnapshot ?? 'a DJ'} — view profile
+                          </Link>
                           <p className="mt-1 text-sm text-ink-2">
                             {request.dealId
                               ? request.currentAgreementId

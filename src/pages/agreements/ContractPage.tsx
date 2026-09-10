@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { useSmartBack } from '@/hooks/useSmartBack'
 import { AlertTriangle, ArrowLeft, CreditCard, Download, PenLine, Printer } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { createLicencePaymentSession, downloadLicensedTrack, getSignatureImageUrls, subscribeAgreement } from '@/services/licenceService'
@@ -35,7 +36,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function ContractPage() {
   const { agreementId } = useParams<{ agreementId: string }>()
-  const navigate = useNavigate()
+  const goBack = useSmartBack('/agreements')
   const [searchParams, setSearchParams] = useSearchParams()
   const { firebaseUser } = useAuth()
   const [agreement, setAgreement] = useState<LicenceAgreementDoc | null | undefined>(undefined)
@@ -129,7 +130,7 @@ export function ContractPage() {
       <style>{`@media print { nav, header, .no-print { display: none !important; } }`}</style>
       <div className="mb-6 flex items-center justify-between no-print">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0 active:opacity-60">
+          <button onClick={goBack} className="flex items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0 active:opacity-60">
             <ArrowLeft className="h-4 w-4" /> Back
           </button>
           <Link to={isDj ? '/dj/requests' : '/dashboard/artist/dj-requests'} className="text-sm text-ink-2 hover:text-ink-0">

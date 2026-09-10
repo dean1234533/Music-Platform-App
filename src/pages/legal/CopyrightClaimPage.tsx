@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import { useSmartBack } from '@/hooks/useSmartBack'
 import { ArrowLeft } from 'lucide-react'
 import { BrandMark } from '@/components/common/BrandMark'
 import { Button } from '@/components/common/Button'
@@ -18,7 +19,7 @@ const MAX_EVIDENCE_FILES = 5
 export function CopyrightClaimPage() {
   const [searchParams] = useSearchParams()
   const trackId = searchParams.get('trackId') ?? ''
-  const navigate = useNavigate()
+  const goBack = useSmartBack('/app')
   const { firebaseUser } = useAuth()
 
   const [claimantName, setClaimantName] = useState(firebaseUser?.displayName ?? '')
@@ -94,7 +95,7 @@ export function CopyrightClaimPage() {
         <Link to="/">
           <BrandMark />
         </Link>
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0 active:opacity-60">
+        <button onClick={goBack} className="flex items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0 active:opacity-60">
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
       </header>

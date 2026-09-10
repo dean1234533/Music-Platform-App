@@ -1,9 +1,11 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { Modal } from '@/components/common/Modal'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
 import { submitLicenceRequest } from '@/services/licenceService'
+import { getDJProfile } from '@/services/djService'
+import { useAuth } from '@/contexts/AuthContext'
 import type { IntendedUse } from '@/types/licence'
 
 const USE_OPTIONS: { value: IntendedUse; label: string }[] = [
@@ -26,6 +28,7 @@ export function RequestDjAccessModal({
   onClose: () => void
 }) {
   const navigate = useNavigate()
+  const { firebaseUser } = useAuth()
   const [intendedUse, setIntendedUse] = useState<IntendedUse>('dj_set')
   const [territory, setTerritory] = useState('')
   const [expectedDate, setExpectedDate] = useState('')
@@ -37,6 +40,22 @@ export function RequestDjAccessModal({
   const [streamingIntention, setStreamingIntention] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isUnverified, setIsUnverified] = useState(false)
+
+  // Many artists default to accepting requests only from verified DJs — surfacing that
+  // upfront (rather than letting an unverified DJ fill out the whole form and only then
+  // hit a rejection) is worth a one-doc lookup, even though this particular artist's
+  // actual policy isn't known here (see TrackPage.tsx, which doesn't currently load it).
+  useEffect(() => {
+    if (!firebaseUser) return
+    let cancelled = false
+    void getDJProfile(firebaseUser.uid).then((profile) => {
+      if (!cancelled) setIsUnverified(profile?.verificationStatus !== 'verified')
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [firebaseUser])
 
   async function handleSubmit() {
     setSubmitting(true)
@@ -70,6 +89,15 @@ export function RequestDjAccessModal({
   return (
     <Modal title={dealId ? 'Request final deal terms' : 'Request DJ access'} onClose={onClose}>
       <div className="flex flex-col gap-4">
+        {isUnverified ? (
+          <div className="rounded-xl border border-warning-500/30 bg-warning-500/10 p-3 text-sm text-ink-1">
+            Your DJ account isn't verified yet. Many artists only accept requests from
+            verified DJs — if this one does, your request will be rejected automatically.{' '}
+            <Link to="/dj/profile" className="font-medium text-brand-400 hover:underline">
+              Get verified first →
+            </Link>
+          </div>
+        ) : null}
         <div>
           <Label>Intended use</Label>
           <select

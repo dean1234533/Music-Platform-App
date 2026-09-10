@@ -392,7 +392,7 @@ test('the contract page has a real back button and shows drawn signature images'
   const contract = read('src/pages/agreements/ContractPage.tsx')
   const service = read('src/services/licenceService.ts')
   const agreementsFn = read('functions/src/licensing/agreements.ts')
-  assert.match(contract, /navigate\(-1\)/)
+  assert.match(contract, /useSmartBack\('\/agreements'\)/)
   assert.match(contract, /getSignatureImageUrls/)
   assert.match(contract, /signatureImageUrl/)
   assert.match(service, /getSignatureImageUrls/)
@@ -1814,4 +1814,104 @@ test('a fan can see artist profile cards and browse tracks again (user-reported)
   assert.match(fn, /await djRef\.update\(\{ roleActive: isDj \}\)/)
 
   assert.match(read('functions/src/index.ts'), /export \{ onUserCreate, onUserRolesChange \} from '\.\/users\.js'/)
+})
+
+test('submitting a verification request notifies every admin, matching submitSupportMessage\'s established pattern (user-reported: "i just asked to be verified as the dj but as admin i did not get a notification")', () => {
+  const fn = read('functions/src/admin/verification.ts')
+
+  // Root cause: submitVerificationRequest wrote the verificationRequests doc (and, for a DJ,
+  // flipped verificationStatus to 'pending') but never told anyone — an admin only found out
+  // by remembering to check Admin -> Verification, exactly the bug already fixed once for
+  // support messages.
+  assert.match(fn, /const adminsSnap = await db\.collection\('users'\)\.where\('roles', 'array-contains', 'admin'\)\.get\(\)/)
+  assert.match(fn, /for \(const adminDoc of adminsSnap\.docs\) \{/)
+  assert.match(fn, /type: 'verification_request'/)
+  assert.match(fn, /linkTo: '\/admin\/verification'/)
+  // The request doc, the djProfiles status flip, and the admin notifications all commit
+  // together — no window where a request exists but the flip or the notification is missing.
+  assert.match(fn, /const batch = db\.batch\(\)/)
+  assert.match(fn, /batch\.set\(requestRef,/)
+  assert.match(fn, /batch\.update\(db\.collection\('djProfiles'\)\.doc\(uid\), \{ verificationStatus: 'pending' \}\)/)
+  assert.match(fn, /await batch\.commit\(\)/)
+})
+
+test('verification is presented as functionally required, not cosmetic, before and during a DJ\'s request attempt (user-reported: "if verification is needed to see things that is important doesnt it make sense to make it clearer to users to actualy verify")', () => {
+  // DJ's own profile page no longer frames verification as just a badge — it says plainly
+  // that most artists default to rejecting unverified DJs' requests.
+  const djProfilePage = read('src/pages/dj/DJProfilePage.tsx')
+  assert.match(djProfilePage, /most artists only accept requests from verified DJs by default/)
+
+  // The request modal itself warns an unverified DJ BEFORE they fill out the whole form and
+  // hit a rejection, rather than only surfacing the problem after submission.
+  const modal = read('src/components/track/RequestDjAccessModal.tsx')
+  assert.match(modal, /import \{ getDJProfile \} from '@\/services\/djService'/)
+  assert.match(modal, /setIsUnverified\(profile\?\.verificationStatus !== 'verified'\)/)
+  assert.match(modal, /Your DJ account isn't verified yet\./)
+  assert.match(modal, /to="\/dj\/profile"/)
+})
+
+test('the DJ profile page collects the evidence verification review actually uses (real name, website, venues), and the admin review page displays it (user-reported: "if the dj profile is used for verifcation this should be more detailed")', () => {
+  // Root cause: AdminVerificationPage already read/displayed socialLinks and venues, but
+  // DJProfilePage's own edit form never exposed inputs for them (or realName) — the schema
+  // supported richer evidence, nothing let a DJ actually provide it.
+  const djProfilePage = read('src/pages/dj/DJProfilePage.tsx')
+  assert.match(djProfilePage, /realName: form\.realName\.trim\(\) \|\| null/)
+  assert.match(djProfilePage, /const nextSocialLinks = \{ \.\.\.profile!\.socialLinks \}/)
+  assert.match(djProfilePage, /venues: form\.venues\.split\(','\)\.map\(\(v\) => v\.trim\(\)\)\.filter\(Boolean\)/)
+  assert.match(djProfilePage, /<Label>Real name<\/Label>/)
+  assert.match(djProfilePage, /<Label>Website or press link<\/Label>/)
+  assert.match(djProfilePage, /<Label>Notable venues \(comma separated\)<\/Label>/)
+
+  // realName is admin-review evidence only — AdminVerificationPage is the one place that
+  // reads it, never rendered on the public DJ profile.
+  const adminPage = read('src/pages/admin/AdminVerificationPage.tsx')
+  assert.match(adminPage, /realName: p\.realName/)
+  assert.match(adminPage, /Real name: \{subject\.realName\}/)
+  const publicDjPage = read('src/pages/dj/DJPublicProfilePage.tsx')
+  assert.doesNotMatch(publicDjPage, /realName/)
+})
+
+test('the artist reviewing a DJ request can actually see who is asking, and both sides of a request link to each other\'s public profile (user-reported: "also can a artist see a dj profile")', () => {
+  // Root cause: /djs/:djId was a public, unguarded route the whole time — the gap was that
+  // nothing in the app actually linked an artist to it. The request list showed a track and
+  // terms but never the requesting DJ's name, and the request detail page showed "DJ: {name}"
+  // as plain text with no link either.
+  const requestsPage = read('src/pages/artist/dashboard/DJRequestsPage.tsx')
+  assert.match(requestsPage, /<Link to=\{`\/djs\/\$\{request\.djId\}`\} className="mt-0\.5 block w-fit text-xs font-medium text-brand-400 hover:underline">/)
+  assert.match(requestsPage, /From \{request\.djNameSnapshot \?\? 'a DJ'\} — view profile/)
+
+  const timelinePage = read('src/pages/agreements/RequestTimelinePage.tsx')
+  assert.match(timelinePage, /<Link to=\{`\/djs\/\$\{licenceRequest\.djId\}`\} className="font-medium text-brand-400 hover:underline">/)
+  // Symmetric fix: a DJ reviewing the same page could see the artist's name but not click
+  // through to their profile either.
+  assert.match(timelinePage, /<Link to=\{`\/artist\/\$\{artist\.slug\}`\} className="font-medium text-brand-400 hover:underline">/)
+})
+
+test('back buttons fall back to a real destination instead of silently doing nothing when a page is opened with no in-app history (user-reported: "the back btton does not work on this page https://backthevibes.com/djs/KGnqp8flPrQQ0DtyV5cuAfEre5f1")', () => {
+  // Root cause: every back button called navigate(-1) directly. That's a no-op (or exits the
+  // SPA) whenever the page was opened via a direct/shared link, a new tab, or after a service
+  // worker reload — exactly how a DJ public profile link like this one is normally reached.
+  const hook = read('src/hooks/useSmartBack.ts')
+  assert.match(hook, /export function useSmartBack\(fallbackPath: string\)/)
+  assert.match(hook, /if \(location\.key === 'default'\) \{/)
+  assert.match(hook, /navigate\(fallbackPath\)/)
+  assert.match(hook, /navigate\(-1\)/)
+
+  // Every page that previously called navigate(-1) directly for its back button now routes
+  // through the shared hook with a real fallback destination instead.
+  const usages = [
+    ['src/pages/track/TrackPage.tsx', "useSmartBack('/')"],
+    ['src/pages/agreements/RequestTimelinePage.tsx', "useSmartBack('/agreements')"],
+    ['src/pages/agreements/ContractPage.tsx', "useSmartBack('/agreements')"],
+    ['src/pages/agreements/MyAgreementsPage.tsx', "useSmartBack('/app')"],
+    ['src/pages/support/SupportPage.tsx', "useSmartBack('/app')"],
+    ['src/pages/dj/DJPublicProfilePage.tsx', "useSmartBack('/')"],
+    ['src/pages/legal/CopyrightClaimPage.tsx', "useSmartBack('/app')"],
+    ['src/pages/artist/ArtistPublicProfilePage.tsx', "useSmartBack('/')"],
+  ]
+  for (const [path, expected] of usages) {
+    const page = read(path)
+    assert.ok(page.includes(expected), `${path} should call ${expected}`)
+    assert.doesNotMatch(page, /onClick=\{\(\) => navigate\(-1\)\}/)
+  }
 })

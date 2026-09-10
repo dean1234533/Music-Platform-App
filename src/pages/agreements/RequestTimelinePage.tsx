@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { useSmartBack } from '@/hooks/useSmartBack'
 import { ArrowLeft, Check, Clock, FileSignature, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import {
@@ -34,7 +35,7 @@ import type { DjDealDoc } from '@/types/deal'
  */
 export function RequestTimelinePage() {
   const { requestId } = useParams<{ requestId: string }>()
-  const navigate = useNavigate()
+  const goBack = useSmartBack('/agreements')
   const [searchParams, setSearchParams] = useSearchParams()
   const { firebaseUser } = useAuth()
   const [licenceRequest, setLicenceRequest] = useState<LicenceRequestDoc | null | undefined>(undefined)
@@ -143,7 +144,7 @@ export function RequestTimelinePage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-8">
-      <button onClick={() => navigate(-1)} className="flex w-fit items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0 active:opacity-60">
+      <button onClick={goBack} className="flex w-fit items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0 active:opacity-60">
         <ArrowLeft className="h-4 w-4" /> Back
       </button>
 
@@ -162,7 +163,26 @@ export function RequestTimelinePage() {
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-3">DJ licence request</p>
         <h1 className="mt-1 text-2xl font-semibold text-ink-0">{track?.title ?? 'Track'}</h1>
         <p className="mt-1 text-sm text-ink-2">
-          {isDj ? `Artist: ${artist?.name ?? 'Loading…'}` : `DJ: ${djName}`} · Request ID: {licenceRequest.requestId}
+          {isDj ? (
+            <>
+              Artist:{' '}
+              {artist ? (
+                <Link to={`/artist/${artist.slug}`} className="font-medium text-brand-400 hover:underline">
+                  {artist.name}
+                </Link>
+              ) : (
+                'Loading…'
+              )}
+            </>
+          ) : (
+            <>
+              DJ:{' '}
+              <Link to={`/djs/${licenceRequest.djId}`} className="font-medium text-brand-400 hover:underline">
+                {djName}
+              </Link>
+            </>
+          )}{' '}
+          · Request ID: {licenceRequest.requestId}
         </p>
       </div>
 

@@ -25,9 +25,11 @@ export const submitVerificationRequest = onCall(async (request) => {
   const collection = profileType === 'artist' ? 'artistProfiles' : 'djProfiles'
   const profileSnap = await db.collection(collection).doc(uid).get()
   if (!profileSnap.exists) throw new HttpsError('failed-precondition', `No ${profileType} profile found.`)
+  const profile = profileSnap.data()!
 
   const requestRef = db.collection('verificationRequests').doc()
-  await requestRef.set({
+  const batch = db.batch()
+  batch.set(requestRef, {
     verificationRequestId: requestRef.id,
     userId: uid,
     profileType,
@@ -37,8 +39,26 @@ export const submitVerificationRequest = onCall(async (request) => {
   })
 
   if (profileType === 'dj') {
-    await db.collection('djProfiles').doc(uid).update({ verificationStatus: 'pending' })
+    batch.update(db.collection('djProfiles').doc(uid), { verificationStatus: 'pending' })
   }
+
+  // Nobody was ever told a new verification request existed — an admin only found out by
+  // remembering to check Admin -> Verification. Notify every admin the same way every other
+  // event in the app does (bell + push), matching submitSupportMessage's established pattern.
+  const adminsSnap = await db.collection('users').where('roles', 'array-contains', 'admin').get()
+  for (const adminDoc of adminsSnap.docs) {
+    batch.set(db.collection('notifications').doc(), {
+      userId: adminDoc.id,
+      type: 'verification_request',
+      title: 'New verification request',
+      body: `${profile.name ?? 'Someone'} wants ${profileType} verification`,
+      linkTo: '/admin/verification',
+      read: false,
+      createdAt: FieldValue.serverTimestamp(),
+    })
+  }
+
+  await batch.commit()
 
   return { verificationRequestId: requestRef.id }
 })

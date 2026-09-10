@@ -16,7 +16,7 @@ export function DJProfilePage() {
   const { firebaseUser, hasRole } = useAuth()
   const navigate = useNavigate()
   const [profile, setProfile] = useState<DJProfile | null>(null)
-  const [form, setForm] = useState({ name: '', bio: '', genres: '', country: '', city: '' })
+  const [form, setForm] = useState({ name: '', bio: '', genres: '', country: '', city: '', realName: '', website: '', venues: '' })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [requestingVerification, setRequestingVerification] = useState(false)
@@ -34,7 +34,16 @@ export function DJProfilePage() {
       (p) => {
         setProfile(p)
         if (p) {
-          setForm({ name: p.name, bio: p.bio, genres: p.genres.join(', '), country: p.country, city: p.city })
+          setForm({
+            name: p.name,
+            bio: p.bio,
+            genres: p.genres.join(', '),
+            country: p.country,
+            city: p.city,
+            realName: p.realName ?? '',
+            website: p.socialLinks.website ?? '',
+            venues: p.venues.join(', '),
+          })
         }
       },
       () => setLoadError(true),
@@ -99,12 +108,21 @@ export function DJProfilePage() {
     setSaving(true)
     setSaved(false)
     try {
+      const nextSocialLinks = { ...profile!.socialLinks }
+      if (form.website.trim()) {
+        nextSocialLinks.website = form.website.trim()
+      } else {
+        delete nextSocialLinks.website
+      }
       await updateDJProfile(profile!.djId, {
         name: form.name,
         bio: form.bio,
         genres: form.genres.split(',').map((g) => g.trim()).filter(Boolean),
         country: form.country,
         city: form.city,
+        realName: form.realName.trim() || null,
+        socialLinks: nextSocialLinks,
+        venues: form.venues.split(',').map((v) => v.trim()).filter(Boolean),
       })
       setSaved(true)
     } finally {
@@ -119,8 +137,10 @@ export function DJProfilePage() {
         {profile.verificationStatus === 'verified' ? <BadgeCheck className="h-5 w-5 text-brand-400" /> : null}
       </div>
       <p className="-mt-4 text-sm text-ink-2">
-        Verification status: <span className="text-ink-0">{profile.verificationStatus}</span>. Badges
-        only appear once an admin approves your account.
+        Verification status: <span className="text-ink-0">{profile.verificationStatus}</span>.{' '}
+        {profile.verificationStatus === 'verified'
+          ? 'The badge next to your name is visible to every artist you request tracks from.'
+          : 'This is more than a badge — most artists only accept requests from verified DJs by default, so an unverified account may get requests rejected automatically.'}
       </p>
       {profile.verificationStatus === 'unverified' && !verificationRequested ? (
         showVerificationForm ? (
@@ -169,6 +189,36 @@ export function DJProfilePage() {
         <div>
           <Label>City</Label>
           <Input value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4 rounded-xl border border-surface-border bg-surface-2 p-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-ink-3">
+          Verification evidence — an admin sees this when reviewing your request, never shown on your public profile except venues
+        </p>
+        <div>
+          <Label>Real name</Label>
+          <Input
+            value={form.realName}
+            onChange={(e) => setForm((f) => ({ ...f, realName: e.target.value }))}
+            placeholder="Legal or professional name, if different from your DJ name"
+          />
+        </div>
+        <div>
+          <Label>Website or press link</Label>
+          <Input
+            value={form.website}
+            onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
+            placeholder="https://…"
+          />
+        </div>
+        <div>
+          <Label>Notable venues (comma separated)</Label>
+          <Input
+            value={form.venues}
+            onChange={(e) => setForm((f) => ({ ...f, venues: e.target.value }))}
+            placeholder="e.g. Fabric, Ministry of Sound"
+          />
         </div>
       </div>
 

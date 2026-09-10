@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, LifeBuoy } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useSmartBack } from '@/hooks/useSmartBack'
 import { submitSupportMessage, subscribeMySupportMessages } from '@/services/helpService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
@@ -16,7 +16,7 @@ function formatDate(value: unknown): string {
 
 export function SupportPage() {
   const { firebaseUser } = useAuth()
-  const navigate = useNavigate()
+  const goBack = useSmartBack('/app')
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -47,7 +47,7 @@ export function SupportPage() {
 
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-10">
-      <button onClick={() => navigate(-1)} className="flex w-fit items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0 active:opacity-60">
+      <button onClick={goBack} className="flex w-fit items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0 active:opacity-60">
         <ArrowLeft className="h-4 w-4" /> Back
       </button>
 

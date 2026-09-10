@@ -10,7 +10,17 @@ import type { VerificationRequestDoc } from '@/types/moderation'
 import type { ArtistProfile, SocialLinks } from '@/types/artist'
 import type { DJProfile } from '@/types/dj'
 
-type Subject = { name: string; photoURL: string | null; bio: string; genres: string[]; location: string; socialLinks: SocialLinks; link: string; extra: string }
+type Subject = {
+  name: string
+  realName: string | null
+  photoURL: string | null
+  bio: string
+  genres: string[]
+  location: string
+  socialLinks: SocialLinks
+  link: string
+  extra: string
+}
 
 function toSubject(req: VerificationRequestDoc, profile: ArtistProfile | DJProfile | null): Subject | null {
   if (!profile) return null
@@ -18,6 +28,7 @@ function toSubject(req: VerificationRequestDoc, profile: ArtistProfile | DJProfi
     const p = profile as ArtistProfile
     return {
       name: p.name,
+      realName: null,
       photoURL: p.photoURL,
       bio: p.bio,
       genres: p.genres,
@@ -30,6 +41,7 @@ function toSubject(req: VerificationRequestDoc, profile: ArtistProfile | DJProfi
   const p = profile as DJProfile
   return {
     name: p.name,
+    realName: p.realName,
     photoURL: p.photoURL,
     bio: p.bio,
     genres: p.genres,
@@ -102,6 +114,7 @@ export function AdminVerificationPage() {
                         <p className="truncate text-base font-semibold text-ink-0">{subject.name}</p>
                         <span className="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 text-xs text-ink-2">{req.profileType}</span>
                       </div>
+                      {subject.realName ? <p className="text-xs text-ink-3">Real name: {subject.realName}</p> : null}
                       {subject.location ? <p className="text-xs text-ink-3">{subject.location}</p> : null}
                       {subject.genres.length ? <p className="mt-1 text-xs text-ink-2">{subject.genres.join(', ')}</p> : null}
                       {subject.bio ? <p className="mt-1 text-sm text-ink-1">{subject.bio}</p> : null}

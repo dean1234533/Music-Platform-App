@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
+import { useSmartBack } from '@/hooks/useSmartBack'
 import { ArrowLeft, BadgeCheck, Flag, MapPin } from 'lucide-react'
 import { subscribeDJProfile } from '@/services/djService'
 import { useAuth } from '@/contexts/AuthContext'
@@ -10,7 +11,7 @@ import type { DJProfile } from '@/types/dj'
 
 export function DJPublicProfilePage() {
   const { djId } = useParams<{ djId: string }>()
-  const navigate = useNavigate()
+  const goBack = useSmartBack('/')
   const { firebaseUser } = useAuth()
   const [profile, setProfile] = useState<DJProfile | null | undefined>(undefined)
   const [loadError, setLoadError] = useState(false)
@@ -39,7 +40,7 @@ export function DJPublicProfilePage() {
     <div className="min-h-svh overflow-x-hidden bg-surface-0 text-ink-0">
       <header className="mx-auto flex max-w-3xl items-center justify-between px-5 pb-6 pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-8">
         <Link to="/" aria-label="BackTheVibes home"><BrandMark /></Link>
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0 active:opacity-60">
+        <button onClick={goBack} className="flex items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0 active:opacity-60">
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
       </header>

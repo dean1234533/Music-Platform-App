@@ -8,6 +8,7 @@ import { subscribeIsFollowing } from '@/services/followService'
 import { subscribeIsSupporting } from '@/services/supportService'
 import { usePlayer } from '@/contexts/PlayerContext'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
+import { useSmartBack } from '@/hooks/useSmartBack'
 import { useAuth } from '@/contexts/AuthContext'
 import { FollowButton } from '@/components/music/FollowButton'
 import { SupportButton } from '@/components/music/SupportButton'
@@ -31,6 +32,7 @@ export function TrackPage() {
   const { trackId: rawParam, slug } = useParams<{ trackId: string; slug?: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const goBack = useSmartBack('/')
   const [resolvedTrackId, setResolvedTrackId] = useState<string | null | undefined>(undefined)
   const [track, setTrack] = useState<TrackDoc | null | undefined>(undefined)
   const { playTrack, currentTrack, isPlaying, playbackKind, togglePlay } = usePlayer()
@@ -144,7 +146,7 @@ export function TrackPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8 overflow-x-hidden px-4 pb-10 pt-[max(2.5rem,env(safe-area-inset-top))]">
-      <button onClick={() => navigate(-1)} className="flex w-fit items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0 active:opacity-60">
+      <button onClick={goBack} className="flex w-fit items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0 active:opacity-60">
         <ArrowLeft className="h-4 w-4" /> Back
       </button>
       <div className="flex flex-col gap-6 sm:flex-row">
