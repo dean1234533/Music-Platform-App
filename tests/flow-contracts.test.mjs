@@ -840,7 +840,7 @@ test('the workspace switcher stays visible whenever there is somewhere else to g
   assert.doesNotMatch(switcher, /workspaces\.length < 2/)
 })
 
-test('signed-in users can send a support message, and it lands somewhere an admin can actually see and resolve it', () => {
+test('signed-in users can send a support message, an admin gets notified and can reply, and the user gets notified with that reply (user-reported: submitting a support message never notified anyone in either direction)', () => {
   const fn = read('functions/src/support.ts')
   assert.match(fn, /export const submitSupportMessage = onCall/)
   assert.match(fn, /export const resolveSupportMessage = onCall/)
@@ -848,17 +848,41 @@ test('signed-in users can send a support message, and it lands somewhere an admi
   assert.match(fn, /enforceRateLimit\(`submitSupportMessage_\$\{request\.auth\.uid\}`, 5, 3600\)/)
   assert.match(fn, /const adminId = await requireAdmin\(request\)/)
   assert.match(fn, /writeAuditLog\(adminId, 'resolve_support_message'/)
+  // Submitting notifies every admin — not just leaving it for one to stumble onto in the Reports page.
+  assert.match(fn, /db\.collection\('users'\)\.where\('roles', 'array-contains', 'admin'\)\.get\(\)/)
+  assert.match(fn, /type: 'support_message'/)
+  assert.match(fn, /linkTo: '\/admin\/reports'/)
+  // Resolving requires an actual reply (not a content-free status flip) and notifies the original user with it.
+  assert.match(fn, /if \(reply\.length < MIN_REPLY_LENGTH \|\| reply\.length > MAX_REPLY_LENGTH\)/)
+  assert.match(fn, /type: 'support_reply'/)
+  assert.match(fn, /body: reply\.slice\(0, 140\)/)
+  assert.match(fn, /linkTo: '\/support'/)
+  assert.match(fn, /userId: supportMessage\.userId/)
 
   const rules = read('firestore.rules')
   assert.match(rules, /match \/supportMessages\/\{docId\} \{/)
   assert.match(rules, /resource\.data\.userId == request\.auth\.uid \|\| isAdmin\(\)/)
+  // Notifications remain Cloud-Function-only create — nothing new needed for a client to fake either of these.
+  assert.match(rules, /match \/notifications\/\{notificationId\} \{\s*allow read: if isSignedIn\(\) && resource\.data\.userId == request\.auth\.uid;/)
 
   const page = read('src/pages/support/SupportPage.tsx')
   assert.match(page, /submitSupportMessage\(\{ subject: subject\.trim\(\), message: message\.trim\(\) \}\)/)
+  // The fan can see their own past messages and any reply — not just a one-shot form into a void.
+  assert.match(page, /subscribeMySupportMessages\(firebaseUser\.uid, setMyMessages\)/)
+  assert.match(page, /\{msg\.reply \?/)
+
+  const helpService = read('src/services/helpService.ts')
+  assert.match(helpService, /export function subscribeMySupportMessages\(/)
+  assert.match(helpService, /where\('userId', '==', uid\)/)
 
   const admin = read('src/pages/admin/AdminReportsPage.tsx')
   assert.match(admin, /listOpenSupportMessages\(\)\.then\(setSupportMessages\)/)
-  assert.match(admin, /resolveSupportMessage\(\{ supportMessageId: id \}\)/)
+  assert.match(admin, /resolveSupportMessage\(\{ supportMessageId: id, reply \}\)/)
+  // The admin has to actually type something before the button is even clickable.
+  assert.match(admin, /disabled=\{\(replyDrafts\[msg\.supportMessageId\] \?\? ''\)\.trim\(\)\.length < 3\}/)
+
+  const indexes = read('firestore.indexes.json')
+  assert.match(indexes, /"collectionGroup": "supportMessages"[\s\S]*?"fieldPath": "userId", "order": "ASCENDING"/)
 
   assert.match(read('src/App.tsx'), /<Route\s+path="\/support"/)
   assert.match(read('src/components/layout/navConfig.ts'), /label: 'Support', to: '\/support'/)

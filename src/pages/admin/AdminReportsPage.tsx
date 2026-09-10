@@ -42,6 +42,7 @@ export function AdminReportsPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<Record<string, ClaimDraft>>({})
   const [evidenceUrls, setEvidenceUrls] = useState<Record<string, string[] | 'loading'>>({})
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({})
 
   async function loadEvidence(claimId: string) {
     setEvidenceUrls((prev) => ({ ...prev, [claimId]: 'loading' }))
@@ -60,10 +61,17 @@ export function AdminReportsPage() {
   }, [])
 
   async function resolveSupport(id: string) {
+    const reply = (replyDrafts[id] ?? '').trim()
+    if (reply.length < 3) return
     setBusyId(id)
     try {
-      await resolveSupportMessage({ supportMessageId: id })
+      await resolveSupportMessage({ supportMessageId: id, reply })
       setSupportMessages((prev) => prev?.filter((m) => m.supportMessageId !== id) ?? null)
+      setReplyDrafts((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
     } finally {
       setBusyId(null)
     }
@@ -172,7 +180,7 @@ export function AdminReportsPage() {
         ) : (
           <div className="flex flex-col divide-y divide-surface-border rounded-xl border border-surface-border">
             {supportMessages.map((msg) => (
-              <div key={msg.supportMessageId} className="flex items-start justify-between gap-3 px-4 py-3">
+              <div key={msg.supportMessageId} className="flex flex-col gap-2 px-4 py-3">
                 <div>
                   <p className="text-sm font-medium text-ink-0">{msg.subject}</p>
                   <p className="mt-1 text-xs text-ink-2">{msg.message}</p>
@@ -180,8 +188,20 @@ export function AdminReportsPage() {
                     {msg.userName ?? 'Unknown'} {msg.userEmail ? `(${msg.userEmail})` : ''}
                   </p>
                 </div>
-                <Button size="sm" loading={busyId === msg.supportMessageId} onClick={() => resolveSupport(msg.supportMessageId)}>
-                  Mark resolved
+                <TextArea
+                  rows={2}
+                  placeholder="Write a reply — the user is notified with this text once you send it."
+                  value={replyDrafts[msg.supportMessageId] ?? ''}
+                  onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [msg.supportMessageId]: e.target.value }))}
+                />
+                <Button
+                  size="sm"
+                  className="w-fit"
+                  disabled={(replyDrafts[msg.supportMessageId] ?? '').trim().length < 3}
+                  loading={busyId === msg.supportMessageId}
+                  onClick={() => resolveSupport(msg.supportMessageId)}
+                >
+                  Send reply &amp; resolve
                 </Button>
               </div>
             ))}

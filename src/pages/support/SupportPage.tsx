@@ -1,17 +1,33 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, LifeBuoy } from 'lucide-react'
-import { submitSupportMessage } from '@/services/helpService'
+import { useAuth } from '@/contexts/AuthContext'
+import { submitSupportMessage, subscribeMySupportMessages } from '@/services/helpService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
+import { LoadingState } from '@/components/common/StateViews'
+import type { SupportMessageDoc } from '@/types/moderation'
+
+function formatDate(value: unknown): string {
+  const ts = value as { toDate?: () => Date } | null
+  if (!ts?.toDate) return ''
+  return ts.toDate().toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
 
 export function SupportPage() {
+  const { firebaseUser } = useAuth()
   const navigate = useNavigate()
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sent, setSent] = useState(false)
+  const [myMessages, setMyMessages] = useState<SupportMessageDoc[] | null>(null)
+
+  useEffect(() => {
+    if (!firebaseUser) return
+    return subscribeMySupportMessages(firebaseUser.uid, setMyMessages)
+  }, [firebaseUser])
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -20,6 +36,8 @@ export function SupportPage() {
     try {
       await submitSupportMessage({ subject: subject.trim(), message: message.trim() })
       setSent(true)
+      setSubject('')
+      setMessage('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not send your message. Please try again.')
     } finally {
@@ -43,7 +61,7 @@ export function SupportPage() {
 
       {sent ? (
         <p className="rounded-xl border border-support-500/30 bg-support-500/5 px-4 py-3 text-sm text-support-400">
-          Thanks — your message has been sent.
+          Thanks — your message has been sent. We'll reply here and notify you.
         </p>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -60,6 +78,39 @@ export function SupportPage() {
             Send message
           </Button>
         </form>
+      )}
+
+      {myMessages === null ? (
+        <LoadingState />
+      ) : myMessages.length === 0 ? null : (
+        <div>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Your messages</h2>
+          <div className="flex flex-col gap-3">
+            {myMessages.map((msg) => (
+              <div key={msg.supportMessageId} className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium text-ink-0">{msg.subject}</p>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                      msg.status === 'resolved' ? 'bg-support-500/10 text-support-400' : 'bg-surface-3 text-ink-2'
+                    }`}
+                  >
+                    {msg.status === 'resolved' ? 'Replied' : 'Open'}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs leading-5 text-ink-2">{msg.message}</p>
+                <p className="mt-1 text-[11px] text-ink-3">{formatDate(msg.createdAt)}</p>
+                {msg.reply ? (
+                  <div className="mt-3 rounded-lg border border-brand-500/20 bg-brand-500/[0.04] px-3 py-2">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-brand-400">BackTheVibes support</p>
+                    <p className="mt-1 text-sm text-ink-0">{msg.reply}</p>
+                    <p className="mt-1 text-[11px] text-ink-3">{formatDate(msg.repliedAt)}</p>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   )

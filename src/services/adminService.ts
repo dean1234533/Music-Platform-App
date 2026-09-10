@@ -63,7 +63,7 @@ export const reviewCopyrightClaim = callable<
 export const adminResolveReport = callable<{ reportId: string; status: 'resolved' | 'dismissed' }, { ok: boolean }>(
   'adminResolveReport',
 )
-export const resolveSupportMessage = callable<{ supportMessageId: string }, { ok: boolean }>('resolveSupportMessage')
+export const resolveSupportMessage = callable<{ supportMessageId: string; reply: string }, { ok: boolean }>('resolveSupportMessage')
 export const adminUpsertSubscriptionPlan = callable<
   {
     planId: string

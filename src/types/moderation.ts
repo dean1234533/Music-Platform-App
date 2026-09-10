@@ -77,6 +77,8 @@ export interface SupportMessageDoc {
   message: string
   status: 'open' | 'resolved'
   createdAt: Timestamp | null
+  reply?: string | null
+  repliedAt?: Timestamp | null
   resolvedBy?: string | null
   resolvedAt?: Timestamp | null
 }
