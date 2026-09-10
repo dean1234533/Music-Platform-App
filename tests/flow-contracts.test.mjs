@@ -73,6 +73,18 @@ test('install banner only shows once signed in, and first-time profiles are awai
   assert.match(users, /permission-denied[\s\S]*?unavailable/)
 })
 
+test('installed PWA launches into the app with a branded iOS startup screen', () => {
+  const app = read('src/App.tsx')
+  const config = read('vite.config.ts')
+  const html = read('index.html')
+  const splash = read('src/components/pwa/PwaLaunchScreen.tsx')
+  assert.match(config, /start_url: '\/app\/home'/)
+  assert.match(app, /isStandaloneDisplayMode\(\) \? <Navigate to="\/app\/home" replace \/>/)
+  assert.match(html, /rel="apple-touch-startup-image"/)
+  assert.match(splash, /pwa-launch-bg\.png/)
+  assert.match(splash, /<BrandMark \/>/)
+})
+
 test('browser tab uses the approved BTV brand favicon', () => {
   const html = read('index.html')
   assert.match(html, /rel="icon"[^>]+backthevibes-favicon-48\.png\?v=4/)

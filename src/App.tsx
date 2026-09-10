@@ -6,13 +6,19 @@ import { ToastProvider } from '@/contexts/ToastContext'
 import { ProtectedRoute, RequireOnboarding } from '@/components/auth/ProtectedRoute'
 import { RoleRoute } from '@/components/auth/RoleRoute'
 import { InstallBanner } from '@/components/pwa/InstallBanner'
+import { PwaLaunchScreen } from '@/components/pwa/PwaLaunchScreen'
 import { LoadingState } from '@/components/common/StateViews'
+import { isStandaloneDisplayMode } from '@/lib/installPrompt'
 
 // Every page is route-level code-split: each becomes its own chunk, fetched
 // only when actually navigated to, instead of one ~1.2MB bundle everyone
 // downloads up front regardless of which of these ~50 pages (many
 // role-gated, most people never touching most of them) they'll ever visit.
 const LandingPage = lazy(() => import('@/pages/marketing/LandingPage').then((m) => ({ default: m.LandingPage })))
+
+function PublicHomeRoute() {
+  return isStandaloneDisplayMode() ? <Navigate to="/app/home" replace /> : <LandingPage />
+}
 
 function LegacyRequestRedirect() {
   const { requestId } = useParams<{ requestId: string }>()
@@ -96,9 +102,10 @@ function App() {
         <ToastProvider>
           <PlayerProvider>
             <InstallBanner />
+            <PwaLaunchScreen />
             <Suspense fallback={<LoadingState label="Loading…" />}>
             <Routes>
-            <Route path="/" element={<LandingPage />} />
+            <Route path="/" element={<PublicHomeRoute />} />
             <Route path="/pricing" element={<PricingPage />} />
             <Route path="/for-djs" element={<ForDjsPage />} />
             <Route path="/for-artists" element={<ForArtistsPage />} />
