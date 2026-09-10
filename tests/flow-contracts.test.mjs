@@ -1637,3 +1637,36 @@ test('DJ Requests never presents a promo-opt-in control that silently fails for 
   const djProfilePage = read('src/pages/dj/DJProfilePage.tsx')
   assert.match(djProfilePage, /No DJ profile found/)
 })
+
+test('a role held without a matching profile document is never a dead end — Settings correctly offers "finish setup" instead of a broken dashboard link, and both dashboards\' own empty states link straight to the fix (user-reported: "No DJ profile found... there is no way to create a profile")', () => {
+  // Root cause: Settings decided "Go to dashboard" vs "+ Add a profile" purely from the roles
+  // array, never checking whether the profile document actually exists — so an account that
+  // holds the role without a profile (e.g. granted via the admin role toggle, which only ever
+  // touches users.roles, never artistProfiles/djProfiles) saw "Go to dashboard", which landed
+  // on a page saying "No profile found... add one from Settings" — pointing right back here.
+  const settings = read('src/pages/fan/SettingsPage.tsx')
+  assert.match(settings, /import \{ subscribeArtistProfile \} from '@\/services\/artistService'/)
+  assert.match(settings, /import \{ subscribeDJProfile \} from '@\/services\/djService'/)
+  assert.match(settings, /const \[hasArtistProfile, setHasArtistProfile\] = useState<boolean \| undefined>\(undefined\)/)
+  assert.match(settings, /const \[hasDjProfile, setHasDjProfile\] = useState<boolean \| undefined>\(undefined\)/)
+  assert.match(settings, /profile\?\.roles\.includes\('artist'\) && hasArtistProfile \? \(/)
+  assert.match(settings, /profile\?\.roles\.includes\('dj'\) && hasDjProfile \? \(/)
+  // Both branches route to the SAME idempotent create flow regardless of whether the role is
+  // already held — createArtistProfile/createDJProfile just create the missing profile and
+  // re-affirm the (already-present) role, never erroring or duplicating anything.
+  assert.match(settings, /to="\/onboarding\/add-role\?role=artist"/)
+  assert.match(settings, /to="\/onboarding\/add-role\?role=dj"/)
+
+  const addRolePage = read('src/pages/onboarding/AddRolePage.tsx')
+  assert.doesNotMatch(addRolePage, /roles\.includes\('artist'\)|roles\.includes\('dj'\)/)
+
+  // Each dashboard's own "no profile" empty state now links straight to that same fix instead
+  // of just describing where to go (the previous copy pointed back at Settings, which — before
+  // the fix above — could never actually get them here).
+  const djProfilePage = read('src/pages/dj/DJProfilePage.tsx')
+  assert.match(djProfilePage, /to="\/onboarding\/add-role\?role=dj"/)
+  assert.match(djProfilePage, /Complete DJ profile/)
+  const artistSettingsPage = read('src/pages/artist/dashboard/ArtistSettingsPage.tsx')
+  assert.match(artistSettingsPage, /to="\/onboarding\/add-role\?role=artist"/)
+  assert.match(artistSettingsPage, /Complete artist profile/)
+})

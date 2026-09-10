@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeArtistProfile, updateArtistProfile } from '@/services/artistService'
 import { subscribeOwnVerificationRequests, submitVerificationRequest } from '@/services/verificationService'
@@ -148,7 +148,22 @@ export function ArtistSettingsPage() {
   }
 
   if (!firebaseUser) return <LoadingState />
-  if (!artist) return <EmptyState title="No artist profile found" description="Add an artist profile from Settings on your account." />
+  if (!artist) {
+    return (
+      <EmptyState
+        title="No artist profile found"
+        description="Your account has the artist role but hasn't finished profile setup yet."
+        action={
+          <Link
+            to="/onboarding/add-role?role=artist"
+            className="mt-2 inline-flex items-center rounded-full bg-brand-500 px-5 py-2.5 text-sm font-semibold text-surface-0 hover:bg-brand-400"
+          >
+            Complete artist profile
+          </Link>
+        }
+      />
+    )
+  }
 
   async function handleSave() {
     setSaving(true)

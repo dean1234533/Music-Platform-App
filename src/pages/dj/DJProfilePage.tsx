@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { BadgeCheck } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeDJProfile, updateDJProfile } from '@/services/djService'
@@ -43,7 +43,22 @@ export function DJProfilePage() {
 
   if (!firebaseUser) return <LoadingState />
   if (loadError) return <ErrorState title="Something went wrong" description="Couldn't load this page. Try refreshing." />
-  if (!profile) return <EmptyState title="No DJ profile found" description="Add a DJ profile from your account settings." />
+  if (!profile) {
+    return (
+      <EmptyState
+        title="No DJ profile found"
+        description="Your account has the DJ role but hasn't finished profile setup yet."
+        action={
+          <Link
+            to="/onboarding/add-role?role=dj"
+            className="mt-2 inline-flex items-center rounded-full bg-dj-400 px-5 py-2.5 text-sm font-semibold text-surface-0 hover:bg-dj-300"
+          >
+            Complete DJ profile
+          </Link>
+        }
+      />
+    )
+  }
 
   async function handleRemoveDjRole() {
     if (!firebaseUser) return
