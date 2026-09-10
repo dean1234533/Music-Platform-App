@@ -62,14 +62,14 @@ export function DJPublicProfilePage() {
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,7,.08)_0%,rgba(5,6,7,.16)_42%,rgba(5,6,7,.76)_100%)]" />
       </div>
 
-      <main className="relative z-10 mx-auto -mt-12 max-w-6xl px-5 sm:-mt-16 sm:px-8 lg:-mt-24 lg:px-10">
-        <section className="premium-panel relative overflow-hidden rounded-[2rem] p-5 sm:p-7 lg:p-9">
+      <main className="relative z-10 mx-auto -mt-28 max-w-6xl px-5 sm:-mt-32 sm:px-8 lg:-mt-52 lg:px-10">
+        <section className="premium-panel relative overflow-hidden rounded-[2rem] !bg-transparent p-5 backdrop-blur-md sm:p-7 lg:p-9">
           <img
             src={profile.coverURL || '/dj-requests-empty-bg.png'}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover object-center opacity-55"
+            className="absolute inset-0 h-full w-full object-cover object-center opacity-75"
           />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,6,7,.88),rgba(5,6,7,.58)_58%,rgba(5,6,7,.38)),linear-gradient(0deg,rgba(5,6,7,.66),transparent_72%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,6,7,.72),rgba(5,6,7,.38)_58%,rgba(5,6,7,.18)),linear-gradient(0deg,rgba(5,6,7,.44),transparent_72%)]" />
           <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-end">
           <div className="h-28 w-28 shrink-0 overflow-hidden rounded-[1.6rem] border border-dj-400/35 bg-surface-3 shadow-[0_24px_70px_rgba(0,0,0,.45)] sm:h-36 sm:w-36">
             {profile.photoURL ? (
