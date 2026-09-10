@@ -2090,3 +2090,40 @@ test('the request Activity timeline has a filter by who acted, and its events ar
   const deleteFnBody = cleanup.slice(cleanup.indexOf('async function deleteRequestAndConversation'), cleanup.indexOf('export const cleanupAbandonedRequests'))
   assert.match(deleteFnBody, /deleteSubcollectionBatched\(requestDoc\.ref\.path, 'events'\)[\s\S]*await requestDoc\.ref\.delete\(\)/)
 })
+
+test('notifications can be filtered and deleted, and the bell shows an unread count (user-reported: "the notifications should have a filter. also you should be able to delete them. also the notifications bell should show a nuber of any new unread notifications")', () => {
+  // Rules: deletion is scoped to the owner and safe as a direct client write — a user's own
+  // notification carries no other party's data or downstream effect, unlike e.g.
+  // licenceRequests where a client delete is always blocked.
+  const rules = read('firestore.rules')
+  const notifRule = rules.slice(rules.indexOf('match /notifications/{notificationId}'), rules.indexOf('match /notifications/{notificationId}') + 700)
+  assert.match(notifRule, /allow delete: if isSignedIn\(\) && resource\.data\.userId == request\.auth\.uid;/)
+  assert.match(notifRule, /allow create: if false;/)
+
+  const service = read('src/services/notificationService.ts')
+  assert.match(service, /export async function deleteNotification\(notificationId: string\): Promise<void>/)
+  assert.match(service, /export function subscribeUnreadNotificationCount\(/)
+  assert.match(service, /where\('read', '==', false\)/)
+
+  const page = read('src/pages/fan/NotificationsPage.tsx')
+  assert.match(page, /const FILTERS = \[\s*\n\s*\{ key: 'all', label: 'All' \},\s*\n\s*\{ key: 'unread', label: 'Unread' \},/)
+  assert.match(page, /const filtered = filter === 'unread' \? \(notifications \?\? \[\]\)\.filter\(\(n\) => !n\.read\) : \(notifications \?\? \[\]\)/)
+  assert.match(page, /import \{ deleteNotification, markNotificationRead, subscribeNotifications \} from '@\/services\/notificationService'/)
+  assert.match(page, /async function handleDelete\(notificationId: string\)/)
+  assert.match(page, /await deleteNotification\(notificationId\)/)
+
+  // Bell badge is shared by both surfaces that render it (mobile TopBar, desktop Sidebar) via
+  // one hook, so they can't disagree.
+  const hook = read('src/hooks/useUnreadNotificationCount.ts')
+  assert.match(hook, /export function useUnreadNotificationCount\(\): number/)
+  assert.match(hook, /return subscribeUnreadNotificationCount\(firebaseUser\.uid, setCount\)/)
+
+  const topBar = read('src/components/layout/TopBar.tsx')
+  assert.match(topBar, /import \{ useUnreadNotificationCount \} from '@\/hooks\/useUnreadNotificationCount'/)
+  assert.match(topBar, /const unreadCount = useUnreadNotificationCount\(\)/)
+  assert.match(topBar, /\{unreadCount > 99 \? '99\+' : unreadCount\}/)
+
+  const sidebar = read('src/components/layout/Sidebar.tsx')
+  assert.match(sidebar, /import \{ useUnreadNotificationCount \} from '@\/hooks\/useUnreadNotificationCount'/)
+  assert.match(sidebar, /item\.to\.endsWith\('\/notifications'\) && unreadCount > 0/)
+})

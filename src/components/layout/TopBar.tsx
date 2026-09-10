@@ -1,12 +1,14 @@
 import { Link, useLocation } from 'react-router-dom'
 import { Bell } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useUnreadNotificationCount } from '@/hooks/useUnreadNotificationCount'
 import { BrandMark } from '@/components/common/BrandMark'
 import { DashboardSwitcherCompact } from './DashboardSwitcher'
 
 export function TopBar() {
   const { profile } = useAuth()
   const { pathname } = useLocation()
+  const unreadCount = useUnreadNotificationCount()
   const homeTo = pathname.startsWith('/dashboard/artist')
     ? '/dashboard/artist'
     : pathname.startsWith('/dj')
@@ -38,8 +40,13 @@ export function TopBar() {
         <DashboardSwitcherCompact />
       </div>
       <div className="ml-2 flex shrink-0 items-center gap-1">
-        <Link to={notificationsTo} className="rounded-full p-2 text-ink-2 hover:bg-surface-2">
+        <Link to={notificationsTo} className="relative rounded-full p-2 text-ink-2 hover:bg-surface-2" aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}>
           <Bell className="h-5 w-5" />
+          {unreadCount > 0 ? (
+            <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger-500 px-1 text-[10px] font-bold leading-none text-white">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          ) : null}
         </Link>
         <Link to={profileTo} className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-surface-3">
           {profile?.photoURL ? (

@@ -522,7 +522,11 @@ service cloud.firestore {
       allow update: if isSignedIn()
         && resource.data.userId == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
-      allow create, delete: if false;
+      // A user's own notification carries no other party's data or downstream
+      // effect (unlike e.g. licenceRequests) — safe as a direct client delete,
+      // scoped to the owner, matching the existing update rule's shape.
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if false;
     }
 
     // ---------------------------------------------------------------------
