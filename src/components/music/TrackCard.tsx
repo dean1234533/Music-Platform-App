@@ -1,4 +1,4 @@
-import { Lock, Play } from 'lucide-react'
+import { Lock, Pause, Play } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { usePlayer } from '@/contexts/PlayerContext'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
@@ -8,15 +8,17 @@ import type { TrackDoc } from '@/types/track'
 
 /** locked is opt-in — only a caller that actually knows this viewer's follow/support status for this track's artist (e.g. the artist profile page) should pass it; everywhere else the tier badge shows on its own with no lock state. */
 export function TrackCard({ track, queue, locked }: { track: TrackDoc; queue?: TrackDoc[]; locked?: boolean }) {
-  const { playTrack, currentTrack, isPlaying } = usePlayer()
+  const { playTrack, togglePlay, currentTrack, isPlaying } = usePlayer()
   const artist = useArtistSummary(track.artistId)
   const isCurrent = currentTrack?.trackId === track.trackId
+  const isCurrentlyPlaying = isCurrent && isPlaying
 
   return (
     <div className="group w-44 shrink-0 sm:w-52">
       <button
         type="button"
-        onClick={() => playTrack(track, queue)}
+        onClick={() => (isCurrent ? togglePlay() : playTrack(track, queue))}
+        aria-label={isCurrentlyPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
         className="relative block aspect-square w-full overflow-hidden rounded-[1.25rem] bg-surface-2 shadow-[0_18px_45px_rgba(0,0,0,.22)] ring-1 ring-white/[0.07] transition duration-500 group-hover:-translate-y-1 group-hover:shadow-[0_26px_65px_rgba(0,0,0,.4)]"
       >
         {track.artworkURL ? (
@@ -36,13 +38,17 @@ export function TrackCard({ track, queue, locked }: { track: TrackDoc; queue?: T
             <Lock className="h-3 w-3" />
           </span>
         ) : null}
-        <div className="absolute inset-0 flex items-end justify-end bg-gradient-to-t from-black/65 via-transparent to-transparent p-4 opacity-0 transition-opacity group-hover:opacity-100">
-          <span
-            className={`flex h-12 w-12 items-center justify-center rounded-full bg-brand-500 text-surface-0 shadow-xl transition-transform hover:scale-105 ${
-              isCurrent && isPlaying ? 'opacity-100' : ''
-            }`}
-          >
-            <Play className="h-5 w-5 translate-x-0.5" fill="currentColor" />
+        <div
+          className={`absolute inset-0 flex items-end justify-end bg-gradient-to-t from-black/65 via-transparent to-transparent p-4 transition-opacity group-hover:opacity-100 ${
+            isCurrentlyPlaying ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-500 text-surface-0 shadow-xl transition-transform hover:scale-105">
+            {isCurrentlyPlaying ? (
+              <Pause className="h-5 w-5" fill="currentColor" />
+            ) : (
+              <Play className="h-5 w-5 translate-x-0.5" fill="currentColor" />
+            )}
           </span>
         </div>
       </button>

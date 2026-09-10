@@ -1523,3 +1523,97 @@ test('BUG 2 — public preview media is a physically separate, actually-clipped 
   assert.match(tracksFn, /if \(!relSnap\.exists\) return false/)
   assert.match(tracksFn, /return status === 'active' \|\| status === 'trialing'/)
 })
+
+test('BUG 3 — every track card (including on the artist profile) actually toggles play/pause instead of always restarting the track from a fresh playTrack call (user-reported: could not stop/pause playback from the profile)', () => {
+  const card = read('src/components/music/TrackCard.tsx')
+  // The root cause: onClick always called playTrack, even for the already-current track — so
+  // clicking a playing card's button just reloaded/restarted it, never paused it. Every page
+  // that renders TrackCard (including the artist profile) shares this one component.
+  assert.match(card, /const \{ playTrack, togglePlay, currentTrack, isPlaying \} = usePlayer\(\)/)
+  assert.match(card, /onClick=\{\(\) => \(isCurrent \? togglePlay\(\) : playTrack\(track, queue\)\)\}/)
+  // The icon itself must actually switch, not just change opacity on an unchanging Play glyph.
+  assert.match(card, /isCurrentlyPlaying \? \(\s*<Pause className="h-5 w-5" fill="currentColor" \/>/)
+  assert.match(card, /aria-label=\{isCurrentlyPlaying \? `Pause \$\{track\.title\}` : `Play \$\{track\.title\}`\}/)
+
+  const profile = read('src/pages/artist/ArtistPublicProfilePage.tsx')
+  assert.match(profile, /import \{ TrackCard \} from '@\/components\/music\/TrackCard'/)
+
+  // The single-track page already had this right — confirms the fix pattern, not a new one.
+  const trackPage = read('src/pages/track/TrackPage.tsx')
+  assert.match(trackPage, /isCurrent \? togglePlay\(\) : playTrack\(track\)/)
+
+  // Resume-from-position, track-change, natural-end, and error-reset are all handled once,
+  // centrally, in the single shared player — never duplicated per page/component.
+  const player = read('src/contexts/PlayerContext.tsx')
+  assert.match(player, /const togglePlay = useCallback\(\(\) => \{\s*const audio = audioRef\.current\s*if \(!audio \|\| !currentTrack\) return\s*if \(isPlaying\) \{\s*audio\.pause\(\)\s*setIsPlaying\(false\)\s*\} else if \(audio\.ended\) \{/)
+  assert.match(player, /setIsPlaying\(false\)\s*setPlaybackKind\(null\)\s*const message = error instanceof FirebaseError/)
+  assert.match(player, /if \(completedKind === 'preview' \|\| completedKind === 'dj_preview'\) \{\s*setIsPlaying\(false\)\s*setPreviewEnded\(true\)/)
+  // Only one HTMLAudioElement for the whole app — a new track's src assignment inherently
+  // stops whatever the previous one was playing; there is no second, competing audio element.
+  assert.match(player, /const audio = new Audio\(\)/)
+  assert.doesNotMatch(player, /new Audio\(\)[\s\S]*new Audio\(\)/)
+
+  // The global player bar already correctly exposes pause/resume and a full-stop (close) control.
+  const bar = read('src/components/player/PlayerBar.tsx')
+  assert.match(bar, /onClick=\{togglePlay\}/)
+  assert.match(bar, /onClick=\{closePlayer\}/)
+  assert.match(bar, /aria-label=\{isPlaying \? 'Pause' : 'Play'\}/)
+
+  // Navigating away deliberately does NOT stop playback — the persistent player is an existing,
+  // intentional feature (already covered by its own dedicated test), not something to change here.
+  assert.match(player, /export function usePlayer\(\): PlayerContextValue \{/)
+})
+
+test('BUG 4 — Discover never shows the same artist twice across Rising/Most Supported, never shows the signed-in artist to themselves, and never autoplays (user-reported: "Dean" appeared in both sections)', () => {
+  const page = read('src/pages/fan/DiscoverPage.tsx')
+
+  // Root cause: listRisingArtists and listMostSupportedArtists are two independent top-N
+  // queries with no awareness of each other — with a small artist pool the same artist can
+  // legitimately rank in both. Fixed at presentation/query-composition time only.
+  const discovery = read('src/services/discoveryService.ts')
+  assert.match(discovery, /export async function listMostSupportedArtists\(count = 12\): Promise<ArtistProfile\[\]> \{\s*const q = query\(collection\(db, 'artistProfiles'\), orderBy\('supporterCount', 'desc'\), limit\(count\)\)/)
+  assert.match(discovery, /export async function listRisingArtists\(count = 12\): Promise<ArtistProfile\[\]> \{\s*const q = query\(collection\(db, 'artistProfiles'\), orderBy\('followerCount', 'desc'\), limit\(count\)\)/)
+
+  // Dedup by immutable artistId (never name/slug), Rising claims first (read top-to-bottom),
+  // and the ranking ORDER within each list is never touched — only which already-ranked
+  // artist gets excluded from a later section.
+  assert.match(page, /const shown = new Set<string>\(firebaseUser \? \[firebaseUser\.uid\] : \[\]\)/)
+  assert.match(page, /const dedupedRising = rising\.filter\(\(artist\) => !shown\.has\(artist\.artistId\)\)/)
+  assert.match(page, /for \(const artist of dedupedRising\) shown\.add\(artist\.artistId\)/)
+  assert.match(page, /const dedupedSupported = supported\.filter\(\(artist\) => !shown\.has\(artist\.artistId\)\)/)
+
+  // Over-fetches (24 candidates for a 12-slot section) so a later section can still fill up
+  // to its normal size from further down the SAME truthful ranking, rather than either
+  // duplicating an artist or unnecessarily going empty just because the top 12 overlapped.
+  assert.match(page, /const FETCH_COUNT = 24/)
+  assert.match(page, /listRisingArtists\(FETCH_COUNT\)/)
+  assert.match(page, /listMostSupportedArtists\(FETCH_COUNT\)/)
+  assert.match(page, /const DISPLAY_COUNT = 12/)
+  assert.match(page, /dedupedRising\.slice\(0, DISPLAY_COUNT\)/)
+  assert.match(page, /dedupedSupported\.slice\(0, DISPLAY_COUNT\)/)
+
+  // Self-exclusion: the signed-in artist is seeded into the "already shown" set before either
+  // section is filtered — this was previously absent (the page didn't even read auth state).
+  assert.match(page, /import \{ useAuth \} from '@\/contexts\/AuthContext'/)
+  assert.match(page, /const \{ firebaseUser \} = useAuth\(\)/)
+
+  // No fabrication: an under-filled section just renders fewer real cards (or the empty
+  // state) — nothing pads it back out to 12 with a repeated artist or invented data.
+  assert.doesNotMatch(page, /Math\.random|fake|placeholder|mock/i)
+  assert.match(page, /'More artists will appear here as the BackTheVibes community grows\.'/)
+  // The "genuinely no data at all" copy is distinct from and never conflated with the
+  // "emptied by dedup" copy — each reason gets its own honest message.
+  assert.match(page, /'No artists have joined yet\.'/)
+  assert.match(page, /'No artists have paying supporters yet\.'/)
+  assert.match(page, /risingEmptyReason === 'claimed'/)
+  assert.match(page, /mostSupportedEmptyReason === 'claimed'/)
+
+  // Existing artist profile links (via ArtistCard) are untouched — same component, same props.
+  assert.match(page, /import \{ ArtistCard \} from '@\/components\/music\/ArtistCard'/)
+  assert.match(page, /<ArtistCard key=\{artist\.artistId\} artist=\{artist\} \/>/)
+
+  // No autoplay: this page never calls playTrack/usePlayer at all — whatever the persistent
+  // global player is already doing (started by a deliberate click elsewhere) just continues
+  // across navigation, which is existing, intentional behaviour, not something introduced here.
+  assert.doesNotMatch(page, /usePlayer|playTrack\(/)
+})

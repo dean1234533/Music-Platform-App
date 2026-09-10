@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   listArtistsSeekingDJExposure,
   listMostSupportedArtists,
@@ -11,11 +12,21 @@ import { LoadingState, EmptyState } from '@/components/common/StateViews'
 import type { ArtistProfile } from '@/types/artist'
 import type { TrackDoc } from '@/types/track'
 
+const DISPLAY_COUNT = 12
+// Over-fetch so there's still a full section left after excluding artists an
+// earlier section already claimed — without this, two overlapping top-N
+// rankings could leave a later section thin even though enough distinct
+// artists genuinely exist further down that same truthful ranking.
+const FETCH_COUNT = 24
+
 export function DiscoverPage() {
+  const { firebaseUser } = useAuth()
   const [loading, setLoading] = useState(true)
   const [newReleases, setNewReleases] = useState<TrackDoc[]>([])
   const [risingArtists, setRisingArtists] = useState<ArtistProfile[]>([])
+  const [risingEmptyReason, setRisingEmptyReason] = useState<'none' | 'claimed' | null>(null)
   const [mostSupported, setMostSupported] = useState<ArtistProfile[]>([])
+  const [mostSupportedEmptyReason, setMostSupportedEmptyReason] = useState<'none' | 'claimed' | null>(null)
   const [djReady, setDjReady] = useState<TrackDoc[]>([])
 
   useEffect(() => {
@@ -24,14 +35,34 @@ export function DiscoverPage() {
       setLoading(true)
       const [releases, rising, supported, dj] = await Promise.all([
         listNewReleaseTracks(24),
-        listRisingArtists(12),
-        listMostSupportedArtists(12),
+        listRisingArtists(FETCH_COUNT),
+        listMostSupportedArtists(FETCH_COUNT),
         listArtistsSeekingDJExposure(12),
       ])
       if (cancelled) return
+
+      // Presentation-layer-only dedup: rankings themselves are untouched (each
+      // list is still exactly what the query returned, in the query's own
+      // order) — this only decides which already-ranked artist appears in
+      // which section, by immutable artistId, never by name/slug. Rising
+      // claims first, matching the order these sections read top-to-bottom.
+      // The signed-in artist never sees themselves in either — a discovery
+      // page recommending you to yourself isn't a real recommendation.
+      const shown = new Set<string>(firebaseUser ? [firebaseUser.uid] : [])
+      const dedupedRising = rising.filter((artist) => !shown.has(artist.artistId))
+      for (const artist of dedupedRising) shown.add(artist.artistId)
+      const dedupedSupported = supported.filter((artist) => !shown.has(artist.artistId))
+
       setNewReleases(releases)
-      setRisingArtists(rising)
-      setMostSupported(supported)
+      // "claimed" here really means "only the signed-in artist themselves" —
+      // Rising has no earlier section to lose candidates to.
+      setRisingEmptyReason(rising.length === 0 ? 'none' : dedupedRising.length === 0 ? 'claimed' : null)
+      setRisingArtists(dedupedRising.slice(0, DISPLAY_COUNT))
+      // Distinguish "no candidates at all" from "candidates existed but this
+      // section's own dedicated query returned none" vs "every candidate was
+      // already claimed by an earlier section" — each gets its own honest copy.
+      setMostSupportedEmptyReason(supported.length === 0 ? 'none' : dedupedSupported.length === 0 ? 'claimed' : null)
+      setMostSupported(dedupedSupported.slice(0, DISPLAY_COUNT))
       setDjReady(dj)
       setLoading(false)
     }
@@ -39,7 +70,7 @@ export function DiscoverPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [firebaseUser])
 
   if (loading) return <LoadingState label="Loading discovery…" />
 
@@ -52,11 +83,23 @@ export function DiscoverPage() {
       </div>
 
       <TrackSection title="New releases" tracks={newReleases} />
-      <ArtistSection title="Rising artists" artists={risingArtists} emptyLabel="No artists have joined yet." />
+      <ArtistSection
+        title="Rising artists"
+        artists={risingArtists}
+        emptyLabel={
+          risingEmptyReason === 'claimed'
+            ? 'More artists will appear here as the BackTheVibes community grows.'
+            : 'No artists have joined yet.'
+        }
+      />
       <ArtistSection
         title="Most supported artists"
         artists={mostSupported}
-        emptyLabel="No artists have paying supporters yet."
+        emptyLabel={
+          mostSupportedEmptyReason === 'claimed'
+            ? 'More artists will appear here as the BackTheVibes community grows.'
+            : 'No artists have paying supporters yet.'
+        }
       />
       <TrackSection
         title="Artists seeking DJ exposure"
