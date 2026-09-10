@@ -1579,10 +1579,10 @@ test('BUG 4 — Discover never shows the same artist twice across Rising/Most Su
   // Dedup by immutable artistId (never name/slug), Rising claims first (read top-to-bottom),
   // and the ranking ORDER within each list is never touched — only which already-ranked
   // artist gets excluded from a later section.
-  assert.match(page, /const shown = new Set<string>\(firebaseUser \? \[firebaseUser\.uid\] : \[\]\)/)
-  assert.match(page, /const dedupedRising = rising\.filter\(\(artist\) => !shown\.has\(artist\.artistId\)\)/)
-  assert.match(page, /for \(const artist of dedupedRising\) shown\.add\(artist\.artistId\)/)
-  assert.match(page, /const dedupedSupported = supported\.filter\(\(artist\) => !shown\.has\(artist\.artistId\)\)/)
+  assert.match(page, /const dedupedRising = excludeSelfUnlessEmpty\(rising\)/)
+  assert.match(page, /const shown = new Set<string>\(dedupedRising\.map\(\(artist\) => artist\.artistId\)\)/)
+  assert.match(page, /const supportedCandidates = excludeSelfUnlessEmpty\(supported\)/)
+  assert.match(page, /const dedupedSupported = supportedCandidates\.filter\(\(artist\) => !shown\.has\(artist\.artistId\)\)/)
 
   // Over-fetches (24 candidates for a 12-slot section) so a later section can still fill up
   // to its normal size from further down the SAME truthful ranking, rather than either
@@ -1618,6 +1618,27 @@ test('BUG 4 — Discover never shows the same artist twice across Rising/Most Su
   // global player is already doing (started by a deliberate click elsewhere) just continues
   // across navigation, which is existing, intentional behaviour, not something introduced here.
   assert.doesNotMatch(page, /usePlayer|playTrack\(/)
+})
+
+test('Discover never blanks Rising/Most Supported out just because the signed-in viewer is currently the only artist on the platform (user-reported: "i can see the card as a dj" — same account is the platform\'s sole artist AND sole DJ, so self-exclusion emptied the fan-facing sections while the DJ-facing Artists page, which has no self-exclusion, showed the card fine)', () => {
+  const page = read('src/pages/fan/DiscoverPage.tsx')
+
+  // Root cause: self-exclusion (added for BUG 4) unconditionally removed the viewer's own
+  // artist profile from both sections. With only one artist in the whole database and that
+  // artist signed in, both sections always went empty — not because the query/rules were
+  // broken (they weren't; verified live), but because self-exclusion had no fallback for
+  // "excluding you leaves nothing else to show."
+  assert.match(page, /const selfId = firebaseUser\?\.uid/)
+  assert.match(
+    page,
+    /const excludeSelfUnlessEmpty = \(list: ArtistProfile\[\]\) => \{\s*\n\s*if \(!selfId\) return list\s*\n\s*const filtered = list\.filter\(\(artist\) => artist\.artistId !== selfId\)\s*\n\s*return filtered\.length > 0 \? filtered : list\s*\n\s*\}/,
+  )
+
+  // The DJ-facing equivalent (Artists tab) has never had self-exclusion at all — confirms
+  // the viewer's own card rendering fine there was never evidence the fan-facing fix was
+  // wrong; the two pages just apply different presentation rules on top of the same query.
+  const djArtistsPage = read('src/pages/dj/DJArtistsPage.tsx')
+  assert.doesNotMatch(djArtistsPage, /firebaseUser|excludeSelf|selfId/)
 })
 
 test('DJ Requests never presents a promo-opt-in control that silently fails for a dj-role account with no djProfiles doc yet, and the write itself no longer becomes an uncaught rejection (user-reported console error: "Uncaught (in promise) FirebaseError: Missing or insufficient permissions")', () => {

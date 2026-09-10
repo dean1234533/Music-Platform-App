@@ -46,21 +46,29 @@ export function DiscoverPage() {
       // order) — this only decides which already-ranked artist appears in
       // which section, by immutable artistId, never by name/slug. Rising
       // claims first, matching the order these sections read top-to-bottom.
-      // The signed-in artist never sees themselves in either — a discovery
-      // page recommending you to yourself isn't a real recommendation.
-      const shown = new Set<string>(firebaseUser ? [firebaseUser.uid] : [])
-      const dedupedRising = rising.filter((artist) => !shown.has(artist.artistId))
-      for (const artist of dedupedRising) shown.add(artist.artistId)
-      const dedupedSupported = supported.filter((artist) => !shown.has(artist.artistId))
+      // The signed-in artist doesn't see themselves recommended when there's
+      // a real alternative — but if excluding them would empty the section
+      // out entirely (e.g. they're currently the only artist on the
+      // platform), show it anyway: a blank "no artists" page is a worse,
+      // more confusing experience than briefly seeing your own card.
+      const selfId = firebaseUser?.uid
+      const excludeSelfUnlessEmpty = (list: ArtistProfile[]) => {
+        if (!selfId) return list
+        const filtered = list.filter((artist) => artist.artistId !== selfId)
+        return filtered.length > 0 ? filtered : list
+      }
+      const dedupedRising = excludeSelfUnlessEmpty(rising)
+      const shown = new Set<string>(dedupedRising.map((artist) => artist.artistId))
+      const supportedCandidates = excludeSelfUnlessEmpty(supported)
+      const dedupedSupported = supportedCandidates.filter((artist) => !shown.has(artist.artistId))
 
       setNewReleases(releases)
-      // "claimed" here really means "only the signed-in artist themselves" —
-      // Rising has no earlier section to lose candidates to.
       setRisingEmptyReason(rising.length === 0 ? 'none' : dedupedRising.length === 0 ? 'claimed' : null)
       setRisingArtists(dedupedRising.slice(0, DISPLAY_COUNT))
-      // Distinguish "no candidates at all" from "candidates existed but this
-      // section's own dedicated query returned none" vs "every candidate was
-      // already claimed by an earlier section" — each gets its own honest copy.
+      // Distinguish "no candidates at all" from "every candidate was already
+      // claimed by an earlier section" (self-exclusion no longer causes this
+      // — it only removes you when someone else remains) — each gets its own
+      // honest copy.
       setMostSupportedEmptyReason(supported.length === 0 ? 'none' : dedupedSupported.length === 0 ? 'claimed' : null)
       setMostSupported(dedupedSupported.slice(0, DISPLAY_COUNT))
       setDjReady(dj)
