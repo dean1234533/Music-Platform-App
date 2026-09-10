@@ -6,6 +6,7 @@ import {
   listNewReleaseTracks,
   listRisingArtists,
 } from '@/services/discoveryService'
+import { getArtistProfile } from '@/services/artistService'
 import { TrackCard } from '@/components/music/TrackCard'
 import { ArtistCard } from '@/components/music/ArtistCard'
 import { LoadingState, EmptyState } from '@/components/common/StateViews'
@@ -27,18 +28,31 @@ export function DiscoverPage() {
   const [risingEmptyReason, setRisingEmptyReason] = useState<'none' | 'claimed' | null>(null)
   const [mostSupported, setMostSupported] = useState<ArtistProfile[]>([])
   const [mostSupportedEmptyReason, setMostSupportedEmptyReason] = useState<'none' | 'claimed' | null>(null)
-  const [djReady, setDjReady] = useState<TrackDoc[]>([])
+  const [djReadyArtists, setDjReadyArtists] = useState<ArtistProfile[]>([])
+  const [djReadyEmptyReason, setDjReadyEmptyReason] = useState<'none' | 'claimed' | null>(null)
 
   useEffect(() => {
     let cancelled = false
     async function load() {
       setLoading(true)
-      const [releases, rising, supported, dj] = await Promise.all([
+      const [releases, rising, supported, djTracks] = await Promise.all([
         listNewReleaseTracks(24),
         listRisingArtists(FETCH_COUNT),
         listMostSupportedArtists(FETCH_COUNT),
-        listArtistsSeekingDJExposure(12),
+        listArtistsSeekingDJExposure(FETCH_COUNT),
       ])
+      if (cancelled) return
+
+      // "Artists seeking DJ exposure" is artist-level, not track-level — a
+      // track query is only how it's sourced (the visibility/embargo checks
+      // live on tracks). Resolve to the tracks' unique artists via the same
+      // single-document getArtistProfile() lookup TrackCard already uses,
+      // never a list query, so it can't hit the get()-without-a-filter
+      // list-query restriction (see onUserRolesChange's comment).
+      const uniqueDjArtistIds = [...new Set(djTracks.map((track) => track.artistId))]
+      const djArtistProfiles = (await Promise.all(uniqueDjArtistIds.map((id) => getArtistProfile(id)))).filter(
+        (a): a is ArtistProfile => a !== null,
+      )
       if (cancelled) return
 
       // Presentation-layer-only dedup: rankings themselves are untouched (each
@@ -61,6 +75,9 @@ export function DiscoverPage() {
       const shown = new Set<string>(dedupedRising.map((artist) => artist.artistId))
       const supportedCandidates = excludeSelfUnlessEmpty(supported)
       const dedupedSupported = supportedCandidates.filter((artist) => !shown.has(artist.artistId))
+      for (const artist of dedupedSupported) shown.add(artist.artistId)
+      const djArtistCandidates = excludeSelfUnlessEmpty(djArtistProfiles)
+      const dedupedDjArtists = djArtistCandidates.filter((artist) => !shown.has(artist.artistId))
 
       setNewReleases(releases)
       setRisingEmptyReason(rising.length === 0 ? 'none' : dedupedRising.length === 0 ? 'claimed' : null)
@@ -71,7 +88,10 @@ export function DiscoverPage() {
       // honest copy.
       setMostSupportedEmptyReason(supported.length === 0 ? 'none' : dedupedSupported.length === 0 ? 'claimed' : null)
       setMostSupported(dedupedSupported.slice(0, DISPLAY_COUNT))
-      setDjReady(dj)
+      setDjReadyEmptyReason(
+        djArtistProfiles.length === 0 ? 'none' : dedupedDjArtists.length === 0 ? 'claimed' : null,
+      )
+      setDjReadyArtists(dedupedDjArtists.slice(0, DISPLAY_COUNT))
       setLoading(false)
     }
     void load()
@@ -109,10 +129,14 @@ export function DiscoverPage() {
             : 'No artists have paying supporters yet.'
         }
       />
-      <TrackSection
+      <ArtistSection
         title="Artists seeking DJ exposure"
-        tracks={djReady}
-        emptyLabel="No tracks are currently open for DJ promotion."
+        artists={djReadyArtists}
+        emptyLabel={
+          djReadyEmptyReason === 'claimed'
+            ? 'More artists will appear here as the BackTheVibes community grows.'
+            : 'No artists are currently open for DJ promotion.'
+        }
       />
     </div>
   )

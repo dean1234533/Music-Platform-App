@@ -1641,6 +1641,38 @@ test('Discover never blanks Rising/Most Supported out just because the signed-in
   assert.doesNotMatch(djArtistsPage, /firebaseUser|excludeSelf|selfId/)
 })
 
+test('Discover\'s "Artists seeking DJ exposure" section shows artist cards, not track cards (user-reported: "shouldn\'t this show the artist card and not the track")', () => {
+  const page = read('src/pages/fan/DiscoverPage.tsx')
+
+  // Root cause: the section is titled and framed as artist-level ("Artists seeking DJ
+  // exposure"), but it rendered via TrackSection/TrackCard — one card per promoted TRACK,
+  // so an artist with several promoted tracks could appear more than once and the cards
+  // themselves looked and linked like tracks, not artists. listArtistsSeekingDJExposure is
+  // sourced from a track query (the embargo/visibility checks are track-level), so the fix
+  // resolves it down to each track's unique artist and renders those as ArtistCards instead.
+  assert.match(page, /const uniqueDjArtistIds = \[\.\.\.new Set\(djTracks\.map\(\(track\) => track\.artistId\)\)\]/)
+  assert.match(
+    page,
+    /const djArtistProfiles = \(await Promise\.all\(uniqueDjArtistIds\.map\(\(id\) => getArtistProfile\(id\)\)\)\)\.filter\(/,
+  )
+  // A single-document getArtistProfile() get() per known artistId — never a list `query()` —
+  // so this can't hit the "list query + cross-document get() with no narrowing filter" rule
+  // restriction that broke every broad browsing query earlier this session.
+  assert.match(page, /import \{ getArtistProfile \} from '@\/services\/artistService'/)
+
+  // Same self-exclusion-unless-it-would-empty-the-section and cross-section dedup as
+  // Rising/Most Supported — an artist already shown above doesn't reappear here, and this
+  // section claims last, matching its position at the bottom of the page.
+  assert.match(page, /const djArtistCandidates = excludeSelfUnlessEmpty\(djArtistProfiles\)/)
+  assert.match(page, /const dedupedDjArtists = djArtistCandidates\.filter\(\(artist\) => !shown\.has\(artist\.artistId\)\)/)
+
+  assert.match(
+    page,
+    /<ArtistSection\s*\n\s*title="Artists seeking DJ exposure"\s*\n\s*artists=\{djReadyArtists\}/,
+  )
+  assert.match(page, /'No artists are currently open for DJ promotion\.'/)
+})
+
 test('DJ Requests never presents a promo-opt-in control that silently fails for a dj-role account with no djProfiles doc yet, and the write itself no longer becomes an uncaught rejection (user-reported console error: "Uncaught (in promise) FirebaseError: Missing or insufficient permissions")', () => {
   const page = read('src/pages/dj/DJRequestsPage.tsx')
   // Root cause: a dj-role account can reach this page without ever having completed DJ
