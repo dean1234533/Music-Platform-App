@@ -1365,25 +1365,25 @@ test('a regular account can only ever have one role, for life — self-service c
   )
   assert.match(addRolePage, /if \(blockedByExistingRole\) \{/)
 
-  // Fan Settings: a plain single-role fan account gets no "Roles" section at
-  // all (no dead-end self-service upsell it can't use) — only an account
-  // that's admin, or already holds artist/dj (legacy multi-role data, or an
-  // admin who added one), sees it.
+  // Fan Settings: no self-service role management at all any more, admin
+  // included — the whole "Roles" section (go-to-dashboard links and "+
+  // Add…" upsell alike) is gone. Cross-dashboard navigation for an account
+  // that legitimately holds more than one role lives in DashboardSwitcher
+  // instead (asserted below), not Settings.
   const fanSettings = read('src/pages/fan/SettingsPage.tsx')
-  assert.match(
-    fanSettings,
-    /hasRole\('admin'\) \|\| profile\?\.roles\.includes\('artist'\) \|\| profile\?\.roles\.includes\('dj'\) \? \(/,
-  )
-  // The "+ Add…" self-service links only render in the admin branch.
-  const rolesSectionStart = fanSettings.indexOf("h2 className=\"mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3\">Roles")
-  const rolesSectionEnd = fanSettings.indexOf('</section>', rolesSectionStart)
-  const rolesSection = fanSettings.slice(rolesSectionStart, rolesSectionEnd)
-  const addArtistIndex = rolesSection.indexOf('+ Add an artist profile')
-  const addDjIndex = rolesSection.indexOf('+ Add a DJ profile')
-  const lastAdminCheckBeforeArtist = rolesSection.lastIndexOf("hasRole('admin')", addArtistIndex)
-  const lastAdminCheckBeforeDj = rolesSection.lastIndexOf("hasRole('admin')", addDjIndex)
-  assert.ok(addArtistIndex !== -1 && lastAdminCheckBeforeArtist !== -1, '"+ Add an artist profile" must be reachable only through an hasRole(\'admin\') branch')
-  assert.ok(addDjIndex !== -1 && lastAdminCheckBeforeDj !== -1, '"+ Add a DJ profile" must be reachable only through an hasRole(\'admin\') branch')
+  assert.doesNotMatch(fanSettings, />Roles</)
+  assert.doesNotMatch(fanSettings, /\+ Add an artist profile/)
+  assert.doesNotMatch(fanSettings, /\+ Add a DJ profile/)
+  assert.doesNotMatch(fanSettings, /Go to Artist dashboard/)
+  assert.doesNotMatch(fanSettings, /Go to DJ dashboard/)
+  assert.doesNotMatch(fanSettings, /onboarding\/add-role/)
+  assert.doesNotMatch(fanSettings, /subscribeArtistProfile|subscribeDJProfile/)
+
+  const dashboardSwitcher = read('src/components/layout/DashboardSwitcher.tsx')
+  assert.match(dashboardSwitcher, /if \(hasRole\('fan'\)\) \{/)
+  assert.match(dashboardSwitcher, /if \(hasRole\('artist'\)\) \{/)
+  assert.match(dashboardSwitcher, /if \(hasRole\('dj'\)\) \{/)
+  assert.match(dashboardSwitcher, /if \(hasRole\('admin'\)\) \{/)
 
   // TrackPage's "Add a DJ profile to request access" prompt is the same
   // story — only an admin viewer gets a working self-service link.
@@ -1441,18 +1441,14 @@ test('a brand-new account picking its first role, or an admin account, still goe
   assert.match(djService, /export async function createDJProfile\(input: CreateDJProfileInput\): Promise<void> \{/)
   assert.match(djService, /callable<CreateDJProfileInput, \{ ok: true \}>\('createDJProfile'\)/)
 
-  // Pricing's "Start free trial" / "Create DJ profile" and Settings' "+ Add…"
-  // links still point at the self-service onboarding/add-role screen — for
-  // a brand-new signed-out visitor (Pricing routes those to /sign-up, the
-  // one-role onboarding pick) or an admin account (Settings gates "+ Add…"
-  // to hasRole('admin') — see the dedicated one-role-per-account test above
-  // for why a regular already-roled account no longer sees either).
+  // Pricing's "Start free trial" / "Create DJ profile" still point at the
+  // self-service onboarding/add-role screen — for a brand-new signed-out
+  // visitor (Pricing routes those to /sign-up, the one-role onboarding
+  // pick) or an admin account. Fan Settings no longer offers this at all,
+  // for any account — see the dedicated one-role-per-account test above.
   const pricing = read('src/pages/marketing/PricingPage.tsx')
   assert.match(pricing, /\/onboarding\/add-role\?role=artist/)
   assert.match(pricing, /\/onboarding\/add-role\?role=dj/)
-  const settings = read('src/pages/fan/SettingsPage.tsx')
-  assert.match(settings, /\+ Add an artist profile/)
-  assert.match(settings, /\+ Add a DJ profile/)
 })
 
 test('restricted-tier Story media never persists a permanent, Storage-rules-bypassing download URL on the document (a currently-entitled viewer reading the raw doc must not keep working access forever after losing entitlement)', () => {
@@ -1821,29 +1817,19 @@ test('DJ Requests never presents a promo-opt-in control that silently fails for 
   assert.match(djProfilePage, /No DJ profile found/)
 })
 
-test('a role held without a matching profile document is never a dead end — Settings correctly offers "finish setup" instead of a broken dashboard link, and both dashboards\' own empty states link straight to the fix (user-reported: "No DJ profile found... there is no way to create a profile")', () => {
-  // Root cause: Settings decided "Go to dashboard" vs "+ Add a profile" purely from the roles
-  // array, never checking whether the profile document actually exists — so an account that
-  // holds the role without a profile (e.g. granted via the admin role toggle, which only ever
-  // touches users.roles, never artistProfiles/djProfiles) saw "Go to dashboard", which landed
-  // on a page saying "No profile found... add one from Settings" — pointing right back here.
-  const settings = read('src/pages/fan/SettingsPage.tsx')
-  assert.match(settings, /import \{ subscribeArtistProfile \} from '@\/services\/artistService'/)
-  assert.match(settings, /import \{ subscribeDJProfile \} from '@\/services\/djService'/)
-  assert.match(settings, /const \[hasArtistProfile, setHasArtistProfile\] = useState<boolean \| undefined>\(undefined\)/)
-  assert.match(settings, /const \[hasDjProfile, setHasDjProfile\] = useState<boolean \| undefined>\(undefined\)/)
-  assert.match(settings, /profile\?\.roles\.includes\('artist'\) && hasArtistProfile \? \(/)
-  assert.match(settings, /profile\?\.roles\.includes\('dj'\) && hasDjProfile \? \(/)
-  // Both branches route to the SAME idempotent create flow regardless of whether the role is
-  // already held — createArtistProfile/createDJProfile just create the missing profile and
-  // re-affirm the (already-present) role, never erroring or duplicating anything.
-  assert.match(settings, /to="\/onboarding\/add-role\?role=artist"/)
-  assert.match(settings, /to="\/onboarding\/add-role\?role=dj"/)
-
+test('a role held without a matching profile document is never a dead end — both dashboards\' own empty states link straight to the fix (user-reported: "No DJ profile found... there is no way to create a profile")', () => {
+  // Root cause, as originally reported: Settings decided "Go to dashboard" vs "+ Add a profile"
+  // purely from the roles array, never checking whether the profile document actually existed —
+  // so an account that held the role without a profile saw "Go to dashboard", which landed on a
+  // page saying "No profile found... add one from Settings" — pointing right back there. Settings'
+  // entire Roles section (including this logic) was later removed outright, for the unrelated
+  // "one role per account" fix (see that dedicated test) — the fix that actually matters now is
+  // that each dashboard's own empty state links straight to the create flow itself, not back
+  // through Settings at all, so this dead end can't recur regardless of what Settings shows.
   const addRolePage = read('src/pages/onboarding/AddRolePage.tsx')
   assert.doesNotMatch(addRolePage, /roles\.includes\('artist'\)|roles\.includes\('dj'\)/)
 
-  // Each dashboard's own "no profile" empty state now links straight to that same fix instead
+  // Each dashboard's own "no profile" empty state links straight to that same fix instead
   // of just describing where to go (the previous copy pointed back at Settings, which — before
   // the fix above — could never actually get them here).
   const djProfilePage = read('src/pages/dj/DJProfilePage.tsx')

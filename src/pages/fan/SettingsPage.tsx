@@ -1,9 +1,7 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { updateBasicProfile, removeRole } from '@/services/userService'
-import { subscribeArtistProfile } from '@/services/artistService'
-import { subscribeDJProfile } from '@/services/djService'
 import { signOut } from '@/services/authService'
 import { Button } from '@/components/common/Button'
 import { AccountSecuritySection } from '@/components/account/AccountSecuritySection'
@@ -13,24 +11,6 @@ export function SettingsPage() {
   const { firebaseUser, profile, hasRole } = useAuth()
   const navigate = useNavigate()
   const [removingRole, setRemovingRole] = useState(false)
-  // Holding the role and actually having the profile document are two
-  // different things (e.g. the role can be granted without ever completing
-  // profile setup) — "Go to dashboard" is only correct once the profile
-  // genuinely exists; otherwise that link is a dead end that bounces
-  // straight back to a "no profile found" page with nowhere to go from
-  // there (user-reported). undefined = still loading/not applicable.
-  const [hasArtistProfile, setHasArtistProfile] = useState<boolean | undefined>(undefined)
-  const [hasDjProfile, setHasDjProfile] = useState<boolean | undefined>(undefined)
-
-  useEffect(() => {
-    if (!firebaseUser || !profile?.roles.includes('artist')) return
-    return subscribeArtistProfile(firebaseUser.uid, (p) => setHasArtistProfile(p !== null))
-  }, [firebaseUser, profile?.roles])
-
-  useEffect(() => {
-    if (!firebaseUser || !profile?.roles.includes('dj')) return
-    return subscribeDJProfile(firebaseUser.uid, (p) => setHasDjProfile(p !== null))
-  }, [firebaseUser, profile?.roles])
 
   async function toggleEmailNotifications() {
     if (!firebaseUser || !profile) return
@@ -77,62 +57,11 @@ export function SettingsPage() {
         </div>
       </section>
 
-      {/* One role per account: a regular (non-admin) account keeps exactly the
-          single role it picked at onboarding for life, so it can never itself
-          add artist or DJ on top of that — only an admin account can. This
-          section only ever offers "Add a role" self-service to an admin; a
-          regular fan account just doesn't get an upsell it can't use. */}
-      {hasRole('admin') || profile?.roles.includes('artist') || profile?.roles.includes('dj') ? (
-        <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Roles</h2>
-          <div className="flex flex-col gap-2">
-            {profile?.roles.includes('artist') && hasArtistProfile ? (
-              <Link
-                to="/dashboard/artist"
-                className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
-              >
-                Go to Artist dashboard →
-              </Link>
-            ) : profile?.roles.includes('artist') ? (
-              <Link
-                to="/onboarding/add-role?role=artist"
-                className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
-              >
-                Finish setting up your artist profile
-              </Link>
-            ) : hasRole('admin') ? (
-              <Link
-                to="/onboarding/add-role?role=artist"
-                className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
-              >
-                + Add an artist profile
-              </Link>
-            ) : null}
-            {profile?.roles.includes('dj') && hasDjProfile ? (
-              <Link
-                to="/dj/discover"
-                className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
-              >
-                Go to DJ dashboard →
-              </Link>
-            ) : profile?.roles.includes('dj') ? (
-              <Link
-                to="/onboarding/add-role?role=dj"
-                className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
-              >
-                Finish setting up your DJ profile
-              </Link>
-            ) : hasRole('admin') ? (
-              <Link
-                to="/onboarding/add-role?role=dj"
-                className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
-              >
-                + Add a DJ profile
-              </Link>
-            ) : null}
-          </div>
-        </section>
-      ) : null}
+      {/* No self-service role management here at all, admin included — one
+          role per account is a backend/admin concern (functions/src/
+          profiles.ts, firestore.rules), and cross-dashboard navigation for
+          an account that legitimately holds more than one role already
+          lives in DashboardSwitcher (the TopBar dropdown), not Settings. */}
 
       <AccountSecuritySection />
 
