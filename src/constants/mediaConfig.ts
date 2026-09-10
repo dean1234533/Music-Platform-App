@@ -30,6 +30,8 @@ export const IMAGE_DIMENSIONS = {
   artwork: { width: 1600, height: 1600 },
   story: { width: 1080, height: 1920 },
   cover: { width: 1920, height: 1080 },
+  /** Kept larger than profile/story — a copyright claim's evidence needs to stay legible, not just small. */
+  evidence: { width: 1600, height: 1600 },
 } as const
 
 export type ImageAssetKind = keyof typeof IMAGE_DIMENSIONS

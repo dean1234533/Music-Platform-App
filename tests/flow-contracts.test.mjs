@@ -2499,3 +2499,28 @@ test('every page with a header nav bar keeps it pinned while scrolling, matching
   assert.match(djProfile, /<header className="sticky top-0 z-30 border-b border-white\/\[0\.07\] bg-surface-0\/80 backdrop-blur-xl">/)
   assert.match(djProfile, /<\/header>\s*\n\s*<div className="min-h-svh overflow-hidden bg-surface-0 pb-24 text-ink-0">/)
 })
+
+test('copyright claim evidence images are compressed before upload, matching every other image upload in the app (user-reported: "also if images are not compress then please do this")', () => {
+  // Audited every Storage upload in the app: track uploads (both the original UploadTrackPage
+  // flow and EditTrackModal's artwork re-upload) already compress via compressImage before
+  // calling the service layer; profile/artist photo, cover, avatar, and story media all
+  // compress internally in profileMediaService.ts/storyService.ts. The one real gap was
+  // copyright claim evidence — uploadCopyrightEvidence took a raw File straight to Storage,
+  // and its only caller never compressed first, so a typical uncompressed phone screenshot/
+  // photo (often several MB) uploaded at full size.
+  const config = read('src/constants/mediaConfig.ts')
+  assert.match(config, /evidence: \{ width: 1600, height: 1600 \}/)
+
+  const page = read('src/pages/legal/CopyrightClaimPage.tsx')
+  assert.match(page, /import \{ compressImage \} from '@\/services\/imageProcessing'/)
+  // PDFs (the accept attribute allows image/*,application/pdf) pass through untouched —
+  // compressImage decodes via <img>/canvas and can't read a PDF — only actual images compress.
+  assert.match(page, /const uploadFile = file\.type\.startsWith\('image\/'\) \? \(await compressImage\(file, 'evidence'\)\)\.file : file/)
+  assert.match(page, /evidenceUrls\.push\(await uploadCopyrightEvidence\(newClaimId, uploadFile\)\)/)
+
+  // A drawn e-signature (a small canvas stroke capture, not a photo) is deliberately left
+  // uncompressed — running lossy image compression on it risks degrading legibility on a
+  // legal document for negligible size savings.
+  const licence = read('src/services/licenceService.ts')
+  assert.doesNotMatch(licence, /compressImage/)
+})

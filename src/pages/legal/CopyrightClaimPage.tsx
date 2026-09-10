@@ -7,6 +7,7 @@ import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
 import { useAuth } from '@/contexts/AuthContext'
 import { newCopyrightClaimId, submitCopyrightClaim, uploadCopyrightEvidence } from '@/services/moderationService'
+import { compressImage } from '@/services/imageProcessing'
 
 const MAX_EVIDENCE_FILES = 5
 
@@ -59,7 +60,12 @@ export function CopyrightClaimPage() {
       const evidenceUrls: string[] = []
       for (let i = 0; i < evidenceFiles.length; i++) {
         setUploadStatus(`Uploading evidence ${i + 1} of ${evidenceFiles.length}…`)
-        evidenceUrls.push(await uploadCopyrightEvidence(newClaimId, evidenceFiles[i]))
+        // PDFs pass through as-is — compressImage decodes via <img>/canvas, which can't
+        // read a PDF. Images (typically an uncompressed phone screenshot/photo) get resized
+        // and re-encoded first, same as every other image upload in the app.
+        const file = evidenceFiles[i]
+        const uploadFile = file.type.startsWith('image/') ? (await compressImage(file, 'evidence')).file : file
+        evidenceUrls.push(await uploadCopyrightEvidence(newClaimId, uploadFile))
       }
       setUploadStatus('')
 
