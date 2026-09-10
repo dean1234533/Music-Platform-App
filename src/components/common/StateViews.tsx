@@ -15,12 +15,14 @@ export function EmptyState({
   action,
   icon,
   backgroundImage,
+  backgroundPosition,
 }: {
   title: string
   description?: string
   action?: ReactNode
   icon?: ReactNode
   backgroundImage?: string
+  backgroundPosition?: string
 }) {
   return (
     <div
@@ -31,6 +33,7 @@ export function EmptyState({
         backgroundImage
           ? {
               backgroundImage: `linear-gradient(90deg, rgba(5, 6, 7, 0.78), rgba(5, 6, 7, 0.6) 50%, rgba(5, 6, 7, 0.78)), url("${backgroundImage}")`,
+              backgroundPosition,
             }
           : undefined
       }

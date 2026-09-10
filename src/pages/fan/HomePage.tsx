@@ -137,6 +137,7 @@ export function HomePage() {
           title="Follow artists to build your feed"
           description="Once you follow artists, their new releases show up here first."
           backgroundImage="/fan-follow-artists-bg.png"
+          backgroundPosition="68% center"
           action={
             <Link to="/app/discover" className="text-sm font-medium text-brand-400 hover:underline">
               Discover artists →
