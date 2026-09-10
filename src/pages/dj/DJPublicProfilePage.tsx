@@ -55,7 +55,7 @@ export function DJPublicProfilePage() {
 
       <div className="relative h-60 w-full overflow-hidden border-y border-white/[0.06] bg-surface-2 sm:h-72 lg:h-96">
         <img
-          src={profile.coverURL || '/dj-requests-empty-bg.png'}
+          src={profile.coverURL || '/artist-command-centre-bg.png'}
           alt=""
           className="h-full w-full object-cover object-center"
         />
@@ -65,7 +65,7 @@ export function DJPublicProfilePage() {
       <main className="relative z-10 mx-auto -mt-28 max-w-6xl px-5 sm:-mt-32 sm:px-8 lg:-mt-52 lg:px-10">
         <section className="premium-panel relative overflow-hidden rounded-[2rem] !bg-transparent p-5 backdrop-blur-md sm:p-7 lg:p-9">
           <img
-            src={profile.coverURL || '/dj-requests-empty-bg.png'}
+            src={profile.coverURL || '/artist-command-centre-bg.png'}
             alt=""
             className="absolute inset-0 h-full w-full object-cover object-center opacity-75"
           />

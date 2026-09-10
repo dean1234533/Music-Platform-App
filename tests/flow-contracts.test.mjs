@@ -2392,3 +2392,18 @@ test('the account email has its own labeled field instead of sitting unlabeled n
   )
   assert.match(page, /<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">\s*\n\s*<div>\s*\n\s*<Label htmlFor="displayName">Display name<\/Label>/)
 })
+
+test('every button shows a pointer/hand cursor on desktop instead of the default arrow (user-reported: "on desktop show that things are clickable using the hand")', () => {
+  // Tailwind v3+ (including v4, used here) deliberately made <button> match the native
+  // browser default of cursor: default, removing the cursor: pointer it used to set — a
+  // documented, intentional change, not a bug in Tailwind itself. Confirmed by grepping the
+  // installed package's actual compiled preflight for any button cursor rule: none exists.
+  // That leaves every raw <button> across the app (most of them — only the shared Button
+  // component happened to already set its own cursor-pointer utility) showing a plain arrow.
+  // Fixed once, globally, rather than touching every file that renders a bare <button>.
+  const preflight = read('node_modules/tailwindcss/preflight.css')
+  assert.doesNotMatch(preflight, /button\s*\{[^}]*cursor:\s*pointer/)
+
+  const css = read('src/index.css')
+  assert.match(css, /button:not\(:disabled\),\s*\n\[role="button"\]:not\(\[aria-disabled="true"\]\) \{\s*\n\s*cursor: pointer;\s*\n\}/)
+})
