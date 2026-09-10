@@ -67,14 +67,16 @@ service cloud.firestore {
         && request.resource.data.get('stripeCustomerId', null) == resource.data.get('stripeCustomerId', null)
         && request.resource.data.get('suspended', false) == resource.data.get('suspended', false)
         && (
-          // Normal account: roles may only ever be fan/artist/dj, and this
-          // path may only ADD to that set, never remove from it — stepping
-          // back from a role to go invisible is an admin-only capability,
-          // never something a regular fan/artist/dj account can do to
-          // itself (every role present before the write must still be
-          // present after it).
-          (request.resource.data.roles.hasOnly(['fan', 'artist', 'dj'])
-            && resource.data.roles.removeAll(request.resource.data.roles).size() == 0)
+          // Normal account, first-ever role write (initial onboarding —
+          // the doc was created with roles == [] and this is the one write
+          // that sets it): may set any subset of fan/artist/dj, once. A
+          // platform has to let a brand-new signup pick its own first role.
+          (resource.data.roles.size() == 0 && request.resource.data.roles.hasOnly(['fan', 'artist', 'dj']))
+          // Normal account, already onboarded: roles are completely frozen
+          // on this client path from here on — no self-service add OR
+          // remove, ever again. Adding a later role (e.g. a fan becoming an
+          // artist) or stepping back from one is admin-only.
+          || (resource.data.roles.hasOnly(['fan', 'artist', 'dj']) && request.resource.data.roles == resource.data.roles)
           // Admin account: free to add or remove its own fan/artist/dj
           // roles — including stepping back from all of them to operate
           // invisibly — but 'admin' itself can never be touched through

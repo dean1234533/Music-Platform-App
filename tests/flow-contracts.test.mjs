@@ -1168,20 +1168,28 @@ test('an admin can never suspend or delete their own account (user-reported: app
   assert.match(deletion, /if \(userId === adminId\) \{\s*throw new HttpsError\('failed-precondition', 'Use account settings to delete your own account/)
 })
 
-test('only an admin account can step back from a role and go invisible — a regular fan/artist/dj account can add roles but never remove one from itself (user-reported: "no users should not be able to do this only admin")', () => {
+test('only an admin account can change its own roles after signup (add or remove, going invisible in the process) — a regular fan/artist/dj account is frozen at whatever roles it picked during onboarding (user-reported: "no users should not be able to do this only admin")', () => {
   const rules = read('firestore.rules')
   assert.match(rules, /function roleActiveFor\(uid, role\) \{\s*return exists\(\/databases\/\$\(database\)\/documents\/users\/\$\(uid\)\)\s*&& role in get\(\/databases\/\$\(database\)\/documents\/users\/\$\(uid\)\)\.data\.roles;/)
   assert.match(rules, /allow read: if roleActiveFor\(artistId, 'artist'\) \|\| isSelf\(artistId\) \|\| isAdmin\(\);/)
   assert.match(rules, /allow read: if roleActiveFor\(djId, 'dj'\) \|\| isSelf\(djId\) \|\| isAdmin\(\);/)
   assert.match(rules, /roleActiveFor\(resource\.data\.artistId, 'artist'\)/)
 
-  // A non-admin account may only ADD to its fan/artist/dj roles through this
-  // path — every role present before the write must still be present after
-  // it — so it can never remove/step back from a role on its own.
-  const usersUpdateRule = rules.slice(rules.indexOf('allow update: if isSelf(userId)'), rules.indexOf('allow update: if isSelf(userId)') + 1500)
-  assert.match(usersUpdateRule, /request\.resource\.data\.roles\.hasOnly\(\['fan', 'artist', 'dj'\]\)\s*&& resource\.data\.roles\.removeAll\(request\.resource\.data\.roles\)\.size\(\) == 0/)
-  // An admin account, by contrast, can add or remove its own fan/artist/dj roles, but never grant/revoke 'admin' via this client-writable path.
+  // A non-admin account may only ever set its own roles ONCE, at initial
+  // signup (roles still []) — after that, this path freezes roles exactly
+  // as-is, so it can never add a later role or step back from one on its own.
+  const usersUpdateRule = rules.slice(rules.indexOf('allow update: if isSelf(userId)'), rules.indexOf('allow update: if isSelf(userId)') + 2000)
+  assert.match(usersUpdateRule, /resource\.data\.roles\.size\(\) == 0 && request\.resource\.data\.roles\.hasOnly\(\['fan', 'artist', 'dj'\]\)/)
+  assert.match(usersUpdateRule, /resource\.data\.roles\.hasOnly\(\['fan', 'artist', 'dj'\]\) && request\.resource\.data\.roles == resource\.data\.roles/)
+  // An admin account, by contrast, can add or remove its own fan/artist/dj roles at any time, but never grant/revoke 'admin' via this client-writable path.
   assert.match(usersUpdateRule, /resource\.data\.roles\.removeAll\(\['admin'\]\)\.hasOnly\(\['fan', 'artist', 'dj'\]\)/)
+
+  // AddRolePage (the only client path that adds a role after signup) is
+  // itself admin-gated too, so an already-onboarded regular user never sees
+  // a form that would just fail on submit.
+  const addRolePage = read('src/pages/onboarding/AddRolePage.tsx')
+  assert.match(addRolePage, /hasRole\('admin'\)/)
+  assert.match(addRolePage, /This isn't self-service/)
 
   const functions = read('functions/src/tracks.ts')
   assert.match(functions, /async function artistRoleActive\(artistId: string\): Promise<boolean> \{/)

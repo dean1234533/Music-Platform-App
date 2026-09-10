@@ -4,10 +4,11 @@ import test from 'node:test'
 
 const rules = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8')
 
-test('a regular user can only add fan/artist/dj roles to themselves, never remove one — only an admin account can step back from a role', () => {
-  // Non-admin branch: roles stay within fan/artist/dj, and every role
-  // present before the write must still be present after it (add-only).
-  assert.match(rules, /request\.resource\.data\.roles\.hasOnly\(\['fan', 'artist', 'dj'\]\)\s*&& resource\.data\.roles\.removeAll\(request\.resource\.data\.roles\)\.size\(\) == 0/)
+test('a regular user can only set roles once at initial signup — no self-service add or remove afterward; only an admin account can change its own roles later', () => {
+  // Non-admin, first-ever write (roles still []): may set any subset of fan/artist/dj, once.
+  assert.match(rules, /resource\.data\.roles\.size\(\) == 0 && request\.resource\.data\.roles\.hasOnly\(\['fan', 'artist', 'dj'\]\)/)
+  // Non-admin, already onboarded: roles field is frozen exactly as-is on this path.
+  assert.match(rules, /resource\.data\.roles\.hasOnly\(\['fan', 'artist', 'dj'\]\) && request\.resource\.data\.roles == resource\.data\.roles/)
   // The admin branch: 'admin' must be present both before and after the write,
   // and with it stripped from both sides the remainder must still be only fan/artist/dj —
   // so an admin account can step in/out of fan/artist/dj like anyone else, but this

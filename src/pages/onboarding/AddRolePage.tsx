@@ -1,15 +1,22 @@
 import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { completeOnboarding } from '@/services/userService'
 import { createArtistProfile } from '@/services/artistService'
 import { createDJProfile } from '@/services/djService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
+import { EmptyState } from '@/components/common/StateViews'
 
-/** Lets an existing account add the artist or DJ role later, per the multi-role requirement. */
+/**
+ * Adds the artist or DJ role to an account that already has at least one
+ * role. Admin-only — a regular already-onboarded account can never add a
+ * role to itself past its initial signup choice (firestore.rules freezes
+ * its roles field from that point on), so this page just explains that
+ * instead of presenting a form that would fail on submit.
+ */
 export function AddRolePage() {
-  const { firebaseUser, profile } = useAuth()
+  const { firebaseUser, profile, hasRole } = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const role: 'artist' | 'dj' = params.get('role') === 'dj' ? 'dj' : 'artist'
@@ -41,6 +48,21 @@ export function AddRolePage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const canAddRole = hasRole('admin') || (profile?.roles.length ?? 0) === 0
+  if (!canAddRole) {
+    return (
+      <EmptyState
+        title="This isn't self-service"
+        description="Adding another role to an account that's already onboarded needs an admin. Reach out and we'll sort it out."
+        action={
+          <Link to="/support" className="text-sm font-medium text-brand-400 hover:underline">
+            Contact support →
+          </Link>
+        }
+      />
+    )
   }
 
   return (
