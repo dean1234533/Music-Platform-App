@@ -28,14 +28,14 @@ export function TopBar() {
       : '/app/notifications'
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/[0.07] bg-surface-0/80 px-4 py-3 backdrop-blur-xl md:hidden">
-      <div className="flex items-center gap-3">
-        <Link to={homeTo} className="flex items-center gap-2">
+    <header className="sticky top-0 z-30 flex w-full min-w-0 items-center justify-between border-b border-white/[0.07] bg-surface-0/80 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-xl md:hidden">
+      <div className="flex min-w-0 items-center gap-2">
+        <Link to={homeTo} className="flex min-w-0 items-center">
           <BrandMark />
         </Link>
         <DashboardSwitcherCompact />
       </div>
-      <div className="flex items-center gap-3">
+      <div className="ml-2 flex shrink-0 items-center gap-1">
         <Link to={notificationsTo} className="rounded-full p-2 text-ink-2 hover:bg-surface-2">
           <Bell className="h-5 w-5" />
         </Link>

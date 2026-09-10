@@ -87,6 +87,17 @@ test('installed PWA launches into the app with a branded iOS startup screen', ()
   assert.match(splash, /<BrandMark \/>/)
 })
 
+test('installed app shell respects iPhone safe areas and cannot exceed the viewport', () => {
+  const topBar = read('src/components/layout/TopBar.tsx')
+  const appShell = read('src/components/layout/AppShell.tsx')
+  const installBanner = read('src/components/pwa/InstallBanner.tsx')
+  assert.match(topBar, /env\(safe-area-inset-top\)/)
+  assert.match(topBar, /w-full min-w-0/)
+  assert.match(appShell, /max-w-full[\s\S]*?overflow-x-hidden/)
+  assert.match(appShell, /w-full min-w-0 flex-1 overflow-y-auto/)
+  assert.match(installBanner, /if \(isStandalone \|\| dismissed\) return null/)
+})
+
 test('browser tab uses the approved BTV brand favicon', () => {
   const html = read('index.html')
   assert.match(html, /rel="icon"[^>]+backthevibes-favicon-48\.png\?v=4/)
