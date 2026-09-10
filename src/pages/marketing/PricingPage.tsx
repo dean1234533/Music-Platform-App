@@ -38,9 +38,11 @@ export function PricingPage() {
 
   return (
     <div className="min-h-svh bg-surface-0 text-ink-0">
-      <header className="mx-auto flex max-w-[1440px] items-center justify-between px-5 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8 lg:px-12">
-        <Link to="/"><BrandMark /></Link>
-        <Link to="/" className="text-sm font-medium text-ink-2 transition hover:text-white">Back to home</Link>
+      <header className="sticky top-0 z-20 border-b border-white/[0.07] bg-surface-0/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1440px] items-center justify-between px-5 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8 lg:px-12">
+          <Link to="/"><BrandMark /></Link>
+          <Link to="/" className="text-sm font-medium text-ink-2 transition hover:text-white">Back to home</Link>
+        </div>
       </header>
 
       <main className="mx-auto max-w-6xl px-5 py-16 sm:px-8 lg:px-12">

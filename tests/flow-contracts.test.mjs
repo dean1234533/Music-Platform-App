@@ -1191,7 +1191,8 @@ test('public mobile pages respect the device safe area and cannot widen the view
 
   assert.match(css, /html,\s*body,\s*#root \{[\s\S]*max-width: 100%;[\s\S]*overflow-x: hidden;/)
   assert.match(artistProfile, /env\(safe-area-inset-top\)/)
-  assert.match(artistProfile, /flex min-w-0 flex-wrap gap-2/)
+  assert.match(artistProfile, /min-w-0 flex-1/)
+  assert.match(artistProfile, /flex flex-wrap gap-2/)
   assert.match(landing, /env\(safe-area-inset-top\)/)
 })
 
@@ -2462,4 +2463,39 @@ test('an artist\'s track catalogue reflows into a real responsive grid instead o
     const caller = read(path)
     assert.doesNotMatch(caller, /<TrackCard[^>]*\bfill\b/, `${path} should not pass fill to TrackCard`)
   }
+})
+
+test('every page with a header nav bar keeps it pinned while scrolling, matching LandingPage\'s established sticky pattern, and it actually works (not silently broken by an overflow-hidden ancestor) (user-reported: "for the pwa download check all pages as some pages has a sticky nav and now doesnt")', () => {
+  // Audited every <header> in the app. Only LandingPage (and the dashboard TopBar, a
+  // different shared component) was ever sticky — the other 10 pages with their own header
+  // all scrolled away with the content. Not a regression traceable to one change (git history
+  // shows none of them ever had `sticky`), but a real, consistent gap worth closing, especially
+  // in PWA/standalone mode where there's no browser chrome to fall back on for navigation.
+  const stickyHeaderPages = [
+    'src/pages/blog/BlogIndexPage.tsx',
+    'src/pages/blog/BlogPostPage.tsx',
+    'src/pages/marketing/ForArtistsPage.tsx',
+    'src/pages/marketing/ForDjsPage.tsx',
+    'src/pages/marketing/LegalPage.tsx',
+    'src/pages/marketing/PricingPage.tsx',
+    'src/pages/legal/CopyrightClaimPage.tsx',
+    'src/pages/legal/CopyrightPolicyPage.tsx',
+  ]
+  for (const path of stickyHeaderPages) {
+    const page = read(path)
+    assert.match(page, /<header className="sticky top-0 z-20 border-b border-white\/\[0\.07\] bg-surface-0\/80 backdrop-blur-xl">/, `${path} should have a sticky header`)
+  }
+
+  // The artist/DJ public profile headers needed a structural fix, not just adding the class:
+  // position: sticky silently falls back to acting like relative inside an overflow-hidden
+  // ancestor, and both pages wrapped their header in exactly that — same trap LandingPage
+  // already avoids by keeping its own sticky header as a sibling before its overflow-hidden
+  // content wrapper, not a descendant of it.
+  const artistProfile = read('src/pages/artist/ArtistPublicProfilePage.tsx')
+  assert.match(artistProfile, /<header className="sticky top-0 z-30 border-b border-white\/\[0\.07\] bg-surface-0\/80 backdrop-blur-xl">/)
+  assert.match(artistProfile, /<\/header>\s*\n\s*<div className="min-h-svh overflow-hidden bg-surface-0 pb-24 text-ink-0">/)
+
+  const djProfile = read('src/pages/dj/DJPublicProfilePage.tsx')
+  assert.match(djProfile, /<header className="sticky top-0 z-30 border-b border-white\/\[0\.07\] bg-surface-0\/80 backdrop-blur-xl">/)
+  assert.match(djProfile, /<\/header>\s*\n\s*<div className="min-h-svh overflow-hidden bg-surface-0 pb-24 text-ink-0">/)
 })

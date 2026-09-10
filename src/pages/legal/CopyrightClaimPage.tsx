@@ -91,13 +91,15 @@ export function CopyrightClaimPage() {
 
   return (
     <div className="min-h-svh bg-surface-0 text-ink-0">
-      <header className="mx-auto flex max-w-2xl items-center justify-between px-5 pb-6 pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-8">
-        <Link to="/">
-          <BrandMark />
-        </Link>
-        <button onClick={goBack} className="flex items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0 active:opacity-60">
-          <ArrowLeft className="h-4 w-4" /> Back
-        </button>
+      <header className="sticky top-0 z-20 border-b border-white/[0.07] bg-surface-0/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-2xl items-center justify-between px-5 pb-6 pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-8">
+          <Link to="/">
+            <BrandMark />
+          </Link>
+          <button onClick={goBack} className="flex items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0 active:opacity-60">
+            <ArrowLeft className="h-4 w-4" /> Back
+          </button>
+        </div>
       </header>
 
       <main className="mx-auto max-w-2xl px-5 pb-24 pt-8 sm:px-8">

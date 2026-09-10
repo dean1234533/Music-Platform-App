@@ -41,18 +41,23 @@ export function DJPublicProfilePage() {
   if (profile === null) return <ErrorState title="DJ not found" description="This DJ profile doesn't exist." />
 
   return (
-    <div className="min-h-svh overflow-hidden bg-surface-0 pb-24 text-ink-0">
-      <header className="relative z-30 mx-auto flex min-h-20 max-w-[1440px] items-center justify-between px-5 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8 lg:px-12">
-        <Link to="/" aria-label="BackTheVibes home"><BrandMark /></Link>
-        <button
-          type="button"
-          onClick={goBack}
-          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-ink-1 transition hover:border-white/20 hover:text-white active:opacity-60"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back
-        </button>
+    <>
+      {/* A sticky header can't stick inside an overflow-hidden ancestor (it silently falls
+          back to acting like position: relative) — kept as a sibling before that wrapper,
+          same structure LandingPage already uses for its own sticky header. */}
+      <header className="sticky top-0 z-30 border-b border-white/[0.07] bg-surface-0/80 backdrop-blur-xl">
+        <div className="mx-auto flex min-h-20 max-w-[1440px] items-center justify-between px-5 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8 lg:px-12">
+          <Link to="/" aria-label="BackTheVibes home"><BrandMark /></Link>
+          <button
+            type="button"
+            onClick={goBack}
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-ink-1 transition hover:border-white/20 hover:text-white active:opacity-60"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back
+          </button>
+        </div>
       </header>
-
+      <div className="min-h-svh overflow-hidden bg-surface-0 pb-24 text-ink-0">
       <div className="relative h-60 w-full overflow-hidden border-y border-white/[0.06] bg-surface-2 sm:h-72 lg:h-96">
         <img
           src={profile.coverURL || '/artist-command-centre-bg.png'}
@@ -140,6 +145,7 @@ export function DJPublicProfilePage() {
         </div>
       </main>
       {showReport ? <ReportUserModal userId={profile.djId} subjectLabel={profile.name} onClose={() => setShowReport(false)} /> : null}
-    </div>
+      </div>
+    </>
   )
 }

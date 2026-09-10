@@ -187,18 +187,23 @@ export function ArtistPublicProfilePage() {
   }
 
   return (
-    <div className="min-h-svh overflow-hidden bg-surface-0 pb-24 text-ink-0">
-      <header className="relative z-30 mx-auto flex min-h-20 max-w-[1440px] items-center justify-between px-5 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8 lg:px-12">
-        <Link to="/" aria-label="BackTheVibes home"><BrandMark /></Link>
-        <button
-          type="button"
-          onClick={goBack}
-          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-ink-1 transition hover:border-white/20 hover:text-white active:opacity-60"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back
-        </button>
+    <>
+      {/* A sticky header can't stick inside an overflow-hidden ancestor (it silently falls
+          back to acting like position: relative) — kept as a sibling before that wrapper,
+          same structure LandingPage already uses for its own sticky header. */}
+      <header className="sticky top-0 z-30 border-b border-white/[0.07] bg-surface-0/80 backdrop-blur-xl">
+        <div className="mx-auto flex min-h-20 max-w-[1440px] items-center justify-between px-5 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8 lg:px-12">
+          <Link to="/" aria-label="BackTheVibes home"><BrandMark /></Link>
+          <button
+            type="button"
+            onClick={goBack}
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-ink-1 transition hover:border-white/20 hover:text-white active:opacity-60"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back
+          </button>
+        </div>
       </header>
-
+      <div className="min-h-svh overflow-hidden bg-surface-0 pb-24 text-ink-0">
       <div className="relative h-60 w-full overflow-hidden border-y border-white/[0.06] bg-surface-2 sm:h-72 lg:h-96">
         <img
           src={artist.coverURL || '/artist-profile-card-bg.png'}
@@ -221,8 +226,8 @@ export function ArtistPublicProfilePage() {
             type="button"
             onClick={() => activeStories.length > 0 && setViewerGroup({ artistId: artist.artistId, stories: activeStories })}
             className={clsx(
-              'h-28 w-28 shrink-0 overflow-hidden rounded-[1.6rem] border shadow-[0_24px_70px_rgba(0,0,0,.45)] sm:h-36 sm:w-36',
-              activeStories.length > 0 ? 'border-brand-400 border-2 cursor-pointer' : 'border-white/15 bg-surface-3',
+              'h-28 w-28 shrink-0 overflow-hidden rounded-[1.6rem] border border-brand-400/35 bg-surface-3 shadow-[0_24px_70px_rgba(0,0,0,.45)] sm:h-36 sm:w-36',
+              activeStories.length > 0 && 'cursor-pointer',
             )}
           >
             {artist.photoURL ? (
@@ -239,16 +244,12 @@ export function ArtistPublicProfilePage() {
               <h1 className="truncate text-3xl font-medium tracking-[-0.045em] text-ink-0 sm:text-5xl">{artist.name}</h1>
               {artist.verified ? <BadgeCheck className="h-6 w-6 shrink-0 text-brand-400" /> : null}
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-2">
-              {artist.location ? (
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-3.5 w-3.5" />
-                  {artist.location}
-                </span>
-              ) : null}
-              <span><strong className="font-semibold text-ink-0">{formatCount(artist.followerCount)}</strong> followers</span>
-              <span><strong className="font-semibold text-ink-0">{formatCount(artist.supporterCount)}</strong> supporters</span>
-            </div>
+            {artist.location ? (
+              <p className="mt-3 flex items-center gap-1.5 text-sm text-ink-2">
+                <MapPin className="h-3.5 w-3.5" />
+                {artist.location}
+              </p>
+            ) : null}
             {artist.genres.length > 0 ? (
               <div className="mt-4 flex flex-wrap gap-2">
                 {artist.genres.map((genre) => (
@@ -259,25 +260,16 @@ export function ArtistPublicProfilePage() {
               </div>
             ) : null}
           </div>
-          <div className="flex min-w-0 flex-wrap gap-2 self-stretch sm:w-auto sm:shrink-0 sm:self-auto">
-            <FollowButton artistId={artist.artistId} />
-            {!firebaseUser || !hasRole('dj') || hasRole('fan') ? <SupportButton artistId={artist.artistId} /> : null}
-            <ShareButton
-              url={artistShareUrl(artist.slug)}
-              title={artist.name}
-              text={`Check out ${artist.name} on BackTheVibes`}
-            />
-            {firebaseUser ? (
-              <button
-                type="button"
-                onClick={() => setShowReport(true)}
-                aria-label="Report this artist profile"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-ink-3 transition hover:border-white/20 hover:text-ink-1"
-              >
-                <Flag className="h-4 w-4" />
-              </button>
-            ) : null}
-          </div>
+          {firebaseUser ? (
+            <button
+              type="button"
+              onClick={() => setShowReport(true)}
+              aria-label="Report this artist profile"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-ink-3 transition hover:border-white/20 hover:text-ink-1"
+            >
+              <Flag className="h-4 w-4" />
+            </button>
+          ) : null}
           </div>
         </section>
 
@@ -350,6 +342,22 @@ export function ArtistPublicProfilePage() {
             <div className="rounded-[1.5rem] border border-brand-400/15 bg-brand-400/[0.055] p-6">
               <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-brand-400">Direct support</p>
               <p className="mt-3 text-sm leading-6 text-ink-1">Support goes beyond a play. Help independent music keep moving.</p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <FollowButton artistId={artist.artistId} />
+                {!firebaseUser || !hasRole('dj') || hasRole('fan') ? <SupportButton artistId={artist.artistId} /> : null}
+                <ShareButton
+                  url={artistShareUrl(artist.slug)}
+                  title={artist.name}
+                  text={`Check out ${artist.name} on BackTheVibes`}
+                />
+              </div>
+            </div>
+            <div className="rounded-[1.5rem] border border-white/[0.08] bg-white/[0.025] p-6">
+              <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-ink-3">Community</p>
+              <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-ink-2">
+                <span><strong className="block text-xl font-medium text-ink-0">{formatCount(artist.followerCount)}</strong> followers</span>
+                <span><strong className="block text-xl font-medium text-ink-0">{formatCount(artist.supporterCount)}</strong> supporters</span>
+              </div>
             </div>
           </aside>
         </div>
@@ -412,6 +420,7 @@ export function ArtistPublicProfilePage() {
         />
       ) : null}
       {showReport ? <ReportArtistModal artistId={artist.artistId} onClose={() => setShowReport(false)} /> : null}
-    </div>
+      </div>
+    </>
   )
 }
