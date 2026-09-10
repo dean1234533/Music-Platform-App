@@ -7,27 +7,30 @@ import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
 
 /**
- * Adds the artist or DJ role to an account that already has at least one
- * role — legitimate self-service, e.g. a fan becoming an artist too. The
- * client only ever requests a specific named action ("create my artist
- * profile" / "create my DJ profile"); the createArtistProfile/
- * createDJProfile Cloud Functions decide the resulting role and grant it
- * server-side for request.auth.uid, never from anything this page sends.
- * firestore.rules' users/{userId} update rule blocks a direct client write
- * to roles after initial signup, so this callable path is the only way an
- * already-onboarded account can gain another role — by design, nothing
- * here lets the caller name an arbitrary role like "admin".
+ * Grants the artist or DJ role to the signed-in account. A regular account
+ * keeps exactly the one role it picked at onboarding for life — this page
+ * only ever re-affirms that same role (e.g. finishing profile setup after
+ * the role was already granted); it can't add a role the account doesn't
+ * already have unless the account is an admin. The client only ever
+ * requests a specific named action ("create my artist profile" / "create
+ * my DJ profile"); the createArtistProfile/createDJProfile Cloud Functions
+ * decide the resulting role and grant it server-side for request.auth.uid,
+ * never from anything this page sends — nothing here lets the caller name
+ * an arbitrary role like "admin".
  */
 export function AddRolePage() {
   const { firebaseUser, profile } = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const role: 'artist' | 'dj' = params.get('role') === 'dj' ? 'dj' : 'artist'
-  // Artist and DJ are mutually exclusive on one account — the Cloud Function
-  // enforces this server-side regardless, but a dead-end submit error isn't
-  // a good first look at the blocker, so it's surfaced here before the form.
-  const otherRole = role === 'artist' ? 'dj' : 'artist'
-  const blockedByOtherRole = profile?.roles.includes(otherRole) ?? false
+  // One role per account — the Cloud Function enforces this server-side
+  // regardless, but a dead-end submit error isn't a good first look at the
+  // blocker, so it's surfaced here before the form. Only blocked when the
+  // account already has a DIFFERENT role than the one being requested; an
+  // admin account, or one re-affirming the role it already holds, isn't.
+  const isAdmin = profile?.roles.includes('admin') ?? false
+  const alreadyHasThisRole = profile?.roles.includes(role) ?? false
+  const blockedByExistingRole = !isAdmin && !alreadyHasThisRole && (profile?.roles.length ?? 0) > 0
 
   const [name, setName] = useState(profile?.displayName ?? '')
   const [bio, setBio] = useState('')
@@ -59,15 +62,15 @@ export function AddRolePage() {
     }
   }
 
-  if (blockedByOtherRole) {
+  if (blockedByExistingRole) {
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 py-10">
         <h1 className="text-xl font-semibold text-ink-0">
           {role === 'artist' ? 'Add your artist profile' : 'Add your DJ profile'}
         </h1>
         <p className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm text-ink-2">
-          Your account already has an active {otherRole === 'artist' ? 'Artist' : 'DJ'} profile. Artist and DJ can't
-          both be active on the same account, so you'll need to step back from {otherRole === 'artist' ? 'Artist' : 'DJ'} first — an admin can do this for you.
+          Your account already has a role, and accounts can only have one active role at a time. Contact an admin if
+          you need to switch.
         </p>
       </div>
     )

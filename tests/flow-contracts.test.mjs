@@ -1227,16 +1227,25 @@ test('only an admin account can change its own roles after signup (add or remove
   // signup (roles still []) — after that, this path freezes roles exactly
   // as-is, so it can never add a later role or step back from one on its own.
   const usersUpdateRule = rules.slice(rules.indexOf('allow update: if isSelf(userId)'), rules.indexOf('allow update: if isSelf(userId)') + 2000)
-  assert.match(usersUpdateRule, /resource\.data\.roles\.size\(\) == 0 && request\.resource\.data\.roles\.hasOnly\(\['fan', 'artist', 'dj'\]\)/)
+  // One role per account, enforced at size 1 (not just "a subset of") so a
+  // crafted write can't pick more than one at once — see the dedicated
+  // one-role-per-account test above.
+  assert.match(
+    usersUpdateRule,
+    /resource\.data\.roles\.size\(\) == 0 && request\.resource\.data\.roles\.size\(\) == 1 && request\.resource\.data\.roles\.hasOnly\(\['fan', 'artist', 'dj'\]\)/,
+  )
   assert.match(usersUpdateRule, /resource\.data\.roles\.hasOnly\(\['fan', 'artist', 'dj'\]\) && request\.resource\.data\.roles == resource\.data\.roles/)
   // An admin account, by contrast, can add or remove its own fan/artist/dj roles at any time, but never grant/revoke 'admin' via this client-writable path.
   assert.match(usersUpdateRule, /resource\.data\.roles\.removeAll\(\['admin'\]\)\.hasOnly\(\['fan', 'artist', 'dj'\]\)/)
 
-  // Adding a role after signup (e.g. a fan becoming an artist too) is
-  // legitimate self-service for any account, not admin-only — AddRolePage
-  // requests the named action via the trusted createArtistProfile/
-  // createDJProfile Cloud Functions instead of writing roles directly, so
-  // it's unrestricted by account type, only by the backend's own checks.
+  // AddRolePage requests the named action via the trusted
+  // createArtistProfile/createDJProfile Cloud Functions instead of writing
+  // roles directly — but those functions themselves now only grant a role
+  // an already-onboarded non-admin account doesn't yet hold when it holds
+  // NO role at all, i.e. never (a regular account always has exactly one
+  // after onboarding); see the dedicated one-role-per-account test above
+  // for the full enforcement. Re-affirming the one role an account already
+  // has, or an admin account adding one, both still work through this path.
   const addRolePage = read('src/pages/onboarding/AddRolePage.tsx')
   assert.doesNotMatch(addRolePage, /This isn't self-service/)
   assert.match(addRolePage, /createArtistProfile\(\{ name, bio, genres: genreList, location \}\)/)
@@ -1280,7 +1289,7 @@ test('only an admin account can change its own roles after signup (add or remove
   assert.match(djPublic, /\.code === 'permission-denied'/)
 })
 
-test('artist and DJ are mutually exclusive on one account — arrayUnion let an account silently accumulate both (user-reported: "a user is not ment to be able to do this... it was said before in a prompt this but you keep doing your own thing")', () => {
+test('a regular account can only ever have one role, for life — self-service can re-affirm the role it already has but never add a different one (user-reported, after an artist/DJ-only mutual-exclusion fix landed: "are you stupid or what, what dont you get about one acount/role per account. if you said it was just admain that is fine but the thing is in the fan settings")', () => {
   // Server-side enforcement: the Cloud Functions that grant these roles must
   // reject the request outright, not just leave it to the UI to hide the
   // option. request.auth.uid is still the only source of identity — no
@@ -1295,23 +1304,26 @@ test('artist and DJ are mutually exclusive on one account — arrayUnion let an 
   assert.match(createArtistBody, /if \(!request\.auth\) throw new HttpsError\('unauthenticated', 'Sign in required\.'\)/)
   assert.match(createArtistBody, /const uid = request\.auth\.uid/)
   assert.match(createArtistBody, /const currentRoles: string\[\] = userSnap\.data\(\)!\.roles \?\? \[\]/)
-  assert.match(createArtistBody, /if \(currentRoles\.includes\('dj'\)\) \{/)
-  assert.match(createArtistBody, /throw new HttpsError\(\s*'failed-precondition',/)
-  // The mutual-exclusion check runs before the "re-affirm an existing profile"
-  // shortcut, so an account that already has a dj role can't slip through it
-  // by having a stale artistProfiles doc from before it ever held 'artist'.
+  assert.match(createArtistBody, /const isAdmin = currentRoles\.includes\('admin'\)/)
+  // Blocked whenever the account already holds ANY role other than the one
+  // being requested — not just the "other" of artist/dj — unless it's admin.
+  assert.match(createArtistBody, /if \(!isAdmin && currentRoles\.length > 0 && !currentRoles\.includes\('artist'\)\) \{/)
+  assert.match(createArtistBody, /throw new HttpsError\(\s*'permission-denied',/)
+  // The check runs before the "re-affirm an existing profile" shortcut, so a
+  // fan account can't slip through it via a stale artistProfiles doc.
   assert.ok(
-    createArtistBody.indexOf("currentRoles.includes('dj')") < createArtistBody.indexOf('existingProfile.exists'),
-    'createArtistProfile must check mutual exclusion before the existing-profile re-affirm shortcut',
+    createArtistBody.indexOf("currentRoles.includes('artist')") < createArtistBody.indexOf('existingProfile.exists'),
+    'createArtistProfile must check the one-role rule before the existing-profile re-affirm shortcut',
   )
 
   assert.match(createDjBody, /if \(!request\.auth\) throw new HttpsError\('unauthenticated', 'Sign in required\.'\)/)
   assert.match(createDjBody, /const uid = request\.auth\.uid/)
   assert.match(createDjBody, /const currentRoles: string\[\] = userSnap\.data\(\)!\.roles \?\? \[\]/)
-  assert.match(createDjBody, /if \(currentRoles\.includes\('artist'\)\) \{/)
+  assert.match(createDjBody, /const isAdmin = currentRoles\.includes\('admin'\)/)
+  assert.match(createDjBody, /if \(!isAdmin && currentRoles\.length > 0 && !currentRoles\.includes\('dj'\)\) \{/)
   assert.ok(
-    createDjBody.indexOf("currentRoles.includes('artist')") < createDjBody.indexOf('existingProfile.exists'),
-    'createDJProfile must check mutual exclusion before the existing-profile re-affirm shortcut',
+    createDjBody.indexOf("currentRoles.includes('dj')") < createDjBody.indexOf('existingProfile.exists'),
+    'createDJProfile must check the one-role rule before the existing-profile re-affirm shortcut',
   )
 
   // Neither function ever reads a role or target uid from request.data — the
@@ -1325,45 +1337,70 @@ test('artist and DJ are mutually exclusive on one account — arrayUnion let an 
 
   // Belt-and-braces at the Firestore rules layer too, for the one remaining
   // direct client write to roles (initial onboarding) — a crafted write
-  // can't set both roles in the same request even before any Cloud Function
-  // is involved.
+  // can't set more than one role in that single unguarded write either.
   const rules = read('firestore.rules')
   const usersUpdateRule = rules.slice(rules.indexOf('allow update: if isSelf(userId)'), rules.indexOf('allow update: if isSelf(userId)') + 2000)
-  assert.match(usersUpdateRule, /&& !request\.resource\.data\.roles\.hasAll\(\['artist', 'dj'\]\)/)
+  assert.match(
+    usersUpdateRule,
+    /resource\.data\.roles\.size\(\) == 0 && request\.resource\.data\.roles\.size\(\) == 1 && request\.resource\.data\.roles\.hasOnly\(\['fan', 'artist', 'dj'\]\)/,
+  )
 
   // The onboarding UI itself only ever lets a brand-new signup pick one role
   // to begin with (selectedRole is a single value, not a multi-select), so
-  // there's no path there that would even attempt to request both at once.
+  // there's no path there that would even attempt to request more than one.
   const onboarding = read('src/pages/onboarding/OnboardingPage.tsx')
   assert.match(onboarding, /const \[selectedRole, setSelectedRole\] = useState<UserRole \| null>\(initialRole\)/)
   assert.match(onboarding, /completeOnboarding\(firebaseUser\.uid, \[selectedRole\]\)/)
 
   // UI: the add-role flow (an already-onboarded account adding artist or dj)
-  // shows the block up front instead of only surfacing it as a submit error.
+  // shows the block up front instead of only surfacing it as a submit error —
+  // for any existing role, not just the specific other of artist/dj, and
+  // never for an admin account or one re-affirming the role it already has.
   const addRolePage = read('src/pages/onboarding/AddRolePage.tsx')
-  assert.match(addRolePage, /const otherRole = role === 'artist' \? 'dj' : 'artist'/)
-  assert.match(addRolePage, /const blockedByOtherRole = profile\?\.roles\.includes\(otherRole\) \?\? false/)
-  assert.match(addRolePage, /if \(blockedByOtherRole\) \{/)
+  assert.match(addRolePage, /const isAdmin = profile\?\.roles\.includes\('admin'\) \?\? false/)
+  assert.match(addRolePage, /const alreadyHasThisRole = profile\?\.roles\.includes\(role\) \?\? false/)
+  assert.match(
+    addRolePage,
+    /const blockedByExistingRole = !isAdmin && !alreadyHasThisRole && \(profile\?\.roles\.length \?\? 0\) > 0/,
+  )
+  assert.match(addRolePage, /if \(blockedByExistingRole\) \{/)
 
-  // Fan Settings no longer offers "+ Add a DJ profile" to an active artist,
-  // or "+ Add an artist profile" to an active DJ.
+  // Fan Settings: a plain single-role fan account gets no "Roles" section at
+  // all (no dead-end self-service upsell it can't use) — only an account
+  // that's admin, or already holds artist/dj (legacy multi-role data, or an
+  // admin who added one), sees it.
   const fanSettings = read('src/pages/fan/SettingsPage.tsx')
-  assert.match(fanSettings, /Artist profile unavailable while your DJ profile is active\./)
-  assert.match(fanSettings, /DJ profile unavailable while your artist profile is active\./)
+  assert.match(
+    fanSettings,
+    /hasRole\('admin'\) \|\| profile\?\.roles\.includes\('artist'\) \|\| profile\?\.roles\.includes\('dj'\) \? \(/,
+  )
+  // The "+ Add…" self-service links only render in the admin branch.
+  const rolesSectionStart = fanSettings.indexOf("h2 className=\"mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3\">Roles")
+  const rolesSectionEnd = fanSettings.indexOf('</section>', rolesSectionStart)
+  const rolesSection = fanSettings.slice(rolesSectionStart, rolesSectionEnd)
+  const addArtistIndex = rolesSection.indexOf('+ Add an artist profile')
+  const addDjIndex = rolesSection.indexOf('+ Add a DJ profile')
+  const lastAdminCheckBeforeArtist = rolesSection.lastIndexOf("hasRole('admin')", addArtistIndex)
+  const lastAdminCheckBeforeDj = rolesSection.lastIndexOf("hasRole('admin')", addDjIndex)
+  assert.ok(addArtistIndex !== -1 && lastAdminCheckBeforeArtist !== -1, '"+ Add an artist profile" must be reachable only through an hasRole(\'admin\') branch')
+  assert.ok(addDjIndex !== -1 && lastAdminCheckBeforeDj !== -1, '"+ Add a DJ profile" must be reachable only through an hasRole(\'admin\') branch')
 
-  // TrackPage no longer offers "Add a DJ profile to request access" to a
-  // viewer who's already an artist.
+  // TrackPage's "Add a DJ profile to request access" prompt is the same
+  // story — only an admin viewer gets a working self-service link.
   const trackPage = read('src/pages/track/TrackPage.tsx')
-  assert.match(trackPage, /DJ requests aren't available on an artist account\./)
+  assert.match(trackPage, /\) : hasRole\('admin'\) \? \(/)
+  assert.match(trackPage, /DJ requests need a DJ account — accounts can only have one role\./)
 
   // Pricing CTAs say so instead of promising a trial/profile the backend
-  // will then reject.
+  // will then reject, for any signed-in non-admin account that already has a
+  // different role — not just the specific other of artist/dj.
   const pricing = read('src/pages/marketing/PricingPage.tsx')
-  assert.match(pricing, /Unavailable while on a DJ account/)
-  assert.match(pricing, /Unavailable while on an artist account/)
+  assert.match(pricing, /const blockedFromArtist = firebaseUser && !hasRole\('artist'\) && !hasRole\('admin'\) && \(profile\?\.roles\.length \?\? 0\) > 0/)
+  assert.match(pricing, /const blockedFromDj = firebaseUser && !hasRole\('dj'\) && !hasRole\('admin'\) && \(profile\?\.roles\.length \?\? 0\) > 0/)
+  assert.match(pricing, /Unavailable — accounts have one role/)
 })
 
-test('fan -> artist and fan -> DJ self-service upgrades work through trusted backend actions, never a client role write (user-reported: freezing roles broke "+ Add an artist profile" / "Start free trial" / "+ Add a DJ profile" / "Create DJ profile")', () => {
+test('a brand-new account picking its first role, or an admin account, still goes through the trusted backend action and never a client role write (user-reported: freezing roles broke "+ Add an artist profile" / "Start free trial" / "+ Add a DJ profile" / "Create DJ profile" — later restricted further to one role per account, see the dedicated test above)', () => {
   const rules = read('firestore.rules')
   // The only legitimate way to create these profiles is now Cloud-Function-only —
   // a direct client create is refused outright, regardless of who's asking.
@@ -1405,8 +1442,11 @@ test('fan -> artist and fan -> DJ self-service upgrades work through trusted bac
   assert.match(djService, /callable<CreateDJProfileInput, \{ ok: true \}>\('createDJProfile'\)/)
 
   // Pricing's "Start free trial" / "Create DJ profile" and Settings' "+ Add…"
-  // links still point at the self-service onboarding/add-role screen —
-  // restored to working (not gated behind admin / a "contact support" wall).
+  // links still point at the self-service onboarding/add-role screen — for
+  // a brand-new signed-out visitor (Pricing routes those to /sign-up, the
+  // one-role onboarding pick) or an admin account (Settings gates "+ Add…"
+  // to hasRole('admin') — see the dedicated one-role-per-account test above
+  // for why a regular already-roled account no longer sees either).
   const pricing = read('src/pages/marketing/PricingPage.tsx')
   assert.match(pricing, /\/onboarding\/add-role\?role=artist/)
   assert.match(pricing, /\/onboarding\/add-role\?role=dj/)

@@ -25,7 +25,7 @@ function featureLabels(plan: SubscriptionPlan): string[] {
 }
 
 export function PricingPage() {
-  const { firebaseUser, hasRole } = useAuth()
+  const { firebaseUser, profile, hasRole } = useAuth()
   const [plans, setPlans] = useState<SubscriptionPlan[] | null>(null)
 
   useSeo({
@@ -85,12 +85,21 @@ export function PricingPage() {
             <h2 className="mt-2 text-3xl font-medium tracking-[-0.04em]">One affordable year of artist tools.</h2>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
-            {/* Artist and DJ are mutually exclusive on one account — an account already
-                active as the other role still links through to /onboarding/add-role,
-                which explains the block, but the CTA copy says so upfront instead of
-                promising a trial/profile the backend will then reject. */}
-            <PriceCard index={0} featured title="Artist Membership" price="£29.99" suffix="/year" description="14 days free. About £2.50 a month, billed once yearly. Publish music, build direct fan support, and manage your earnings." features={['14-day free trial', 'Up to 10 stored tracks', 'Releases, analytics and supporter offers', 'DJ outreach, licensing and earnings tools']} cta={firebaseUser && hasRole('artist') ? 'Open artist dashboard' : firebaseUser && hasRole('dj') ? 'Unavailable while on a DJ account' : 'Start free trial'} to={firebaseUser ? (hasRole('artist') ? '/dashboard/artist' : '/onboarding/add-role?role=artist') : '/sign-up?role=artist'} />
-            <PriceCard index={1} title="DJ" price="Free" description="Discover releases and agree track licences directly with artists." features={['Direct artist-approved licence requests', 'Filters, crates, notes and analytics', 'Verification and secure downloads']} cta={firebaseUser && hasRole('dj') ? 'Open DJ workspace' : firebaseUser && hasRole('artist') ? 'Unavailable while on an artist account' : 'Create DJ profile'} to={firebaseUser ? (hasRole('dj') ? '/dj/discover' : '/onboarding/add-role?role=dj') : '/sign-up?role=dj'} />
+            {/* One role per account — a signed-in account already holding a
+                different role still links through to /onboarding/add-role,
+                which explains the block, but the CTA copy says so upfront
+                instead of promising a trial/profile the backend will then
+                reject. An admin account is unrestricted either way. */}
+            {(() => {
+              const blockedFromArtist = firebaseUser && !hasRole('artist') && !hasRole('admin') && (profile?.roles.length ?? 0) > 0
+              const blockedFromDj = firebaseUser && !hasRole('dj') && !hasRole('admin') && (profile?.roles.length ?? 0) > 0
+              return (
+                <>
+                  <PriceCard index={0} featured title="Artist Membership" price="£29.99" suffix="/year" description="14 days free. About £2.50 a month, billed once yearly. Publish music, build direct fan support, and manage your earnings." features={['14-day free trial', 'Up to 10 stored tracks', 'Releases, analytics and supporter offers', 'DJ outreach, licensing and earnings tools']} cta={firebaseUser && hasRole('artist') ? 'Open artist dashboard' : blockedFromArtist ? 'Unavailable — accounts have one role' : 'Start free trial'} to={firebaseUser ? (hasRole('artist') ? '/dashboard/artist' : '/onboarding/add-role?role=artist') : '/sign-up?role=artist'} />
+                  <PriceCard index={1} title="DJ" price="Free" description="Discover releases and agree track licences directly with artists." features={['Direct artist-approved licence requests', 'Filters, crates, notes and analytics', 'Verification and secure downloads']} cta={firebaseUser && hasRole('dj') ? 'Open DJ workspace' : blockedFromDj ? 'Unavailable — accounts have one role' : 'Create DJ profile'} to={firebaseUser ? (hasRole('dj') ? '/dj/discover' : '/onboarding/add-role?role=dj') : '/sign-up?role=dj'} />
+                </>
+              )
+            })()}
           </div>
           <p className="mt-6 text-center text-xs leading-5 text-ink-3">DJ licence prices are agreed with each artist. BackTheVibes takes 15% of net transaction revenue; the artist receives 85%.</p>
           <p className="mt-2 text-center text-xs leading-5 text-ink-3">Artist earnings clear after 7 days. Artists can request a payout whenever their available balance reaches £25.</p>

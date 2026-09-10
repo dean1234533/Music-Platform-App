@@ -67,16 +67,15 @@ service cloud.firestore {
         && request.resource.data.subscriptionStatus == resource.data.subscriptionStatus
         && request.resource.data.get('stripeCustomerId', null) == resource.data.get('stripeCustomerId', null)
         && request.resource.data.get('suspended', false) == resource.data.get('suspended', false)
-        // Artist and DJ are mutually exclusive on one account, everywhere a
-        // client can touch roles — never both present at once, regardless
-        // of which branch below applies.
-        && !request.resource.data.roles.hasAll(['artist', 'dj'])
         && (
           // Normal account, first-ever role write (initial onboarding —
           // the doc was created with roles == [] and this is the one write
-          // that sets it): may set any subset of fan/artist/dj, once. A
-          // platform has to let a brand-new signup pick its own first role.
-          (resource.data.roles.size() == 0 && request.resource.data.roles.hasOnly(['fan', 'artist', 'dj']))
+          // that sets it): sets exactly one of fan/artist/dj, once. A
+          // regular account keeps exactly this one role for life — never
+          // more than one at a time, enforced here at size 1 rather than
+          // just "a subset of", so a crafted write can't pick two roles at
+          // once (e.g. ['fan', 'artist']) in this single unguarded write.
+          (resource.data.roles.size() == 0 && request.resource.data.roles.size() == 1 && request.resource.data.roles.hasOnly(['fan', 'artist', 'dj']))
           // Normal account, already onboarded: roles are completely frozen
           // on this client path from here on — no self-service add OR
           // remove, ever again. Adding a later role (e.g. a fan becoming an

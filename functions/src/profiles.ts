@@ -22,17 +22,18 @@ function sanitizeGenres(input: unknown): string[] {
 }
 
 /**
- * The only legitimate way an already-onboarded account gains the artist
- * role — firestore.rules' users/{userId} update rule freezes a regular
- * account's own roles field after its one-time initial signup write, so
- * this is the trusted, server-validated replacement for the client write
- * that used to create the profile and grant the role directly. The caller
- * only ever names the action ("create my artist profile"); this function
- * decides the resulting role, always for request.auth.uid, never a
- * client-supplied id. Idempotent: a retried/replayed call, or an account
- * that already has a profile (e.g. an admin re-adding a role it had
- * stepped back from), just gets its existing slug back and the role
- * re-affirmed, rather than erroring or creating a duplicate.
+ * Grants the artist role — always for request.auth.uid, never a
+ * client-supplied id, and the caller only ever names the action ("create my
+ * artist profile"); this function alone decides the resulting role. A
+ * regular account keeps exactly the one role it picked at onboarding for
+ * life — this only ever re-affirms that same role (e.g. finishing profile
+ * setup after the role was already granted, or a retried/replayed call, or
+ * an admin re-adding a role it had stepped back from). Adding a role the
+ * account doesn't already have is admin-only; see the mutual-exclusion
+ * check below. firestore.rules' users/{userId} update rule freezes a
+ * regular account's own roles field after its one-time initial signup
+ * write, so this Cloud Function — which has admin-SDK access and bypasses
+ * that rule — has to enforce the same restriction itself.
  */
 export const createArtistProfile = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
@@ -55,16 +56,21 @@ export const createArtistProfile = onCall(async (request) => {
     const [userSnap, existingProfile] = await Promise.all([tx.get(userRef), tx.get(artistRef)])
     if (!userSnap.exists) throw new HttpsError('failed-precondition', 'Account is not fully set up yet.')
 
-    // Artist and DJ are mutually exclusive on one account — never both active
-    // at once. The only way off an active role today is an admin-only step
-    // back (removeRole, gated in firestore.rules to accounts already holding
-    // 'admin'), so a regular account that's already DJ simply can't self-
-    // serve into artist; this is a hard block, not a UI hint.
+    // One role per account — a regular account keeps exactly the single
+    // role it picked at onboarding for life; this path only re-affirms that
+    // same role (e.g. finishing profile setup, or an admin re-adding a role
+    // it had stepped back from), never adds a second one alongside it.
+    // Changing a regular account's role at all is admin-only, matching
+    // firestore.rules' users/{userId} update rule, which already freezes
+    // this field completely for a non-admin account after its first write —
+    // this Cloud Function has admin-SDK access and so must enforce the same
+    // restriction itself rather than relying on those rules to stop it.
     const currentRoles: string[] = userSnap.data()!.roles ?? []
-    if (currentRoles.includes('dj')) {
+    const isAdmin = currentRoles.includes('admin')
+    if (!isAdmin && currentRoles.length > 0 && !currentRoles.includes('artist')) {
       throw new HttpsError(
-        'failed-precondition',
-        'Your account already has an active DJ profile. Artist and DJ can\'t both be active on the same account — step back from DJ first.',
+        'permission-denied',
+        'Your account already has a role, and accounts can only have one active role. An admin needs to change it for you.',
       )
     }
 
@@ -144,13 +150,14 @@ export const createDJProfile = onCall(async (request) => {
     const [userSnap, existingProfile] = await Promise.all([tx.get(userRef), tx.get(djRef)])
     if (!userSnap.exists) throw new HttpsError('failed-precondition', 'Account is not fully set up yet.')
 
-    // See createArtistProfile above — artist and DJ are mutually exclusive
-    // on one account, enforced here rather than left to the UI to hide.
+    // See createArtistProfile above — one role per account, enforced here
+    // rather than left to the UI to hide.
     const currentRoles: string[] = userSnap.data()!.roles ?? []
-    if (currentRoles.includes('artist')) {
+    const isAdmin = currentRoles.includes('admin')
+    if (!isAdmin && currentRoles.length > 0 && !currentRoles.includes('dj')) {
       throw new HttpsError(
-        'failed-precondition',
-        'Your account already has an active artist profile. Artist and DJ can\'t both be active on the same account — step back from artist first.',
+        'permission-denied',
+        'Your account already has a role, and accounts can only have one active role. An admin needs to change it for you.',
       )
     }
 

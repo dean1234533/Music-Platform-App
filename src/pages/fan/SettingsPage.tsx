@@ -77,52 +77,62 @@ export function SettingsPage() {
         </div>
       </section>
 
-      <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Roles</h2>
-        <div className="flex flex-col gap-2">
-          {profile?.roles.includes('artist') && hasArtistProfile ? (
-            <Link
-              to="/dashboard/artist"
-              className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
-            >
-              Go to Artist dashboard →
-            </Link>
-          ) : profile?.roles.includes('dj') ? (
-            // Artist and DJ are mutually exclusive on one account — an active
-            // DJ can't also add an artist profile, so this hides the dead-end
-            // link instead of letting them hit the server-side rejection.
-            <p className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm text-ink-3">
-              Artist profile unavailable while your DJ profile is active.
-            </p>
-          ) : (
-            <Link
-              to="/onboarding/add-role?role=artist"
-              className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
-            >
-              {profile?.roles.includes('artist') ? 'Finish setting up your artist profile' : '+ Add an artist profile'}
-            </Link>
-          )}
-          {profile?.roles.includes('dj') && hasDjProfile ? (
-            <Link
-              to="/dj/discover"
-              className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
-            >
-              Go to DJ dashboard →
-            </Link>
-          ) : profile?.roles.includes('artist') ? (
-            <p className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm text-ink-3">
-              DJ profile unavailable while your artist profile is active.
-            </p>
-          ) : (
-            <Link
-              to="/onboarding/add-role?role=dj"
-              className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
-            >
-              {profile?.roles.includes('dj') ? 'Finish setting up your DJ profile' : '+ Add a DJ profile'}
-            </Link>
-          )}
-        </div>
-      </section>
+      {/* One role per account: a regular (non-admin) account keeps exactly the
+          single role it picked at onboarding for life, so it can never itself
+          add artist or DJ on top of that — only an admin account can. This
+          section only ever offers "Add a role" self-service to an admin; a
+          regular fan account just doesn't get an upsell it can't use. */}
+      {hasRole('admin') || profile?.roles.includes('artist') || profile?.roles.includes('dj') ? (
+        <section>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Roles</h2>
+          <div className="flex flex-col gap-2">
+            {profile?.roles.includes('artist') && hasArtistProfile ? (
+              <Link
+                to="/dashboard/artist"
+                className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
+              >
+                Go to Artist dashboard →
+              </Link>
+            ) : profile?.roles.includes('artist') ? (
+              <Link
+                to="/onboarding/add-role?role=artist"
+                className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
+              >
+                Finish setting up your artist profile
+              </Link>
+            ) : hasRole('admin') ? (
+              <Link
+                to="/onboarding/add-role?role=artist"
+                className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
+              >
+                + Add an artist profile
+              </Link>
+            ) : null}
+            {profile?.roles.includes('dj') && hasDjProfile ? (
+              <Link
+                to="/dj/discover"
+                className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
+              >
+                Go to DJ dashboard →
+              </Link>
+            ) : profile?.roles.includes('dj') ? (
+              <Link
+                to="/onboarding/add-role?role=dj"
+                className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
+              >
+                Finish setting up your DJ profile
+              </Link>
+            ) : hasRole('admin') ? (
+              <Link
+                to="/onboarding/add-role?role=dj"
+                className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm font-medium text-ink-0 hover:bg-surface-2"
+              >
+                + Add a DJ profile
+              </Link>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       <AccountSecuritySection />
 
