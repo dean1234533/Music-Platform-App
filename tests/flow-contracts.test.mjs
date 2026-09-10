@@ -2164,19 +2164,27 @@ test('a public Story has an actual discovery surface instead of being visible no
   assert.ok(hasBroadStoriesIndex, 'firestore.indexes.json should have a stories index on [visibility, expiresAt] with no artistId prefix')
 })
 
-test('createLicencePaymentSession surfaces a real error instead of an opaque 500 when Stripe rejects the session (user-reported console error: "createLicencePaymentSession:1 Failed to load resource: the server responded with a status of 500")', () => {
-  // Every explicit application-level error path in this function already used HttpsError
-  // codes that map to 400/403/404, not 500 — traced resolveLicencePartyRole, the
-  // failed-precondition checks, and getPlatformSettings, none of which could produce a raw
-  // 500. That leaves an uncaught exception as the only remaining explanation, and the one
-  // call actually capable of throwing something other than HttpsError is the Stripe SDK
-  // call itself (bad currency, a non-integer amount, an API-side failure) — previously
-  // uncaught, which firebase-functions wraps as an opaque INTERNAL/500 with no detail on
-  // either side.
+test('createLicencePaymentSession surfaces the real underlying error to the client instead of a bare 500, since this environment cannot reliably read recent server-side function logs (user-reported console error recurring after the first fix: "createLicencePaymentSession:1 Failed to load resource: the server responded with a status of 500")', () => {
+  // A 500 status code alone doesn't mean the first fix (wrapping the Stripe call and
+  // throwing HttpsError('internal', ...)) didn't work — 'internal' itself maps to HTTP 500,
+  // so the network tab necessarily still shows 500 either way. What that first fix didn't
+  // do was make the actual cause visible anywhere reachable: functions:log repeatedly
+  // returned only stale deploy-audit entries in this environment, never the live invocation
+  // error, and gcloud logging read is permission-denied here. So the real fix is to stop
+  // depending on server-side log access at all — the try/catch now spans everything from
+  // getPlatformSettings through the Stripe call (an uncaught Firestore write failure before
+  // the Stripe call was just as unhandled as a Stripe rejection was), and the thrown
+  // HttpsError includes the real error's own message text, which ContractPage's handlePay
+  // already surfaces to the user as actionError.
   const fn = read('functions/src/stripe/licencePayment.ts')
-  assert.match(fn, /let session\s*\n\s*try \{\s*\n\s*session = await stripe\.checkout\.sessions\.create\(/)
+  assert.match(fn, /let session\s*\n\s*try \{\s*\n\s*const settings = await getPlatformSettings\(\)/)
+  assert.match(fn, /session = await stripe\.checkout\.sessions\.create\(/)
   assert.match(fn, /unit_amount: Math\.round\(agreement\.licenceFeeMinor\)/)
   assert.match(fn, /\} catch \(error\) \{/)
-  assert.match(fn, /console\.error\('\[createLicencePaymentSession\] Stripe session creation failed:', error\)/)
-  assert.match(fn, /throw new HttpsError\('internal', 'Could not start payment\. Please try again in a moment\.'\)/)
+  assert.match(fn, /console\.error\('\[createLicencePaymentSession\] failed:', error\)/)
+  assert.match(fn, /const detail = error instanceof Error \? error\.message : String\(error\)/)
+  assert.match(fn, /throw new HttpsError\('internal', `Could not start payment: \$\{detail\}`\)/)
+
+  const page = read('src/pages/agreements/ContractPage.tsx')
+  assert.match(page, /setActionError\(error instanceof Error \? error\.message : 'Could not start payment\.'\)/)
 })

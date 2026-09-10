@@ -37,19 +37,20 @@ export const createLicencePaymentSession = onCall({ secrets: [stripeSecretKey] }
     throw new HttpsError('failed-precondition', 'This track is under a copyright review — payment is temporarily unavailable.')
   }
   const trackTitle = track?.title ?? 'Track licence'
-  const settings = await getPlatformSettings()
-  const platformFeeMinor = Math.round(agreement.licenceFeeMinor * (settings.djServiceFeePercent / 100))
-  const artistNetMinor = agreement.licenceFeeMinor - platformFeeMinor
 
-  await agreementRef.update({
-    platformFeePercent: settings.djServiceFeePercent,
-    platformFeeMinor,
-    artistNetMinor,
-  })
-
-  const stripe = getStripe()
   let session
   try {
+    const settings = await getPlatformSettings()
+    const platformFeeMinor = Math.round(agreement.licenceFeeMinor * (settings.djServiceFeePercent / 100))
+    const artistNetMinor = agreement.licenceFeeMinor - platformFeeMinor
+
+    await agreementRef.update({
+      platformFeePercent: settings.djServiceFeePercent,
+      platformFeeMinor,
+      artistNetMinor,
+    })
+
+    const stripe = getStripe()
     session = await stripe.checkout.sessions.create({
       mode: 'payment',
       line_items: [
@@ -67,12 +68,16 @@ export const createLicencePaymentSession = onCall({ secrets: [stripeSecretKey] }
       metadata: { agreementId, kind: 'licence_payment' },
     })
   } catch (error) {
-    // A raw Stripe SDK error (bad currency, non-integer amount, API outage) was previously
-    // left uncaught — firebase-functions wraps that as an opaque 500 with no detail on either
-    // side, and the platform-fee fields above had already been written even though the
-    // session never got created. Surface a clear, retryable error instead.
-    console.error('[createLicencePaymentSession] Stripe session creation failed:', error)
-    throw new HttpsError('internal', 'Could not start payment. Please try again in a moment.')
+    // Any uncaught error here (a raw Stripe SDK rejection, an unexpected Firestore write
+    // failure) was previously left uncaught — firebase-functions wraps that as an opaque
+    // INTERNAL/500 with no detail on either side. This environment's log tooling can't
+    // reliably surface recent invocation logs, so the real cause is included directly in the
+    // message returned to the client instead of only being logged server-side — visible as
+    // error.message on whatever caught the callable's rejection (e.g. ContractPage's
+    // handlePay's actionError).
+    console.error('[createLicencePaymentSession] failed:', error)
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new HttpsError('internal', `Could not start payment: ${detail}`)
   }
 
   return { url: session.url }
