@@ -208,8 +208,14 @@ export function ArtistPublicProfilePage() {
       </div>
 
       <main className="relative z-10 mx-auto -mt-12 max-w-6xl px-5 sm:-mt-14 sm:px-8 lg:-mt-16 lg:px-10">
-        <section className="premium-panel rounded-[2rem] p-5 sm:p-7 lg:p-9">
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-end">
+        <section className="premium-panel relative overflow-hidden rounded-[2rem] p-5 sm:p-7 lg:p-9">
+          <img
+            src={artist.coverURL || '/artist-profile-card-bg.png'}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover object-center opacity-70"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,6,7,.9),rgba(5,6,7,.68)_52%,rgba(5,6,7,.82)),linear-gradient(0deg,rgba(5,6,7,.7),transparent_65%)]" />
+          <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-end">
           <button
             type="button"
             onClick={() => activeStories.length > 0 && setViewerGroup({ artistId: artist.artistId, stories: activeStories })}

@@ -136,6 +136,7 @@ export function HomePage() {
         <EmptyState
           title="Follow artists to build your feed"
           description="Once you follow artists, their new releases show up here first."
+          backgroundImage="/fan-follow-artists-bg.png"
           action={
             <Link to="/app/discover" className="text-sm font-medium text-brand-400 hover:underline">
               Discover artists →

@@ -14,17 +14,30 @@ export function EmptyState({
   description,
   action,
   icon,
+  backgroundImage,
 }: {
   title: string
   description?: string
   action?: ReactNode
   icon?: ReactNode
+  backgroundImage?: string
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-surface-border bg-surface-1/40 px-6 py-16 text-center">
+    <div
+      className={`flex flex-col items-center justify-center gap-3 rounded-2xl border bg-surface-1/40 bg-cover bg-center px-6 py-16 text-center ${
+        backgroundImage ? 'border-white/10 shadow-[inset_0_1px_rgba(255,255,255,0.06)]' : 'border-dashed border-surface-border'
+      }`}
+      style={
+        backgroundImage
+          ? {
+              backgroundImage: `linear-gradient(90deg, rgba(5, 6, 7, 0.78), rgba(5, 6, 7, 0.6) 50%, rgba(5, 6, 7, 0.78)), url("${backgroundImage}")`,
+            }
+          : undefined
+      }
+    >
       {icon}
       <h3 className="text-lg font-semibold text-ink-0">{title}</h3>
-      {description ? <p className="max-w-sm text-sm text-ink-2">{description}</p> : null}
+      {description ? <p className={`max-w-sm text-sm ${backgroundImage ? 'text-ink-1' : 'text-ink-2'}`}>{description}</p> : null}
       {action}
     </div>
   )
