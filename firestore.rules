@@ -67,13 +67,18 @@ service cloud.firestore {
         && request.resource.data.get('stripeCustomerId', null) == resource.data.get('stripeCustomerId', null)
         && request.resource.data.get('suspended', false) == resource.data.get('suspended', false)
         && (
-          // Normal account: roles may only ever be fan/artist/dj — this is
-          // the only path that adds OR removes any of the three, letting an
-          // artist/DJ genuinely step back from that role, not just add one.
-          request.resource.data.roles.hasOnly(['fan', 'artist', 'dj'])
-          // Admin account: the same fan/artist/dj add/remove freedom, but
-          // 'admin' itself can never be touched through this client path —
-          // granting or revoking admin is a backend-only operation, always.
+          // Normal account: roles may only ever be fan/artist/dj, and this
+          // path may only ADD to that set, never remove from it — stepping
+          // back from a role to go invisible is an admin-only capability,
+          // never something a regular fan/artist/dj account can do to
+          // itself (every role present before the write must still be
+          // present after it).
+          (request.resource.data.roles.hasOnly(['fan', 'artist', 'dj'])
+            && resource.data.roles.removeAll(request.resource.data.roles).size() == 0)
+          // Admin account: free to add or remove its own fan/artist/dj
+          // roles — including stepping back from all of them to operate
+          // invisibly — but 'admin' itself can never be touched through
+          // this client path; granting or revoking admin is backend-only.
           || (resource.data.roles.hasAny(['admin'])
               && request.resource.data.roles.hasAny(['admin'])
               && request.resource.data.roles.removeAll(['admin']).hasOnly(['fan', 'artist', 'dj']))

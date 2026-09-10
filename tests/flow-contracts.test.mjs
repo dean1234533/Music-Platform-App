@@ -1168,16 +1168,19 @@ test('an admin can never suspend or delete their own account (user-reported: app
   assert.match(deletion, /if \(userId === adminId\) \{\s*throw new HttpsError\('failed-precondition', 'Use account settings to delete your own account/)
 })
 
-test('stepping back from a role (e.g. an admin testing invisibly) hides the public profile and its tracks everywhere, not just on the profile page (user-reported)', () => {
+test('only an admin account can step back from a role and go invisible — a regular fan/artist/dj account can add roles but never remove one from itself (user-reported: "no users should not be able to do this only admin")', () => {
   const rules = read('firestore.rules')
   assert.match(rules, /function roleActiveFor\(uid, role\) \{\s*return exists\(\/databases\/\$\(database\)\/documents\/users\/\$\(uid\)\)\s*&& role in get\(\/databases\/\$\(database\)\/documents\/users\/\$\(uid\)\)\.data\.roles;/)
   assert.match(rules, /allow read: if roleActiveFor\(artistId, 'artist'\) \|\| isSelf\(artistId\) \|\| isAdmin\(\);/)
   assert.match(rules, /allow read: if roleActiveFor\(djId, 'dj'\) \|\| isSelf\(djId\) \|\| isAdmin\(\);/)
   assert.match(rules, /roleActiveFor\(resource\.data\.artistId, 'artist'\)/)
 
-  // An admin can still add/remove its own fan/artist/dj roles, but never grant/revoke 'admin' via this client-writable path.
+  // A non-admin account may only ADD to its fan/artist/dj roles through this
+  // path — every role present before the write must still be present after
+  // it — so it can never remove/step back from a role on its own.
   const usersUpdateRule = rules.slice(rules.indexOf('allow update: if isSelf(userId)'), rules.indexOf('allow update: if isSelf(userId)') + 1500)
-  assert.match(usersUpdateRule, /request\.resource\.data\.roles\.hasOnly\(\['fan', 'artist', 'dj'\]\)/)
+  assert.match(usersUpdateRule, /request\.resource\.data\.roles\.hasOnly\(\['fan', 'artist', 'dj'\]\)\s*&& resource\.data\.roles\.removeAll\(request\.resource\.data\.roles\)\.size\(\) == 0/)
+  // An admin account, by contrast, can add or remove its own fan/artist/dj roles, but never grant/revoke 'admin' via this client-writable path.
   assert.match(usersUpdateRule, /resource\.data\.roles\.removeAll\(\['admin'\]\)\.hasOnly\(\['fan', 'artist', 'dj'\]\)/)
 
   const functions = read('functions/src/tracks.ts')
@@ -1207,6 +1210,8 @@ test('stepping back from a role (e.g. an admin testing invisibly) hides the publ
     const src = read(page)
     assert.match(src, /removeRole/)
     assert.match(src, new RegExp(label))
+    // The button only renders for admin accounts — a regular user never sees it at all.
+    assert.match(src, /hasRole\('admin'\)/)
   }
 
   // A visitor blocked by the live-role gate sees a clean "not found," not a generic error screen.

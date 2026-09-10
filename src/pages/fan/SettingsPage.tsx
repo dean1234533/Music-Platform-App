@@ -8,7 +8,7 @@ import { AccountSecuritySection } from '@/components/account/AccountSecuritySect
 import { PushNotificationControl } from '@/components/notifications/PushNotificationControl'
 
 export function SettingsPage() {
-  const { firebaseUser, profile } = useAuth()
+  const { firebaseUser, profile, hasRole } = useAuth()
   const navigate = useNavigate()
   const [removingRole, setRemovingRole] = useState(false)
 
@@ -95,10 +95,10 @@ export function SettingsPage() {
 
       <AccountSecuritySection />
 
-      {profile?.roles.includes('fan') ? (
+      {profile?.roles.includes('fan') && hasRole('admin') ? (
         <section className="flex flex-col gap-2 rounded-xl border border-danger-500/20 bg-danger-500/[0.03] p-4">
-          <p className="text-sm font-semibold text-ink-0">Step back from fan</p>
-          <p className="text-xs leading-5 text-ink-2">Removes browsing/discovery access until you add the fan role back. Nothing is deleted.</p>
+          <p className="text-sm font-semibold text-ink-0">Step back from fan (admin only)</p>
+          <p className="text-xs leading-5 text-ink-2">Removes browsing/discovery access until you add the fan role back. Nothing is deleted. Only visible to admin accounts.</p>
           <Button variant="danger" size="sm" className="w-fit" loading={removingRole} onClick={handleRemoveFanRole}>
             Remove fan role
           </Button>

@@ -13,7 +13,7 @@ import { AccountSecuritySection } from '@/components/account/AccountSecuritySect
 import type { DJProfile } from '@/types/dj'
 
 export function DJProfilePage() {
-  const { firebaseUser } = useAuth()
+  const { firebaseUser, hasRole } = useAuth()
   const navigate = useNavigate()
   const [profile, setProfile] = useState<DJProfile | null>(null)
   const [form, setForm] = useState({ name: '', bio: '', genres: '', country: '', city: '' })
@@ -174,13 +174,15 @@ export function DJProfilePage() {
 
       <AccountSecuritySection />
 
-      <div className="flex flex-col gap-2 rounded-xl border border-danger-500/20 bg-danger-500/[0.03] p-4">
-        <p className="text-sm font-semibold text-ink-0">Step back from DJ</p>
-        <p className="text-xs leading-5 text-ink-2">Hides your public DJ profile from everyone until you add the DJ role back. Nothing is deleted.</p>
-        <Button variant="danger" size="sm" className="w-fit" loading={removingRole} onClick={handleRemoveDjRole}>
-          Remove DJ role
-        </Button>
-      </div>
+      {hasRole('admin') ? (
+        <div className="flex flex-col gap-2 rounded-xl border border-danger-500/20 bg-danger-500/[0.03] p-4">
+          <p className="text-sm font-semibold text-ink-0">Step back from DJ (admin only)</p>
+          <p className="text-xs leading-5 text-ink-2">Hides your public DJ profile from everyone until you add the DJ role back. Nothing is deleted. Only visible to admin accounts.</p>
+          <Button variant="danger" size="sm" className="w-fit" loading={removingRole} onClick={handleRemoveDjRole}>
+            Remove DJ role
+          </Button>
+        </div>
+      ) : null}
 
       <Button
         variant="secondary"

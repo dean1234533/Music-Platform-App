@@ -23,7 +23,7 @@ const DJ_POLICY_OPTIONS: { value: DJRequestPolicy; label: string }[] = [
 ]
 
 export function ArtistSettingsPage() {
-  const { firebaseUser } = useAuth()
+  const { firebaseUser, hasRole } = useAuth()
   const navigate = useNavigate()
   const [artist, setArtist] = useState<ArtistProfile | null>(null)
   const [removingRole, setRemovingRole] = useState(false)
@@ -306,15 +306,17 @@ export function ArtistSettingsPage() {
 
       <AccountSecuritySection />
 
-      <section className="flex flex-col gap-2 rounded-xl border border-danger-500/20 bg-danger-500/[0.03] p-4">
-        <p className="text-sm font-semibold text-ink-0">Step back from artist</p>
-        <p className="text-xs leading-5 text-ink-2">
-          Hides your public artist profile and tracks from everyone — including on shared links — until you add the artist role back. Nothing is deleted.
-        </p>
-        <Button variant="danger" size="sm" className="w-fit" loading={removingRole} onClick={handleRemoveArtistRole}>
-          Remove artist role
-        </Button>
-      </section>
+      {hasRole('admin') ? (
+        <section className="flex flex-col gap-2 rounded-xl border border-danger-500/20 bg-danger-500/[0.03] p-4">
+          <p className="text-sm font-semibold text-ink-0">Step back from artist (admin only)</p>
+          <p className="text-xs leading-5 text-ink-2">
+            Hides your public artist profile and tracks from everyone — including on shared links — until you add the artist role back. Nothing is deleted. Only visible to admin accounts.
+          </p>
+          <Button variant="danger" size="sm" className="w-fit" loading={removingRole} onClick={handleRemoveArtistRole}>
+            Remove artist role
+          </Button>
+        </section>
+      ) : null}
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Session</h2>
