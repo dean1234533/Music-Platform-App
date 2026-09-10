@@ -193,7 +193,7 @@ export function ArtistSettingsPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-col gap-8">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-8">
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold text-ink-0">Artist settings</h1>
         <Link
@@ -227,25 +227,29 @@ export function ArtistSettingsPage() {
             {photoError ? <p className="text-xs text-danger-500">{photoError}</p> : null}
           </div>
         </div>
-        <div>
-          <Label>Artist name</Label>
-          <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <Label>Artist name</Label>
+            <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+          </div>
+          <div>
+            <Label>Genres (comma separated)</Label>
+            <Input value={form.genres} onChange={(e) => setForm((f) => ({ ...f, genres: e.target.value }))} />
+          </div>
         </div>
         <div>
           <Label>Biography</Label>
           <TextArea rows={3} value={form.bio} onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))} />
         </div>
-        <div>
-          <Label>Genres (comma separated)</Label>
-          <Input value={form.genres} onChange={(e) => setForm((f) => ({ ...f, genres: e.target.value }))} />
-        </div>
-        <div>
-          <Label>Location</Label>
-          <Input value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))} />
-        </div>
-        <div>
-          <Label>Website</Label>
-          <Input value={form.website} onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))} />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <Label>Location</Label>
+            <Input value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))} />
+          </div>
+          <div>
+            <Label>Website</Label>
+            <Input value={form.website} onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))} />
+          </div>
         </div>
       </section>
 

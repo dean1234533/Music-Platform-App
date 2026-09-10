@@ -46,7 +46,7 @@ export function SupportPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-10">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-10">
       <button onClick={goBack} className="flex w-fit items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0 active:opacity-60">
         <ArrowLeft className="h-4 w-4" /> Back
       </button>

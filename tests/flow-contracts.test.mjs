@@ -2280,24 +2280,51 @@ test('a free-plan fan cannot claim artist-defined perk offers, enforced server-s
   assert.doesNotMatch(artistPage, /useFanFeature|locked=/)
 })
 
-test('every settings page is centered and width-constrained inside the shared 1440px content area, instead of pinning left with a large empty gap or stretching edge to edge (user-reported: "all the settings pages need to be centered and fit the screen better")', () => {
+test('every settings page is centered inside the shared 1440px content area (user-reported: "all the settings pages need to be centered and fit the screen better")', () => {
   // Root cause: AppShell already centers a wide max-w-[1440px] content area for every
-  // dashboard page (mx-auto on <main>'s inner div) — but three settings pages set their own
-  // max-w-lg form container with no mx-auto of its own, so on a wide screen that narrow form
+  // dashboard page (mx-auto on <main>'s inner div) — but the settings pages set their own
+  // narrow form container with no mx-auto of its own, so on a wide screen that narrow form
   // sat flush against the LEFT edge of the already-centered 1440px area instead of being
   // centered within it. AdminSettingsPage had no width constraint at all, so its 4-column
   // grids stretched edge to edge on a wide screen.
   const fan = read('src/pages/fan/SettingsPage.tsx')
-  assert.match(fan, /<div className="mx-auto flex w-full max-w-lg flex-col gap-8">/)
+  assert.match(fan, /<div className="mx-auto flex w-full max-w-2xl flex-col gap-8">/)
 
   const artist = read('src/pages/artist/dashboard/ArtistSettingsPage.tsx')
-  assert.match(artist, /<div className="mx-auto flex w-full max-w-lg flex-col gap-8">/)
+  assert.match(artist, /<div className="mx-auto flex w-full max-w-2xl flex-col gap-8">/)
 
   const dj = read('src/pages/dj/DJProfilePage.tsx')
-  assert.match(dj, /<div className="mx-auto flex w-full max-w-lg flex-col gap-6">/)
+  assert.match(dj, /<div className="mx-auto flex w-full max-w-2xl flex-col gap-6">/)
 
   const admin = read('src/pages/admin/AdminSettingsPage.tsx')
-  assert.match(admin, /<div className="mx-auto flex w-full max-w-3xl flex-col gap-8">/)
+  assert.match(admin, /<div className="mx-auto flex w-full max-w-4xl flex-col gap-8">/)
+})
+
+test('settings forms use their available width instead of leaving large empty gutters on a wide screen, and other narrow forms across the app got the same fix (user-reported follow-up: "no the settings bit should fit the screen properly, there is currently way to much space on the screen" then "also fix any other form that is too narrow on desktop")', () => {
+  // Centering alone (the first fix) made the emptiness more visible, not less — a 512px-wide
+  // (max-w-lg) form centered in a 1440px area still leaves huge gutters on both sides.
+  // Widened the settings forms to max-w-2xl (max-w-4xl for admin's grid-heavy page) and
+  // paired short fields into 2-column grids instead of stacking every field full-width in a
+  // single column, so the extra width is actually put to use rather than just stretching a
+  // handful of inputs.
+  const dj = read('src/pages/dj/DJProfilePage.tsx')
+  assert.match(dj, /<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">\s*\n\s*<div>\s*\n\s*<Label>DJ name<\/Label>/)
+  assert.match(dj, /<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">\s*\n\s*<div>\s*\n\s*<Label>Real name<\/Label>/)
+
+  const artist = read('src/pages/artist/dashboard/ArtistSettingsPage.tsx')
+  assert.match(artist, /<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">\s*\n\s*<div>\s*\n\s*<Label>Artist name<\/Label>/)
+  assert.match(artist, /<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">\s*\n\s*<div>\s*\n\s*<Label>Location<\/Label>/)
+
+  // Other real multi-field forms across the app that had the identical narrow/uncentered
+  // pattern, not just the four pages the original report named.
+  const profile = read('src/pages/fan/ProfilePage.tsx')
+  assert.match(profile, /<div className="mx-auto flex w-full max-w-2xl flex-col gap-6">/)
+
+  const support = read('src/pages/support/SupportPage.tsx')
+  assert.match(support, /<div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-10">/)
+
+  const addRole = read('src/pages/onboarding/AddRolePage.tsx')
+  assert.match(addRole, /<div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 py-10">/)
 })
 
 test('a DJ can set a profile photo, and both artist and DJ settings link to a live preview of their public profile (user-reported: "the dj has no profile image. they should be able to set one. also anyone with a profile should be able to preveiw it to see what it will look like live")', () => {

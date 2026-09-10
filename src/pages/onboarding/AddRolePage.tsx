@@ -55,7 +55,7 @@ export function AddRolePage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-lg flex-col gap-4 px-4 py-10">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 py-10">
       <h1 className="text-xl font-semibold text-ink-0">
         {role === 'artist' ? 'Add your artist profile' : 'Add your DJ profile'}
       </h1>

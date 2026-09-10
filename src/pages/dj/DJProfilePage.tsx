@@ -155,7 +155,7 @@ export function DJProfilePage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-semibold text-ink-0">DJ settings</h1>
@@ -218,19 +218,21 @@ export function DJProfilePage() {
         )
       ) : null}
 
-      <div>
-        <Label>DJ name</Label>
-        <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <Label>DJ name</Label>
+          <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+        </div>
+        <div>
+          <Label>Genres (comma separated)</Label>
+          <Input value={form.genres} onChange={(e) => setForm((f) => ({ ...f, genres: e.target.value }))} />
+        </div>
       </div>
       <div>
         <Label>Bio</Label>
         <TextArea rows={3} value={form.bio} onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))} />
       </div>
-      <div>
-        <Label>Genres (comma separated)</Label>
-        <Input value={form.genres} onChange={(e) => setForm((f) => ({ ...f, genres: e.target.value }))} />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <Label>Country</Label>
           <Input value={form.country} onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))} />
@@ -241,25 +243,27 @@ export function DJProfilePage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 rounded-xl border border-surface-border bg-surface-2 p-3">
+      <div className="flex flex-col gap-4 rounded-xl border border-surface-border bg-surface-2 p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-ink-3">
           Verification evidence — an admin sees this when reviewing your request, never shown on your public profile except venues
         </p>
-        <div>
-          <Label>Real name</Label>
-          <Input
-            value={form.realName}
-            onChange={(e) => setForm((f) => ({ ...f, realName: e.target.value }))}
-            placeholder="Legal or professional name, if different from your DJ name"
-          />
-        </div>
-        <div>
-          <Label>Website or press link</Label>
-          <Input
-            value={form.website}
-            onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
-            placeholder="https://…"
-          />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <Label>Real name</Label>
+            <Input
+              value={form.realName}
+              onChange={(e) => setForm((f) => ({ ...f, realName: e.target.value }))}
+              placeholder="Legal or professional name, if different from your DJ name"
+            />
+          </div>
+          <div>
+            <Label>Website or press link</Label>
+            <Input
+              value={form.website}
+              onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
+              placeholder="https://…"
+            />
+          </div>
         </div>
         <div>
           <Label>Notable venues (comma separated)</Label>

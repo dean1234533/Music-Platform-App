@@ -51,7 +51,7 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="flex max-w-lg flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-ink-0">Profile</h1>
         <Link
