@@ -1280,6 +1280,89 @@ test('only an admin account can change its own roles after signup (add or remove
   assert.match(djPublic, /\.code === 'permission-denied'/)
 })
 
+test('artist and DJ are mutually exclusive on one account — arrayUnion let an account silently accumulate both (user-reported: "a user is not ment to be able to do this... it was said before in a prompt this but you keep doing your own thing")', () => {
+  // Server-side enforcement: the Cloud Functions that grant these roles must
+  // reject the request outright, not just leave it to the UI to hide the
+  // option. request.auth.uid is still the only source of identity — no
+  // client-supplied uid or role name is trusted anywhere in either function.
+  const profiles = read('functions/src/profiles.ts')
+
+  const createArtistStart = profiles.indexOf('export const createArtistProfile')
+  const createDjStart = profiles.indexOf('export const createDJProfile')
+  const createArtistBody = profiles.slice(createArtistStart, createDjStart)
+  const createDjBody = profiles.slice(createDjStart)
+
+  assert.match(createArtistBody, /if \(!request\.auth\) throw new HttpsError\('unauthenticated', 'Sign in required\.'\)/)
+  assert.match(createArtistBody, /const uid = request\.auth\.uid/)
+  assert.match(createArtistBody, /const currentRoles: string\[\] = userSnap\.data\(\)!\.roles \?\? \[\]/)
+  assert.match(createArtistBody, /if \(currentRoles\.includes\('dj'\)\) \{/)
+  assert.match(createArtistBody, /throw new HttpsError\(\s*'failed-precondition',/)
+  // The mutual-exclusion check runs before the "re-affirm an existing profile"
+  // shortcut, so an account that already has a dj role can't slip through it
+  // by having a stale artistProfiles doc from before it ever held 'artist'.
+  assert.ok(
+    createArtistBody.indexOf("currentRoles.includes('dj')") < createArtistBody.indexOf('existingProfile.exists'),
+    'createArtistProfile must check mutual exclusion before the existing-profile re-affirm shortcut',
+  )
+
+  assert.match(createDjBody, /if \(!request\.auth\) throw new HttpsError\('unauthenticated', 'Sign in required\.'\)/)
+  assert.match(createDjBody, /const uid = request\.auth\.uid/)
+  assert.match(createDjBody, /const currentRoles: string\[\] = userSnap\.data\(\)!\.roles \?\? \[\]/)
+  assert.match(createDjBody, /if \(currentRoles\.includes\('artist'\)\) \{/)
+  assert.ok(
+    createDjBody.indexOf("currentRoles.includes('artist')") < createDjBody.indexOf('existingProfile.exists'),
+    'createDJProfile must check mutual exclusion before the existing-profile re-affirm shortcut',
+  )
+
+  // Neither function ever reads a role or target uid from request.data — the
+  // function name alone decides the role, and request.auth.uid alone decides
+  // who it's granted to, so a crafted { role: 'dj' } or { uid: '<other>' }
+  // payload in request.data has no effect.
+  assert.doesNotMatch(createArtistBody, /request\.data\?\.\w*[Rr]ole/)
+  assert.doesNotMatch(createDjBody, /request\.data\?\.\w*[Rr]ole/)
+  assert.doesNotMatch(createArtistBody, /request\.data\?\.uid/)
+  assert.doesNotMatch(createDjBody, /request\.data\?\.uid/)
+
+  // Belt-and-braces at the Firestore rules layer too, for the one remaining
+  // direct client write to roles (initial onboarding) — a crafted write
+  // can't set both roles in the same request even before any Cloud Function
+  // is involved.
+  const rules = read('firestore.rules')
+  const usersUpdateRule = rules.slice(rules.indexOf('allow update: if isSelf(userId)'), rules.indexOf('allow update: if isSelf(userId)') + 2000)
+  assert.match(usersUpdateRule, /&& !request\.resource\.data\.roles\.hasAll\(\['artist', 'dj'\]\)/)
+
+  // The onboarding UI itself only ever lets a brand-new signup pick one role
+  // to begin with (selectedRole is a single value, not a multi-select), so
+  // there's no path there that would even attempt to request both at once.
+  const onboarding = read('src/pages/onboarding/OnboardingPage.tsx')
+  assert.match(onboarding, /const \[selectedRole, setSelectedRole\] = useState<UserRole \| null>\(initialRole\)/)
+  assert.match(onboarding, /completeOnboarding\(firebaseUser\.uid, \[selectedRole\]\)/)
+
+  // UI: the add-role flow (an already-onboarded account adding artist or dj)
+  // shows the block up front instead of only surfacing it as a submit error.
+  const addRolePage = read('src/pages/onboarding/AddRolePage.tsx')
+  assert.match(addRolePage, /const otherRole = role === 'artist' \? 'dj' : 'artist'/)
+  assert.match(addRolePage, /const blockedByOtherRole = profile\?\.roles\.includes\(otherRole\) \?\? false/)
+  assert.match(addRolePage, /if \(blockedByOtherRole\) \{/)
+
+  // Fan Settings no longer offers "+ Add a DJ profile" to an active artist,
+  // or "+ Add an artist profile" to an active DJ.
+  const fanSettings = read('src/pages/fan/SettingsPage.tsx')
+  assert.match(fanSettings, /Artist profile unavailable while your DJ profile is active\./)
+  assert.match(fanSettings, /DJ profile unavailable while your artist profile is active\./)
+
+  // TrackPage no longer offers "Add a DJ profile to request access" to a
+  // viewer who's already an artist.
+  const trackPage = read('src/pages/track/TrackPage.tsx')
+  assert.match(trackPage, /DJ requests aren't available on an artist account\./)
+
+  // Pricing CTAs say so instead of promising a trial/profile the backend
+  // will then reject.
+  const pricing = read('src/pages/marketing/PricingPage.tsx')
+  assert.match(pricing, /Unavailable while on a DJ account/)
+  assert.match(pricing, /Unavailable while on an artist account/)
+})
+
 test('fan -> artist and fan -> DJ self-service upgrades work through trusted backend actions, never a client role write (user-reported: freezing roles broke "+ Add an artist profile" / "Start free trial" / "+ Add a DJ profile" / "Create DJ profile")', () => {
   const rules = read('firestore.rules')
   // The only legitimate way to create these profiles is now Cloud-Function-only —

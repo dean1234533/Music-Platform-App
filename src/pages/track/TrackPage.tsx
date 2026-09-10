@@ -240,6 +240,10 @@ export function TrackPage() {
             <Button size="sm" onClick={() => setShowDjRequest(true)}>
               Request DJ access
             </Button>
+          ) : hasRole('artist') ? (
+            // Artist and DJ are mutually exclusive on one account — an
+            // active artist can't add a DJ profile, so no dead-end link here.
+            <span className="text-sm text-ink-3">DJ requests aren't available on an artist account.</span>
           ) : (
             <Link to="/onboarding/add-role?role=dj" className="text-sm font-medium text-dj-400 hover:underline">
               Add a DJ profile to request access →

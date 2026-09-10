@@ -55,6 +55,19 @@ export const createArtistProfile = onCall(async (request) => {
     const [userSnap, existingProfile] = await Promise.all([tx.get(userRef), tx.get(artistRef)])
     if (!userSnap.exists) throw new HttpsError('failed-precondition', 'Account is not fully set up yet.')
 
+    // Artist and DJ are mutually exclusive on one account — never both active
+    // at once. The only way off an active role today is an admin-only step
+    // back (removeRole, gated in firestore.rules to accounts already holding
+    // 'admin'), so a regular account that's already DJ simply can't self-
+    // serve into artist; this is a hard block, not a UI hint.
+    const currentRoles: string[] = userSnap.data()!.roles ?? []
+    if (currentRoles.includes('dj')) {
+      throw new HttpsError(
+        'failed-precondition',
+        'Your account already has an active DJ profile. Artist and DJ can\'t both be active on the same account — step back from DJ first.',
+      )
+    }
+
     if (existingProfile.exists) {
       tx.update(userRef, { roles: FieldValue.arrayUnion('artist'), updatedAt: FieldValue.serverTimestamp() })
       return { slug: existingProfile.data()!.slug as string }
@@ -130,6 +143,16 @@ export const createDJProfile = onCall(async (request) => {
   await db.runTransaction(async (tx) => {
     const [userSnap, existingProfile] = await Promise.all([tx.get(userRef), tx.get(djRef)])
     if (!userSnap.exists) throw new HttpsError('failed-precondition', 'Account is not fully set up yet.')
+
+    // See createArtistProfile above — artist and DJ are mutually exclusive
+    // on one account, enforced here rather than left to the UI to hide.
+    const currentRoles: string[] = userSnap.data()!.roles ?? []
+    if (currentRoles.includes('artist')) {
+      throw new HttpsError(
+        'failed-precondition',
+        'Your account already has an active artist profile. Artist and DJ can\'t both be active on the same account — step back from artist first.',
+      )
+    }
 
     if (existingProfile.exists) {
       tx.update(userRef, { roles: FieldValue.arrayUnion('dj'), updatedAt: FieldValue.serverTimestamp() })

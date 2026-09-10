@@ -23,6 +23,11 @@ export function AddRolePage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const role: 'artist' | 'dj' = params.get('role') === 'dj' ? 'dj' : 'artist'
+  // Artist and DJ are mutually exclusive on one account — the Cloud Function
+  // enforces this server-side regardless, but a dead-end submit error isn't
+  // a good first look at the blocker, so it's surfaced here before the form.
+  const otherRole = role === 'artist' ? 'dj' : 'artist'
+  const blockedByOtherRole = profile?.roles.includes(otherRole) ?? false
 
   const [name, setName] = useState(profile?.displayName ?? '')
   const [bio, setBio] = useState('')
@@ -52,6 +57,20 @@ export function AddRolePage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  if (blockedByOtherRole) {
+    return (
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 py-10">
+        <h1 className="text-xl font-semibold text-ink-0">
+          {role === 'artist' ? 'Add your artist profile' : 'Add your DJ profile'}
+        </h1>
+        <p className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm text-ink-2">
+          Your account already has an active {otherRole === 'artist' ? 'Artist' : 'DJ'} profile. Artist and DJ can't
+          both be active on the same account, so you'll need to step back from {otherRole === 'artist' ? 'Artist' : 'DJ'} first — an admin can do this for you.
+        </p>
+      </div>
+    )
   }
 
   return (

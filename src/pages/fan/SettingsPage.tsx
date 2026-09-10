@@ -87,6 +87,13 @@ export function SettingsPage() {
             >
               Go to Artist dashboard →
             </Link>
+          ) : profile?.roles.includes('dj') ? (
+            // Artist and DJ are mutually exclusive on one account — an active
+            // DJ can't also add an artist profile, so this hides the dead-end
+            // link instead of letting them hit the server-side rejection.
+            <p className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm text-ink-3">
+              Artist profile unavailable while your DJ profile is active.
+            </p>
           ) : (
             <Link
               to="/onboarding/add-role?role=artist"
@@ -102,6 +109,10 @@ export function SettingsPage() {
             >
               Go to DJ dashboard →
             </Link>
+          ) : profile?.roles.includes('artist') ? (
+            <p className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3 text-sm text-ink-3">
+              DJ profile unavailable while your artist profile is active.
+            </p>
           ) : (
             <Link
               to="/onboarding/add-role?role=dj"
