@@ -867,13 +867,17 @@ test('signed-in users can send a support message, an admin gets notified and can
 
   const page = read('src/pages/support/SupportPage.tsx')
   assert.match(page, /submitSupportMessage\(\{ subject: subject\.trim\(\), message: message\.trim\(\) \}\)/)
-  // The fan can see their own past messages and any reply — not just a one-shot form into a void.
-  assert.match(page, /subscribeMySupportMessages\(firebaseUser\.uid, setMyMessages\)/)
-  assert.match(page, /\{msg\.reply \?/)
+  // The fan can see their own still-open messages — not just a one-shot form into a void. A
+  // resolved message drops out of this list entirely (user-reported: it used to stick around
+  // after being resolved) since the reply already arrived via notification, not this page.
+  assert.match(page, /subscribeMySupportMessages\(firebaseUser\.uid, setOpenMessages\)/)
+  assert.doesNotMatch(page, /msg\.reply/)
+  assert.doesNotMatch(page, /'resolved'/)
 
   const helpService = read('src/services/helpService.ts')
   assert.match(helpService, /export function subscribeMySupportMessages\(/)
   assert.match(helpService, /where\('userId', '==', uid\)/)
+  assert.match(helpService, /where\('status', '==', 'open'\)/)
 
   const admin = read('src/pages/admin/AdminReportsPage.tsx')
   assert.match(admin, /listOpenSupportMessages\(\)\.then\(setSupportMessages\)/)
@@ -882,7 +886,10 @@ test('signed-in users can send a support message, an admin gets notified and can
   assert.match(admin, /disabled=\{\(replyDrafts\[msg\.supportMessageId\] \?\? ''\)\.trim\(\)\.length < 3\}/)
 
   const indexes = read('firestore.indexes.json')
-  assert.match(indexes, /"collectionGroup": "supportMessages"[\s\S]*?"fieldPath": "userId", "order": "ASCENDING"/)
+  assert.match(
+    indexes,
+    /"collectionGroup": "supportMessages"[\s\S]*?"fieldPath": "userId", "order": "ASCENDING" \}[\s\S]*?"fieldPath": "status", "order": "ASCENDING" \}[\s\S]*?"fieldPath": "createdAt", "order": "DESCENDING"/,
+  )
 
   assert.match(read('src/App.tsx'), /<Route\s+path="\/support"/)
   assert.match(read('src/components/layout/navConfig.ts'), /label: 'Support', to: '\/support'/)

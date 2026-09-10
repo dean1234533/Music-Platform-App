@@ -22,11 +22,11 @@ export function SupportPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sent, setSent] = useState(false)
-  const [myMessages, setMyMessages] = useState<SupportMessageDoc[] | null>(null)
+  const [openMessages, setOpenMessages] = useState<SupportMessageDoc[] | null>(null)
 
   useEffect(() => {
     if (!firebaseUser) return
-    return subscribeMySupportMessages(firebaseUser.uid, setMyMessages)
+    return subscribeMySupportMessages(firebaseUser.uid, setOpenMessages)
   }, [firebaseUser])
 
   async function handleSubmit(event: FormEvent) {
@@ -61,7 +61,7 @@ export function SupportPage() {
 
       {sent ? (
         <p className="rounded-xl border border-support-500/30 bg-support-500/5 px-4 py-3 text-sm text-support-400">
-          Thanks — your message has been sent. We'll reply here and notify you.
+          Thanks — your message has been sent. We'll notify you here once we reply.
         </p>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -80,33 +80,17 @@ export function SupportPage() {
         </form>
       )}
 
-      {myMessages === null ? (
+      {openMessages === null ? (
         <LoadingState />
-      ) : myMessages.length === 0 ? null : (
+      ) : openMessages.length === 0 ? null : (
         <div>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Your messages</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Awaiting a reply</h2>
           <div className="flex flex-col gap-3">
-            {myMessages.map((msg) => (
+            {openMessages.map((msg) => (
               <div key={msg.supportMessageId} className="rounded-xl border border-surface-border bg-surface-1 px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium text-ink-0">{msg.subject}</p>
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                      msg.status === 'resolved' ? 'bg-support-500/10 text-support-400' : 'bg-surface-3 text-ink-2'
-                    }`}
-                  >
-                    {msg.status === 'resolved' ? 'Replied' : 'Open'}
-                  </span>
-                </div>
+                <p className="text-sm font-medium text-ink-0">{msg.subject}</p>
                 <p className="mt-1 text-xs leading-5 text-ink-2">{msg.message}</p>
                 <p className="mt-1 text-[11px] text-ink-3">{formatDate(msg.createdAt)}</p>
-                {msg.reply ? (
-                  <div className="mt-3 rounded-lg border border-brand-500/20 bg-brand-500/[0.04] px-3 py-2">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-brand-400">BackTheVibes support</p>
-                    <p className="mt-1 text-sm text-ink-0">{msg.reply}</p>
-                    <p className="mt-1 text-[11px] text-ink-3">{formatDate(msg.repliedAt)}</p>
-                  </div>
-                ) : null}
               </div>
             ))}
           </div>
