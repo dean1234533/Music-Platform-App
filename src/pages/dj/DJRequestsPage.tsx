@@ -268,17 +268,24 @@ export function DJRequestsPage() {
           </div>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {dealOpportunities.map(({ deal, track }) => (
-              <DealOpportunityCard
-                key={`${track.trackId}-${deal.dealId}`}
-                deal={deal}
-                track={track}
-                accepted={Boolean(requests?.some((request) => request.dealId === deal.dealId && request.trackId === track.trackId))}
-                accepting={acceptingDealId === deal.dealId}
-                onAccept={() => void acceptArtistDeal(deal, track)}
-                onRequestTerms={() => setRequestTarget({ trackId: track.trackId, dealId: deal.dealId })}
-              />
-            ))}
+            {dealOpportunities.map(({ deal, track }) => {
+              // The most recent matching request only — a DJ can request again after a prior
+              // one for this exact deal+track closed (rejected/cancelled/expired), so an old
+              // closed request must never mask a fresh one still in progress.
+              const matches = requests?.filter((r) => r.dealId === deal.dealId && r.trackId === track.trackId) ?? []
+              const activeRequest = matches.find((r) => !CLOSED_STATUSES.includes(r.status)) ?? matches[0] ?? null
+              return (
+                <DealOpportunityCard
+                  key={`${track.trackId}-${deal.dealId}`}
+                  deal={deal}
+                  track={track}
+                  request={activeRequest}
+                  accepting={acceptingDealId === deal.dealId}
+                  onAccept={() => void acceptArtistDeal(deal, track)}
+                  onRequestTerms={() => setRequestTarget({ trackId: track.trackId, dealId: deal.dealId })}
+                />
+              )
+            })}
           </div>
         )}
       </section>
@@ -348,20 +355,27 @@ function dealPriceLabel(deal: DjDealDoc): string {
 function DealOpportunityCard({
   deal,
   track,
-  accepted,
+  request,
   accepting,
   onAccept,
   onRequestTerms,
 }: {
   deal: DjDealDoc
   track: TrackDoc
-  accepted: boolean
+  request: LicenceRequestDoc | null
   accepting: boolean
   onAccept: () => void
   onRequestTerms: () => void
 }) {
   const artist = useArtistSummary(track.artistId)
   const canAcceptImmediately = deal.priceType === 'free' || deal.priceType === 'fixed'
+  // A request existing isn't a permanent state — it moves through review, can be approved
+  // into an active deal, or closed out (rejected/cancelled/expired), and the DJ needs a
+  // different, accurate action at each point instead of a button stuck forever on "Awaiting
+  // artist" (user-reported: "the request has been completed... but the deal now just says
+  // awaiting artist with no way to do anything").
+  const isClosed = request ? CLOSED_STATUSES.includes(request.status) : false
+  const isApproved = request?.status === 'approved'
 
   return (
     <div className="flex min-w-0 flex-col gap-4 rounded-2xl border border-surface-border bg-surface-1 p-4 transition hover:border-dj-500/40">
@@ -378,15 +392,35 @@ function DealOpportunityCard({
           <p className="mt-1 line-clamp-1 text-xs text-ink-3">{deal.description || deal.permittedUse}</p>
         </div>
       </div>
-      <Button
-        size="sm"
-        onClick={canAcceptImmediately ? onAccept : onRequestTerms}
-        loading={accepting}
-        disabled={accepted}
-        className="w-full"
-      >
-        {accepted ? (canAcceptImmediately ? 'Awaiting artist' : 'Terms requested') : (canAcceptImmediately ? 'Accept deal' : 'Request final terms')}
-      </Button>
+      {!request || isClosed ? (
+        <>
+          {isClosed ? (
+            <p className="text-xs text-ink-3">Previous request was {STATUS_LABEL[request!.status]?.toLowerCase() ?? request!.status} — you can request again.</p>
+          ) : null}
+          <Button
+            size="sm"
+            onClick={canAcceptImmediately ? onAccept : onRequestTerms}
+            loading={accepting}
+            className="w-full"
+          >
+            {canAcceptImmediately ? 'Accept deal' : 'Request final terms'}
+          </Button>
+        </>
+      ) : isApproved ? (
+        <Link
+          to={`/dj-requests/${request.requestId}?as=dj`}
+          className="flex w-full items-center justify-center rounded-lg bg-support-500/15 px-3 py-2 text-sm font-medium text-support-400 hover:bg-support-500/20"
+        >
+          Deal active — view contract
+        </Link>
+      ) : (
+        <Link
+          to={`/dj-requests/${request.requestId}?as=dj`}
+          className="flex w-full items-center justify-center rounded-lg border border-surface-border bg-surface-2 px-3 py-2 text-sm font-medium text-ink-1 hover:bg-surface-3"
+        >
+          {STATUS_LABEL[request.status] ?? 'View request'}
+        </Link>
+      )}
     </div>
   )
 }

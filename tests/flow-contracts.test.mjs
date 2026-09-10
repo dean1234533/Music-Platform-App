@@ -2032,3 +2032,31 @@ test('DJ Deals shows a deal\'s own request activity instead of nothing, once a D
   const fn = read('functions/src/licensing/requests.ts')
   assert.match(fn, /userId: artistId,\s*\n\s*type: 'dj_request',/)
 })
+
+test('the "Accept deal" card reflects the request\'s actual status instead of getting stuck on "Awaiting artist" forever (user-reported: "as the dj i accepted the deal but the request has been completed and the deal now just says awaiting artist with no way to do anything")', () => {
+  // Root cause: accepted was `Boolean(requests?.some(request => request.dealId === ... && request.trackId === ...))`
+  // — true the instant ANY request existed for that deal+track, with the button permanently
+  // disabled once true. It never looked at the request's status, so approval, rejection, or
+  // any other resolution left the card frozen showing "Awaiting artist" with a disabled
+  // button and no way to view the outcome or try again.
+  const page = read('src/pages/dj/DJRequestsPage.tsx')
+
+  // The most recent request for this deal+track drives the card, not just its existence —
+  // and a closed (rejected/cancelled/expired) one doesn't mask a fresh request still active.
+  assert.match(page, /const matches = requests\?\.filter\(\(r\) => r\.dealId === deal\.dealId && r\.trackId === track\.trackId\) \?\? \[\]/)
+  assert.match(page, /const activeRequest = matches\.find\(\(r\) => !CLOSED_STATUSES\.includes\(r\.status\)\) \?\? matches\[0\] \?\? null/)
+  assert.match(page, /request=\{activeRequest\}/)
+
+  // Three distinct, accurate states instead of one permanently-stuck one: no request (or a
+  // closed one) re-enables Accept/Request, an approved request links to the live contract,
+  // and anything still in progress links to its real status via the existing STATUS_LABEL map
+  // rather than a hardcoded "Awaiting artist"/"Terms requested" string.
+  assert.match(page, /const isClosed = request \? CLOSED_STATUSES\.includes\(request\.status\) : false/)
+  assert.match(page, /const isApproved = request\?\.status === 'approved'/)
+  assert.match(page, /Previous request was \{STATUS_LABEL\[request!\.status\]\?\.toLowerCase\(\) \?\? request!\.status\} — you can request again\./)
+  assert.match(page, /Deal active — view contract/)
+  assert.match(page, /\{STATUS_LABEL\[request\.status\] \?\? 'View request'\}/)
+  // Links to the real request, not a dead end — and explicitly as the DJ side, matching the
+  // ?as=dj convention already used elsewhere on this same page for a dual-role test account.
+  assert.match(page, /to=\{`\/dj-requests\/\$\{request\.requestId\}\?as=dj`\}/)
+})
