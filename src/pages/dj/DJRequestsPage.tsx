@@ -166,6 +166,7 @@ export function DJRequestsPage() {
             icon={<MessageSquare className="h-8 w-8 text-dj-400" />}
             title="You haven’t sent a request yet"
             description="Choose a track below and select Request access. The request will then appear here."
+            backgroundImage="/dj-requests-empty-bg.png"
             action={(
               <Link
                 to="/dj/discover"
