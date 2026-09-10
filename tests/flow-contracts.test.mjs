@@ -1031,10 +1031,12 @@ test('music access ALLOW/DENY matrix — every row of the spec, traced to the co
 
   // 2. Public user (signed out, uid === null) accesses the preview -> ALLOW.
   //    canPreviewTrack's base case (public/followers/supporters/early_access)
-  //    falls through to an unconditional `return true` with no uid check —
-  //    only the dj_only/private branches require one, and neither applies here.
+  //    falls through to an unconditional `return true`. A signed-out caller's
+  //    roles resolve to [] (no Firestore lookup), so `roles.includes('dj')`
+  //    correctly denies dj_only without a separate uid check.
   assert.match(tracksFn, /async function canPreviewTrack\(uid: string \| null, track: FirebaseFirestore\.DocumentData\): Promise<boolean> \{/)
-  assert.match(tracksFn, /if \(track\.visibility === 'dj_only'\) \{\s*if \(!uid\) return false/)
+  assert.match(tracksFn, /const roles = uid \? await getRoles\(uid\) : \[\]/)
+  assert.match(tracksFn, /if \(track\.visibility === 'dj_only'\) return roles\.includes\('dj'\)/)
 
   // 3. Public user (no uid) accesses a followers-tier full stream -> DENY.
   //    canStreamFullTrack hits `if (!uid) return false` before any tier check
@@ -1164,4 +1166,52 @@ test('an admin can never suspend or delete their own account (user-reported: app
 
   const deletion = read('functions/src/account/deleteAccount.ts')
   assert.match(deletion, /if \(userId === adminId\) \{\s*throw new HttpsError\('failed-precondition', 'Use account settings to delete your own account/)
+})
+
+test('stepping back from a role (e.g. an admin testing invisibly) hides the public profile and its tracks everywhere, not just on the profile page (user-reported)', () => {
+  const rules = read('firestore.rules')
+  assert.match(rules, /function roleActiveFor\(uid, role\) \{\s*return exists\(\/databases\/\$\(database\)\/documents\/users\/\$\(uid\)\)\s*&& role in get\(\/databases\/\$\(database\)\/documents\/users\/\$\(uid\)\)\.data\.roles;/)
+  assert.match(rules, /allow read: if roleActiveFor\(artistId, 'artist'\) \|\| isSelf\(artistId\) \|\| isAdmin\(\);/)
+  assert.match(rules, /allow read: if roleActiveFor\(djId, 'dj'\) \|\| isSelf\(djId\) \|\| isAdmin\(\);/)
+  assert.match(rules, /roleActiveFor\(resource\.data\.artistId, 'artist'\)/)
+
+  // An admin can still add/remove its own fan/artist/dj roles, but never grant/revoke 'admin' via this client-writable path.
+  const usersUpdateRule = rules.slice(rules.indexOf('allow update: if isSelf(userId)'), rules.indexOf('allow update: if isSelf(userId)') + 1500)
+  assert.match(usersUpdateRule, /request\.resource\.data\.roles\.hasOnly\(\['fan', 'artist', 'dj'\]\)/)
+  assert.match(usersUpdateRule, /resource\.data\.roles\.removeAll\(\['admin'\]\)\.hasOnly\(\['fan', 'artist', 'dj'\]\)/)
+
+  const functions = read('functions/src/tracks.ts')
+  assert.match(functions, /async function artistRoleActive\(artistId: string\): Promise<boolean> \{/)
+  // Every entitlement check must gate on the artist's live role, and must do so AFTER its own admin-bypass check,
+  // so an admin never loses the ability to preview/play/stream while investigating an account that has gone dark.
+  for (const fn of ['canPreviewTrack', 'canPlayDjPreview', 'canStreamFullTrack']) {
+    const start = functions.indexOf(`async function ${fn}(`)
+    const end = functions.indexOf('\n}', start)
+    const body = functions.slice(start, end)
+    const adminCheckIndex = body.indexOf("roles.includes('admin')")
+    const roleActiveCheckIndex = body.indexOf('artistRoleActive(track.artistId)')
+    assert.ok(adminCheckIndex !== -1, `${fn} should bypass for admins`)
+    assert.ok(roleActiveCheckIndex !== -1, `${fn} should gate on artistRoleActive`)
+    assert.ok(adminCheckIndex < roleActiveCheckIndex, `${fn} must check admin bypass before the artist role-active gate`)
+  }
+
+  const userService = read('src/services/userService.ts')
+  assert.match(userService, /export async function removeRole\(uid: string, role: Exclude<UserRole, 'admin'>\): Promise<void> \{/)
+  assert.match(userService, /roles: arrayRemove\(role\)/)
+
+  for (const [page, label] of [
+    ['src/pages/artist/dashboard/ArtistSettingsPage.tsx', 'Remove artist role'],
+    ['src/pages/dj/DJProfilePage.tsx', 'Remove DJ role'],
+    ['src/pages/fan/SettingsPage.tsx', 'Remove fan role'],
+  ]) {
+    const src = read(page)
+    assert.match(src, /removeRole/)
+    assert.match(src, new RegExp(label))
+  }
+
+  // A visitor blocked by the live-role gate sees a clean "not found," not a generic error screen.
+  const artistPublic = read('src/pages/artist/ArtistPublicProfilePage.tsx')
+  assert.match(artistPublic, /\.code === 'permission-denied'/)
+  const djPublic = read('src/pages/dj/DJPublicProfilePage.tsx')
+  assert.match(djPublic, /\.code === 'permission-denied'/)
 })

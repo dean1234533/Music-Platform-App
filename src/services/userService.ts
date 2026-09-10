@@ -1,5 +1,6 @@
 import type { User } from 'firebase/auth'
 import {
+  arrayRemove,
   doc,
   getDoc,
   onSnapshot,
@@ -88,6 +89,22 @@ export async function completeOnboarding(uid: string, roles: UserRole[]): Promis
   await updateDoc(userRef(uid), {
     roles: safeRoles,
     onboardingComplete: true,
+    updatedAt: serverTimestamp(),
+  })
+}
+
+/**
+ * Steps back from a role — never grants 'admin' or removes it (Firestore
+ * rules block both regardless), so this is safe to expose as a self-service
+ * action even on an admin account. Doesn't touch or delete the underlying
+ * artistProfiles/djProfiles doc: removing 'artist'/'dj' just makes that
+ * profile stop being publicly readable (see firestore.rules'
+ * roleActiveFor) until the role is added back via the add-role flow, at
+ * which point the same profile reappears exactly as it was.
+ */
+export async function removeRole(uid: string, role: Exclude<UserRole, 'admin'>): Promise<void> {
+  await updateDoc(userRef(uid), {
+    roles: arrayRemove(role),
     updatedAt: serverTimestamp(),
   })
 }

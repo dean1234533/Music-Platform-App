@@ -19,6 +19,11 @@ async function getRoles(uid: string): Promise<string[]> {
   return (user.data()?.roles ?? []) as string[]
 }
 
+/** Mirrors firestore.rules' roleActiveFor — an artist who has stepped back from the role (removeRole) goes dark everywhere, not just their profile page. */
+async function artistRoleActive(artistId: string): Promise<boolean> {
+  return (await getRoles(artistId)).includes('artist')
+}
+
 /**
  * Whether this listener may hear the configured preview clip. Deliberately
  * permissive — the acquisition funnel (preview -> follow -> full track) only
@@ -30,15 +35,12 @@ async function getRoles(uid: string): Promise<string[]> {
 async function canPreviewTrack(uid: string | null, track: FirebaseFirestore.DocumentData): Promise<boolean> {
   if (track.takenDown === true || (track.restrictedCapabilities ?? []).includes('streaming')) return false
   if (uid === track.artistId) return true
+  const roles = uid ? await getRoles(uid) : []
+  if (roles.includes('admin')) return true
   if (!isPublished(track) || track.previewEnabled === false) return false
-  if (track.visibility === 'private') {
-    return uid ? (await getRoles(uid)).includes('admin') : false
-  }
-  if (track.visibility === 'dj_only') {
-    if (!uid) return false
-    const roles = await getRoles(uid)
-    return roles.includes('dj') || roles.includes('admin')
-  }
+  if (!(await artistRoleActive(track.artistId))) return false
+  if (track.visibility === 'private') return false
+  if (track.visibility === 'dj_only') return roles.includes('dj')
   return true
 }
 
@@ -47,7 +49,9 @@ async function canPlayDjPreview(uid: string | null, track: FirebaseFirestore.Doc
   if ((track.restrictedCapabilities ?? []).includes('streaming') || (track.restrictedCapabilities ?? []).includes('dj_licensing')) return false
   if (uid === track.artistId) return true
   const roles = await getRoles(uid)
-  return roles.includes('admin') || (roles.includes('dj') && track.djPromotion === true && typeof track.djPreviewAudioPath === 'string')
+  if (roles.includes('admin')) return true
+  if (!(await artistRoleActive(track.artistId))) return false
+  return roles.includes('dj') && track.djPromotion === true && typeof track.djPreviewAudioPath === 'string'
 }
 
 /**
@@ -79,6 +83,7 @@ async function canStreamFullTrack(uid: string | null, track: FirebaseFirestore.D
     if (roles.includes('admin')) return true
   }
   if (!isPublished(track)) return false
+  if (!(await artistRoleActive(track.artistId))) return false
   if (track.visibility === 'public') return true
   if (track.visibility === 'early_access') {
     // The public-release date (if any) is checked before the auth guard

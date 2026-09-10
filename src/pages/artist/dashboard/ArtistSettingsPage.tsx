@@ -5,6 +5,7 @@ import { subscribeArtistProfile, updateArtistProfile } from '@/services/artistSe
 import { subscribeOwnVerificationRequests, submitVerificationRequest } from '@/services/verificationService'
 import { uploadArtistCover, uploadArtistPhoto } from '@/services/profileMediaService'
 import { signOut } from '@/services/authService'
+import { removeRole } from '@/services/userService'
 import { openBillingPortal, subscribeToOwnSubscription, subscribeToPlan } from '@/services/subscriptionService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
@@ -25,6 +26,25 @@ export function ArtistSettingsPage() {
   const { firebaseUser } = useAuth()
   const navigate = useNavigate()
   const [artist, setArtist] = useState<ArtistProfile | null>(null)
+  const [removingRole, setRemovingRole] = useState(false)
+
+  async function handleRemoveArtistRole() {
+    if (!firebaseUser) return
+    if (
+      !window.confirm(
+        'Step back from your artist role? Your public artist profile and tracks stop being visible to anyone — including on shared links — until you add the artist role back. Nothing is deleted.',
+      )
+    ) {
+      return
+    }
+    setRemovingRole(true)
+    try {
+      await removeRole(firebaseUser.uid, 'artist')
+      navigate('/')
+    } finally {
+      setRemovingRole(false)
+    }
+  }
   const [form, setForm] = useState<{ name: string; bio: string; genres: string; location: string; website: string }>({
     name: '',
     bio: '',
@@ -285,6 +305,16 @@ export function ArtistSettingsPage() {
       </section>
 
       <AccountSecuritySection />
+
+      <section className="flex flex-col gap-2 rounded-xl border border-danger-500/20 bg-danger-500/[0.03] p-4">
+        <p className="text-sm font-semibold text-ink-0">Step back from artist</p>
+        <p className="text-xs leading-5 text-ink-2">
+          Hides your public artist profile and tracks from everyone — including on shared links — until you add the artist role back. Nothing is deleted.
+        </p>
+        <Button variant="danger" size="sm" className="w-fit" loading={removingRole} onClick={handleRemoveArtistRole}>
+          Remove artist role
+        </Button>
+      </section>
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Session</h2>

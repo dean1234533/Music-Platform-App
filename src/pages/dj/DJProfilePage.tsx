@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { subscribeDJProfile, updateDJProfile } from '@/services/djService'
 import { submitVerificationRequest } from '@/services/verificationService'
 import { signOut } from '@/services/authService'
+import { removeRole } from '@/services/userService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
 import { LoadingState, EmptyState, ErrorState } from '@/components/common/StateViews'
@@ -24,6 +25,7 @@ export function DJProfilePage() {
   const [verificationNote, setVerificationNote] = useState('')
   const [verificationError, setVerificationError] = useState<string | null>(null)
   const [loadError, setLoadError] = useState(false)
+  const [removingRole, setRemovingRole] = useState(false)
 
   useEffect(() => {
     if (!firebaseUser) return
@@ -42,6 +44,24 @@ export function DJProfilePage() {
   if (!firebaseUser) return <LoadingState />
   if (loadError) return <ErrorState title="Something went wrong" description="Couldn't load this page. Try refreshing." />
   if (!profile) return <EmptyState title="No DJ profile found" description="Add a DJ profile from your account settings." />
+
+  async function handleRemoveDjRole() {
+    if (!firebaseUser) return
+    if (
+      !window.confirm(
+        'Step back from your DJ role? Your public DJ profile stops being visible to anyone until you add the DJ role back. Nothing is deleted.',
+      )
+    ) {
+      return
+    }
+    setRemovingRole(true)
+    try {
+      await removeRole(firebaseUser.uid, 'dj')
+      navigate('/')
+    } finally {
+      setRemovingRole(false)
+    }
+  }
 
   async function handleRequestVerification() {
     if (verificationNote.trim().length < 10) {
@@ -153,6 +173,14 @@ export function DJProfilePage() {
       </Button>
 
       <AccountSecuritySection />
+
+      <div className="flex flex-col gap-2 rounded-xl border border-danger-500/20 bg-danger-500/[0.03] p-4">
+        <p className="text-sm font-semibold text-ink-0">Step back from DJ</p>
+        <p className="text-xs leading-5 text-ink-2">Hides your public DJ profile from everyone until you add the DJ role back. Nothing is deleted.</p>
+        <Button variant="danger" size="sm" className="w-fit" loading={removingRole} onClick={handleRemoveDjRole}>
+          Remove DJ role
+        </Button>
+      </div>
 
       <Button
         variant="secondary"

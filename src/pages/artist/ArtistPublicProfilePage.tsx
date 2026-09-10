@@ -59,7 +59,16 @@ export function ArtistPublicProfilePage() {
 
   useEffect(() => {
     if (!artistId) return
-    const unsubProfile = subscribeArtistProfile(artistId, setArtist, () => setLoadError(true))
+    const unsubProfile = subscribeArtistProfile(artistId, setArtist, (error) => {
+      // The artist stepped back from the artist role (removeRole) — the
+      // profile doc still exists but reads now fail closed. That's a
+      // deliberately-hidden profile, not a real error.
+      if ((error as { code?: string }).code === 'permission-denied') {
+        setArtistId(null)
+      } else {
+        setLoadError(true)
+      }
+    })
     const unsubTracks = subscribePublicArtistTracks(artistId, setTracks)
     return () => {
       unsubProfile()

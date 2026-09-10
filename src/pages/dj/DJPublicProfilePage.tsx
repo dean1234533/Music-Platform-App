@@ -18,7 +18,15 @@ export function DJPublicProfilePage() {
 
   useEffect(() => {
     if (!djId) return
-    return subscribeDJProfile(djId, setProfile, () => setLoadError(true))
+    return subscribeDJProfile(djId, setProfile, (error) => {
+      // The DJ stepped back from the dj role (removeRole) — the profile doc
+      // still exists but reads now fail closed. Deliberately hidden, not an error.
+      if ((error as { code?: string }).code === 'permission-denied') {
+        setProfile(null)
+      } else {
+        setLoadError(true)
+      }
+    })
   }, [djId])
 
   if (profile === undefined && loadError) {

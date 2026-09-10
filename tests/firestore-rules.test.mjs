@@ -4,9 +4,13 @@ import test from 'node:test'
 
 const rules = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8')
 
-test('users cannot grant themselves admin or paid status', () => {
+test('users can add/remove their own fan/artist/dj roles but can never grant or revoke admin themselves', () => {
   assert.match(rules, /roles\.hasOnly\(\['fan', 'artist', 'dj'\]\)/)
-  assert.match(rules, /resource\.data\.roles\.hasAny\(\['admin'\]\)[\s\S]*?request\.resource\.data\.roles == resource\.data\.roles/)
+  // The admin branch: 'admin' must be present both before and after the write,
+  // and with it stripped from both sides the remainder must still be only fan/artist/dj —
+  // so an admin account can step in/out of fan/artist/dj like anyone else, but this
+  // client-writable path can never itself add or remove 'admin'.
+  assert.match(rules, /resource\.data\.roles\.hasAny\(\['admin'\]\)[\s\S]*?request\.resource\.data\.roles\.hasAny\(\['admin'\]\)[\s\S]*?request\.resource\.data\.roles\.removeAll\(\['admin'\]\)\.hasOnly\(\['fan', 'artist', 'dj'\]\)/)
   assert.match(rules, /subscriptionStatus == resource\.data\.subscriptionStatus/)
   assert.match(rules, /stripeCustomerId[\s\S]*?== resource\.data/)
 })

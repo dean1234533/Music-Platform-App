@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import { updateBasicProfile } from '@/services/userService'
+import { updateBasicProfile, removeRole } from '@/services/userService'
 import { signOut } from '@/services/authService'
 import { Button } from '@/components/common/Button'
 import { AccountSecuritySection } from '@/components/account/AccountSecuritySection'
@@ -9,6 +10,8 @@ import { PushNotificationControl } from '@/components/notifications/PushNotifica
 export function SettingsPage() {
   const { firebaseUser, profile } = useAuth()
   const navigate = useNavigate()
+  const [removingRole, setRemovingRole] = useState(false)
+
   async function toggleEmailNotifications() {
     if (!firebaseUser || !profile) return
     await updateBasicProfile(firebaseUser.uid, {
@@ -17,6 +20,20 @@ export function SettingsPage() {
         email: !profile.notificationPreferences.email,
       },
     })
+  }
+
+  async function handleRemoveFanRole() {
+    if (!firebaseUser) return
+    if (!window.confirm("Step back from the fan role? You'll lose access to browsing/discovery (following, library, playlists) until you add it back. Nothing is deleted.")) {
+      return
+    }
+    setRemovingRole(true)
+    try {
+      await removeRole(firebaseUser.uid, 'fan')
+      navigate('/')
+    } finally {
+      setRemovingRole(false)
+    }
   }
 
   return (
@@ -77,6 +94,16 @@ export function SettingsPage() {
       </section>
 
       <AccountSecuritySection />
+
+      {profile?.roles.includes('fan') ? (
+        <section className="flex flex-col gap-2 rounded-xl border border-danger-500/20 bg-danger-500/[0.03] p-4">
+          <p className="text-sm font-semibold text-ink-0">Step back from fan</p>
+          <p className="text-xs leading-5 text-ink-2">Removes browsing/discovery access until you add the fan role back. Nothing is deleted.</p>
+          <Button variant="danger" size="sm" className="w-fit" loading={removingRole} onClick={handleRemoveFanRole}>
+            Remove fan role
+          </Button>
+        </section>
+      ) : null}
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Session</h2>

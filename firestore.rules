@@ -25,6 +25,17 @@ service cloud.firestore {
       return hasRole('admin');
     }
 
+    // Whether uid's account currently holds `role` — the live source of
+    // truth for public profile visibility, not just "does a profile doc
+    // exist". Stepping back from the artist/dj role (removeRole) hides the
+    // public profile immediately without touching or deleting the profile
+    // doc itself, so re-adding the role (AddRolePage) restores it exactly
+    // as it was.
+    function roleActiveFor(uid, role) {
+      return exists(/databases/$(database)/documents/users/$(uid))
+        && role in get(/databases/$(database)/documents/users/$(uid)).data.roles;
+    }
+
     function hasActiveSupportFor(artistId) {
       return isSignedIn()
         && exists(/databases/$(database)/documents/supportRelationships/$(request.auth.uid + '_' + artistId))
@@ -56,8 +67,16 @@ service cloud.firestore {
         && request.resource.data.get('stripeCustomerId', null) == resource.data.get('stripeCustomerId', null)
         && request.resource.data.get('suspended', false) == resource.data.get('suspended', false)
         && (
+          // Normal account: roles may only ever be fan/artist/dj — this is
+          // the only path that adds OR removes any of the three, letting an
+          // artist/DJ genuinely step back from that role, not just add one.
           request.resource.data.roles.hasOnly(['fan', 'artist', 'dj'])
-          || (resource.data.roles.hasAny(['admin']) && request.resource.data.roles == resource.data.roles)
+          // Admin account: the same fan/artist/dj add/remove freedom, but
+          // 'admin' itself can never be touched through this client path —
+          // granting or revoking admin is a backend-only operation, always.
+          || (resource.data.roles.hasAny(['admin'])
+              && request.resource.data.roles.hasAny(['admin'])
+              && request.resource.data.roles.removeAll(['admin']).hasOnly(['fan', 'artist', 'dj']))
         );
 
       allow delete: if false;
@@ -69,7 +88,10 @@ service cloud.firestore {
     // followerCount/supporterCount are frozen — Cloud Functions only.
     // ---------------------------------------------------------------------
     match /artistProfiles/{artistId} {
-      allow read: if true;
+      // Public only while the account still actually holds the artist role
+      // — stepping back from it (removeRole) hides this from everyone but
+      // the owner and admins, without deleting anything.
+      allow read: if roleActiveFor(artistId, 'artist') || isSelf(artistId) || isAdmin();
       allow create: if isSelf(artistId)
         && request.resource.data.artistId == artistId
         && request.resource.data.get('trackCount', 0) == 0;
@@ -96,7 +118,8 @@ service cloud.firestore {
     }
 
     match /djProfiles/{djId} {
-      allow read: if true;
+      // Same live-role gate as artistProfiles above.
+      allow read: if roleActiveFor(djId, 'dj') || isSelf(djId) || isAdmin();
       allow create: if isSelf(djId) && request.resource.data.djId == djId
         && request.resource.data.verificationStatus == 'unverified';
       // Verification is server-maintained. bulkOutreachOptIn is DJ-writable.
@@ -120,7 +143,13 @@ service cloud.firestore {
       // real gate is entirely in getTrackPlaybackUrl + storage.rules: this
       // doc never contains playable audio, only Storage paths that are
       // owner-only at the Storage layer regardless of who can read this doc.
-      allow read: if ((resource.data.get('status', 'published') == 'published') && (
+      // The artist-still-holds-the-role gate also applies here — the same
+      // stepping-back that hides artistProfiles hides their tracks too, not
+      // just the profile page, so a bookmarked/shared track link goes dark
+      // along with everything else.
+      allow read: if ((resource.data.get('status', 'published') == 'published')
+        && roleActiveFor(resource.data.artistId, 'artist')
+        && (
            resource.data.visibility == 'public'
         || resource.data.visibility == 'followers'
         || resource.data.visibility == 'supporters'
