@@ -7,11 +7,15 @@ import {
   listRisingArtists,
 } from '@/services/discoveryService'
 import { getArtistProfile } from '@/services/artistService'
+import { listActivePublicStories, subscribeMyViewedStoryIds } from '@/services/storyService'
 import { TrackCard } from '@/components/music/TrackCard'
 import { ArtistCard } from '@/components/music/ArtistCard'
+import { StoryRail } from '@/components/stories/StoryRail'
+import { StoryViewer, type StoryGroup } from '@/components/stories/StoryViewer'
 import { LoadingState, EmptyState } from '@/components/common/StateViews'
 import type { ArtistProfile } from '@/types/artist'
 import type { TrackDoc } from '@/types/track'
+import type { StoryDoc } from '@/types/story'
 
 const DISPLAY_COUNT = 12
 // Over-fetch so there's still a full section left after excluding artists an
@@ -30,18 +34,37 @@ export function DiscoverPage() {
   const [mostSupportedEmptyReason, setMostSupportedEmptyReason] = useState<'none' | 'claimed' | null>(null)
   const [djReadyArtists, setDjReadyArtists] = useState<ArtistProfile[]>([])
   const [djReadyEmptyReason, setDjReadyEmptyReason] = useState<'none' | 'claimed' | null>(null)
+  const [storiesByArtist, setStoriesByArtist] = useState<Map<string, StoryDoc[]>>(new Map())
+  const [viewedStoryIds, setViewedStoryIds] = useState<Set<string>>(new Set())
+  const [viewerGroups, setViewerGroups] = useState<StoryGroup[] | null>(null)
+  const [viewerInitialArtistId, setViewerInitialArtistId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!firebaseUser) {
+      setViewedStoryIds(new Set())
+      return
+    }
+    return subscribeMyViewedStoryIds(firebaseUser.uid, setViewedStoryIds)
+  }, [firebaseUser])
 
   useEffect(() => {
     let cancelled = false
     async function load() {
       setLoading(true)
-      const [releases, rising, supported, djTracks] = await Promise.all([
+      const [releases, rising, supported, djTracks, stories] = await Promise.all([
         listNewReleaseTracks(24),
         listRisingArtists(FETCH_COUNT),
         listMostSupportedArtists(FETCH_COUNT),
         listArtistsSeekingDJExposure(FETCH_COUNT),
+        listActivePublicStories(),
       ])
       if (cancelled) return
+
+      const byArtist = new Map<string, StoryDoc[]>()
+      for (const story of stories) {
+        byArtist.set(story.artistId, [...(byArtist.get(story.artistId) ?? []), story])
+      }
+      setStoriesByArtist(byArtist)
 
       // "Artists seeking DJ exposure" is artist-level, not track-level — a
       // track query is only how it's sourced (the visibility/embargo checks
@@ -107,6 +130,12 @@ export function DiscoverPage() {
 
   if (loading) return <LoadingState label="Loading discovery…" />
 
+  function openRail(artistId: string) {
+    const groups: StoryGroup[] = Array.from(storiesByArtist.entries()).map(([id, stories]) => ({ artistId: id, stories }))
+    setViewerGroups(groups)
+    setViewerInitialArtistId(artistId)
+  }
+
   return (
     <div className="flex flex-col gap-12">
       <div className="border-b border-white/[0.08] pb-8 pt-2">
@@ -114,6 +143,19 @@ export function DiscoverPage() {
         <h1 className="mt-3 text-4xl font-medium tracking-[-0.045em] text-ink-0 sm:text-5xl">Find your next obsession.</h1>
         <p className="mt-3 text-base text-ink-2">Independent releases, real momentum, no fabricated charts.</p>
       </div>
+
+      {storiesByArtist.size > 0 ? (
+        <div>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-3">Live stories</h2>
+          <StoryRail
+            groups={Array.from(storiesByArtist.entries()).map(([artistId, stories]) => ({
+              artistId,
+              hasUnseen: stories.some((s) => !viewedStoryIds.has(s.storyId)),
+            }))}
+            onOpen={openRail}
+          />
+        </div>
+      ) : null}
 
       <TrackSection title="New releases" tracks={newReleases} />
       <ArtistSection
@@ -143,6 +185,15 @@ export function DiscoverPage() {
             : 'No artists are currently open for DJ promotion.'
         }
       />
+
+      {viewerGroups && viewerInitialArtistId ? (
+        <StoryViewer
+          groups={viewerGroups}
+          initialArtistId={viewerInitialArtistId}
+          viewerUserId={firebaseUser?.uid ?? null}
+          onClose={() => setViewerGroups(null)}
+        />
+      ) : null}
     </div>
   )
 }

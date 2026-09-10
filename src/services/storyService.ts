@@ -1,4 +1,4 @@
-import { collection, onSnapshot, orderBy, query, Timestamp, where } from 'firebase/firestore'
+import { collection, getDocs, limit, onSnapshot, orderBy, query, Timestamp, where } from 'firebase/firestore'
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
 import { doc, setDoc, deleteDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore'
 import { db, storage } from '@/lib/firebase'
@@ -202,6 +202,26 @@ export function subscribeActiveStoriesForArtists(
     )
   })
   return () => unsubs.forEach((u) => u())
+}
+
+/**
+ * A public Story had no actual discovery surface — visible only on the
+ * posting artist's own profile page, or in a fan's Home feed and only once
+ * they already follow/support that artist. This gives public Stories the
+ * same kind of general browsing surface Discover already has for tracks and
+ * artists (user-reported: "i just put up a story as a artist and no one can
+ * see it, it does not show anywhere").
+ */
+export async function listActivePublicStories(count = 30): Promise<StoryDoc[]> {
+  const q = query(
+    collection(db, 'stories'),
+    where('visibility', '==', 'public'),
+    where('expiresAt', '>', Timestamp.now()),
+    orderBy('expiresAt', 'asc'),
+    limit(count),
+  )
+  const snap = await getDocs(q)
+  return snap.docs.map((d) => d.data() as StoryDoc)
 }
 
 /** Drives the seen/unseen ring on StoryBubble/StoryRail. */

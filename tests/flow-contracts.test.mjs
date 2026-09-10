@@ -2127,3 +2127,39 @@ test('notifications can be filtered and deleted, and the bell shows an unread co
   assert.match(sidebar, /import \{ useUnreadNotificationCount \} from '@\/hooks\/useUnreadNotificationCount'/)
   assert.match(sidebar, /item\.to\.endsWith\('\/notifications'\) && unreadCount > 0/)
 })
+
+test('a public Story has an actual discovery surface instead of being visible nowhere but the posting artist\'s own profile (user-reported: "i just put up a story as a artist and no one can see it, it does not show anywhere")', () => {
+  // Root cause confirmed live: the story itself, the rules, and the artist's own public
+  // profile page were all already correct — an unauthenticated query for this exact
+  // artistId+visibility:'public' story succeeded and returned the real document. The actual
+  // gap was that a public Story never had a general discovery surface: it only ever showed
+  // on the posting artist's own profile page, or in a fan's Home feed and only once that fan
+  // already followed/supported the artist — never anywhere a fan with no existing
+  // relationship to that artist would see it, which defeats the point of "public".
+  const service = read('src/services/storyService.ts')
+  assert.match(service, /export async function listActivePublicStories\(count = 30\): Promise<StoryDoc\[\]>/)
+  assert.match(service, /where\('visibility', '==', 'public'\)/)
+  assert.match(service, /where\('expiresAt', '>', Timestamp\.now\(\)\)/)
+
+  const page = read('src/pages/fan/DiscoverPage.tsx')
+  assert.match(page, /import \{ listActivePublicStories, subscribeMyViewedStoryIds \} from '@\/services\/storyService'/)
+  assert.match(page, /import \{ StoryRail \} from '@\/components\/stories\/StoryRail'/)
+  assert.match(page, /import \{ StoryViewer, type StoryGroup \} from '@\/components\/stories\/StoryViewer'/)
+  assert.match(page, /listActivePublicStories\(\),/)
+  assert.match(page, /byArtist\.set\(story\.artistId, \[\.\.\.\(byArtist\.get\(story\.artistId\) \?\? \[\]\), story\]\)/)
+  assert.match(page, /<StoryRail/)
+  assert.match(page, /<StoryViewer/)
+
+  // A broad (no artistId filter) list query needs its own composite index — confirmed live
+  // this exact query hit FAILED_PRECONDITION (missing index) before adding it, distinct from
+  // and not to be confused with the earlier session's PERMISSION_DENIED list-query bug.
+  const indexes = JSON.parse(read('firestore.indexes.json'))
+  const hasBroadStoriesIndex = indexes.indexes.some(
+    (idx) =>
+      idx.collectionGroup === 'stories' &&
+      idx.fields.length === 2 &&
+      idx.fields[0].fieldPath === 'visibility' &&
+      idx.fields[1].fieldPath === 'expiresAt',
+  )
+  assert.ok(hasBroadStoriesIndex, 'firestore.indexes.json should have a stories index on [visibility, expiresAt] with no artistId prefix')
+})
