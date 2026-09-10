@@ -48,22 +48,32 @@ export const createLicencePaymentSession = onCall({ secrets: [stripeSecretKey] }
   })
 
   const stripe = getStripe()
-  const session = await stripe.checkout.sessions.create({
-    mode: 'payment',
-    line_items: [
-      {
-        price_data: {
-          currency: agreement.currency ?? 'gbp',
-          unit_amount: agreement.licenceFeeMinor,
-          product_data: { name: `DJ licence: ${trackTitle}` },
+  let session
+  try {
+    session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      line_items: [
+        {
+          price_data: {
+            currency: agreement.currency ?? 'gbp',
+            unit_amount: Math.round(agreement.licenceFeeMinor),
+            product_data: { name: `DJ licence: ${trackTitle}` },
+          },
+          quantity: 1,
         },
-        quantity: 1,
-      },
-    ],
-    success_url: successUrl,
-    cancel_url: cancelUrl,
-    metadata: { agreementId, kind: 'licence_payment' },
-  })
+      ],
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata: { agreementId, kind: 'licence_payment' },
+    })
+  } catch (error) {
+    // A raw Stripe SDK error (bad currency, non-integer amount, API outage) was previously
+    // left uncaught — firebase-functions wraps that as an opaque 500 with no detail on either
+    // side, and the platform-fee fields above had already been written even though the
+    // session never got created. Surface a clear, retryable error instead.
+    console.error('[createLicencePaymentSession] Stripe session creation failed:', error)
+    throw new HttpsError('internal', 'Could not start payment. Please try again in a moment.')
+  }
 
   return { url: session.url }
 })

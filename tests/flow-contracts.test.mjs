@@ -2163,3 +2163,20 @@ test('a public Story has an actual discovery surface instead of being visible no
   )
   assert.ok(hasBroadStoriesIndex, 'firestore.indexes.json should have a stories index on [visibility, expiresAt] with no artistId prefix')
 })
+
+test('createLicencePaymentSession surfaces a real error instead of an opaque 500 when Stripe rejects the session (user-reported console error: "createLicencePaymentSession:1 Failed to load resource: the server responded with a status of 500")', () => {
+  // Every explicit application-level error path in this function already used HttpsError
+  // codes that map to 400/403/404, not 500 — traced resolveLicencePartyRole, the
+  // failed-precondition checks, and getPlatformSettings, none of which could produce a raw
+  // 500. That leaves an uncaught exception as the only remaining explanation, and the one
+  // call actually capable of throwing something other than HttpsError is the Stripe SDK
+  // call itself (bad currency, a non-integer amount, an API-side failure) — previously
+  // uncaught, which firebase-functions wraps as an opaque INTERNAL/500 with no detail on
+  // either side.
+  const fn = read('functions/src/stripe/licencePayment.ts')
+  assert.match(fn, /let session\s*\n\s*try \{\s*\n\s*session = await stripe\.checkout\.sessions\.create\(/)
+  assert.match(fn, /unit_amount: Math\.round\(agreement\.licenceFeeMinor\)/)
+  assert.match(fn, /\} catch \(error\) \{/)
+  assert.match(fn, /console\.error\('\[createLicencePaymentSession\] Stripe session creation failed:', error\)/)
+  assert.match(fn, /throw new HttpsError\('internal', 'Could not start payment\. Please try again in a moment\.'\)/)
+})
