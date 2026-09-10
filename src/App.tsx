@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Routes, Route, useParams } from 'react-router-dom'
-import { AuthProvider } from '@/contexts/AuthContext'
+import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { PlayerProvider } from '@/contexts/PlayerContext'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { ProtectedRoute, RequireOnboarding } from '@/components/auth/ProtectedRoute'
@@ -9,6 +9,7 @@ import { InstallBanner } from '@/components/pwa/InstallBanner'
 import { PwaLaunchScreen } from '@/components/pwa/PwaLaunchScreen'
 import { LoadingState } from '@/components/common/StateViews'
 import { isStandaloneDisplayMode } from '@/lib/installPrompt'
+import { workspaceHomeForRoles } from '@/lib/workspaceRoute'
 
 // Every page is route-level code-split: each becomes its own chunk, fetched
 // only when actually navigated to, instead of one ~1.2MB bundle everyone
@@ -17,7 +18,15 @@ import { isStandaloneDisplayMode } from '@/lib/installPrompt'
 const LandingPage = lazy(() => import('@/pages/marketing/LandingPage').then((m) => ({ default: m.LandingPage })))
 
 function PublicHomeRoute() {
-  return isStandaloneDisplayMode() ? <Navigate to="/app/home" replace /> : <LandingPage />
+  return isStandaloneDisplayMode() ? <Navigate to="/launch" replace /> : <LandingPage />
+}
+
+function PwaEntryRoute() {
+  const { firebaseUser, profile, initializing } = useAuth()
+  if (initializing) return <LoadingState label="Opening your workspace…" />
+  if (!firebaseUser) return <Navigate to="/sign-in" replace state={{ from: { pathname: '/launch', search: '' } }} />
+  if (!profile?.onboardingComplete) return <Navigate to="/onboarding" replace />
+  return <Navigate to={workspaceHomeForRoles(profile.roles)} replace />
 }
 
 function LegacyRequestRedirect() {
@@ -106,6 +115,7 @@ function App() {
             <Suspense fallback={<LoadingState label="Loading…" />}>
             <Routes>
             <Route path="/" element={<PublicHomeRoute />} />
+            <Route path="/launch" element={<PwaEntryRoute />} />
             <Route path="/pricing" element={<PricingPage />} />
             <Route path="/for-djs" element={<ForDjsPage />} />
             <Route path="/for-artists" element={<ForArtistsPage />} />
@@ -194,7 +204,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <RequireOnboarding>
-                    <FanDashboardLayout />
+                    <RoleRoute role="fan">
+                      <FanDashboardLayout />
+                    </RoleRoute>
                   </RequireOnboarding>
                 </ProtectedRoute>
               }

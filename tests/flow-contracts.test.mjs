@@ -80,11 +80,23 @@ test('installed PWA launches into the app with a branded iOS startup screen', ()
   const config = read('vite.config.ts')
   const html = read('index.html')
   const splash = read('src/components/pwa/PwaLaunchScreen.tsx')
-  assert.match(config, /start_url: '\/app\/home'/)
-  assert.match(app, /isStandaloneDisplayMode\(\) \? <Navigate to="\/app\/home" replace \/>/)
+  assert.match(config, /start_url: '\/launch'/)
+  assert.match(app, /isStandaloneDisplayMode\(\) \? <Navigate to="\/launch" replace \/>/)
+  assert.match(app, /workspaceHomeForRoles\(profile\.roles\)/)
   assert.match(html, /rel="apple-touch-startup-image"/)
   assert.match(splash, /pwa-launch-bg\.png/)
   assert.match(splash, /<BrandMark \/>/)
+})
+
+test('role-only accounts cannot enter another workspace or inherit its navigation', () => {
+  const app = read('src/App.tsx')
+  const roleRoute = read('src/components/auth/RoleRoute.tsx')
+  const workspaceRoute = read('src/lib/workspaceRoute.ts')
+  const signIn = read('src/pages/auth/SignInPage.tsx')
+  assert.match(app, /<RoleRoute role="fan">[\s\S]*?<FanDashboardLayout \/>[\s\S]*?<\/RoleRoute>/)
+  assert.match(roleRoute, /workspaceHomeForRoles\(profile\?\.roles \?\? \[\]\)/)
+  assert.match(workspaceRoute, /roles\.includes\('admin'\)[\s\S]*?return '\/admin\/users'/)
+  assert.match(signIn, /return workspaceHomeForRoles\(profile\.roles\)/)
 })
 
 test('installed app shell respects iPhone safe areas and cannot exceed the viewport', () => {
@@ -1114,4 +1126,15 @@ test('a signed-in user can report another account (e.g. a DJ), and an admin revi
   assert.match(admin, /report\.targetType === 'artist' \|\| report\.targetType === 'track' \|\| report\.targetType === 'user'/)
   // No generic public page exists for a plain account, so a 'user' subject renders as text, not a dead/wrong link.
   assert.match(admin, /Account: \{subjects\[report\.reportId\]!\.label\}/)
+})
+
+test('public mobile pages respect the device safe area and cannot widen the viewport', () => {
+  const css = read('src/index.css')
+  const artistProfile = read('src/pages/artist/ArtistPublicProfilePage.tsx')
+  const landing = read('src/pages/marketing/LandingPage.tsx')
+
+  assert.match(css, /html,\s*body,\s*#root \{[\s\S]*max-width: 100%;[\s\S]*overflow-x: hidden;/)
+  assert.match(artistProfile, /env\(safe-area-inset-top\)/)
+  assert.match(artistProfile, /flex min-w-0 flex-wrap gap-2/)
+  assert.match(landing, /env\(safe-area-inset-top\)/)
 })

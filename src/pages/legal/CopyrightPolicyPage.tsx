@@ -40,7 +40,7 @@ const sections: [string, string][] = [
 export function CopyrightPolicyPage() {
   return (
     <div className="min-h-svh bg-surface-0 text-ink-0">
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-6 sm:px-8">
+      <header className="mx-auto flex max-w-5xl items-center justify-between px-5 pb-6 pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-8">
         <Link to="/">
           <BrandMark />
         </Link>

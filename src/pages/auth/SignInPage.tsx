@@ -7,6 +7,7 @@ import { signInWithEmail, signOut } from '@/services/authService'
 import { friendlyAuthError } from '@/utils/authErrors'
 import { ensureUserDocument, getUserProfile } from '@/services/userService'
 import { isSafeReturnPath } from '@/utils/returnTo'
+import { workspaceHomeForRoles } from '@/lib/workspaceRoute'
 import type { User } from 'firebase/auth'
 
 const SUSPENDED_MESSAGE = 'This account has been suspended. Contact support if you believe this is a mistake.'
@@ -22,10 +23,7 @@ async function dashboardAfterSignIn(user: User): Promise<string> {
     throw new SuspendedAccountError(SUSPENDED_MESSAGE)
   }
   if (!profile?.onboardingComplete) return '/onboarding'
-  if (profile.roles.includes('admin')) return '/admin/users'
-  if (profile.roles.includes('artist')) return '/dashboard/artist'
-  if (profile.roles.includes('dj')) return '/dj/discover'
-  return '/app/home'
+  return workspaceHomeForRoles(profile.roles)
 }
 
 export function SignInPage() {

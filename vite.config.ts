@@ -30,7 +30,7 @@ export default defineConfig({
         short_name: 'BackTheVibes',
         description: 'Support the artists you actually listen to.',
         id: '/',
-        start_url: '/app/home',
+        start_url: '/launch',
         scope: '/',
         display: 'standalone',
         background_color: '#050607',

@@ -30,7 +30,7 @@ export function BlogIndexPage() {
 
   return (
     <div className="min-h-svh bg-surface-0 text-ink-0">
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-6 sm:px-8">
+      <header className="mx-auto flex max-w-5xl items-center justify-between px-5 pb-6 pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-8">
         <Link to="/"><BrandMark /></Link>
         <Link to="/" className="flex items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0"><ArrowLeft className="h-4 w-4" /> Back home</Link>
       </header>

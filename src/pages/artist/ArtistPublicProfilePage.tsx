@@ -174,7 +174,7 @@ export function ArtistPublicProfilePage() {
 
   return (
     <div className="min-h-svh overflow-hidden bg-surface-0 pb-24 text-ink-0">
-      <header className="relative z-30 mx-auto flex h-20 max-w-[1440px] items-center justify-between px-5 sm:px-8 lg:px-12">
+      <header className="relative z-30 mx-auto flex min-h-20 max-w-[1440px] items-center justify-between px-5 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8 lg:px-12">
         <Link to="/" aria-label="BackTheVibes home"><BrandMark /></Link>
         <button
           type="button"
@@ -243,7 +243,7 @@ export function ArtistPublicProfilePage() {
               </div>
             ) : null}
           </div>
-          <div className="flex shrink-0 gap-2 self-stretch sm:self-auto">
+          <div className="flex min-w-0 flex-wrap gap-2 self-stretch sm:w-auto sm:shrink-0 sm:self-auto">
             <FollowButton artistId={artist.artistId} />
             {!firebaseUser || !hasRole('dj') || hasRole('fan') ? <SupportButton artistId={artist.artistId} /> : null}
             <ShareButton

@@ -143,7 +143,7 @@ export function TrackPage() {
   const previewUnavailable = !access.fullAccess && track.previewEnabled === false
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-10">
+    <div className="mx-auto flex max-w-3xl flex-col gap-8 overflow-x-hidden px-4 pb-10 pt-[max(2.5rem,env(safe-area-inset-top))]">
       <button onClick={() => navigate(-1)} className="flex w-fit items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0">
         <ArrowLeft className="h-4 w-4" /> Back
       </button>

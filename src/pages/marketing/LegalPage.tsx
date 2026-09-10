@@ -79,7 +79,7 @@ export function LegalPage({ type }: { type: 'terms' | 'privacy' }) {
 
   return (
     <div className="min-h-svh bg-surface-0 text-ink-0">
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-6 sm:px-8"><Link to="/"><BrandMark /></Link><Link to="/" className="flex items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0"><ArrowLeft className="h-4 w-4" /> Back home</Link></header>
+      <header className="mx-auto flex max-w-5xl items-center justify-between px-5 pb-6 pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-8"><Link to="/"><BrandMark /></Link><Link to="/" className="flex items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0"><ArrowLeft className="h-4 w-4" /> Back home</Link></header>
       <main className="mx-auto max-w-5xl px-5 pb-24 pt-16 sm:px-8 sm:pt-24">
         <p className="eyebrow">Legal</p>
         <h1 className="mt-4 text-5xl font-medium tracking-[-0.055em] sm:text-7xl">{isTerms ? 'Terms & conditions' : 'Privacy policy'}</h1>

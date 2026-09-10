@@ -35,7 +35,7 @@ export function BlogPostPage() {
   if (!post) {
     return (
       <div className="min-h-svh bg-surface-0 text-ink-0">
-        <header className="mx-auto flex max-w-3xl items-center justify-between px-5 py-6 sm:px-8"><Link to="/"><BrandMark /></Link></header>
+        <header className="mx-auto flex max-w-3xl items-center justify-between px-5 pb-6 pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-8"><Link to="/"><BrandMark /></Link></header>
         <main className="mx-auto max-w-3xl px-5 pb-24 pt-16 sm:px-8"><ErrorState title="Post not found" description="This blog post doesn't exist." /></main>
       </div>
     )
@@ -45,7 +45,7 @@ export function BlogPostPage() {
 
   return (
     <div className="min-h-svh bg-surface-0 text-ink-0">
-      <header className="mx-auto flex max-w-3xl items-center justify-between px-5 py-6 sm:px-8">
+      <header className="mx-auto flex max-w-3xl items-center justify-between px-5 pb-6 pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-8">
         <Link to="/"><BrandMark /></Link>
         <Link to="/blog" className="flex items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0"><ArrowLeft className="h-4 w-4" /> All posts</Link>
       </header>

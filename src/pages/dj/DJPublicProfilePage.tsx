@@ -28,8 +28,8 @@ export function DJPublicProfilePage() {
   if (profile === null) return <ErrorState title="DJ not found" description="This DJ profile doesn't exist." />
 
   return (
-    <div className="min-h-svh bg-surface-0 text-ink-0">
-      <header className="mx-auto flex max-w-3xl items-center justify-between px-5 py-6 sm:px-8">
+    <div className="min-h-svh overflow-x-hidden bg-surface-0 text-ink-0">
+      <header className="mx-auto flex max-w-3xl items-center justify-between px-5 pb-6 pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-8">
         <Link to="/" aria-label="BackTheVibes home"><BrandMark /></Link>
         <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0">
           <ArrowLeft className="h-4 w-4" /> Back
