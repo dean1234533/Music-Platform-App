@@ -13,10 +13,9 @@ export { stripeWebhook } from './stripe/webhook.js'
 export { updateSupportAllocations } from './support/allocations.js'
 export { onSupportRelationshipCreate, onSupportRelationshipDelete } from './support/triggers.js'
 
-// Phase 3 — DJ discovery, licence requests, messaging.
+// Phase 3 — DJ discovery, licence requests, negotiation (structured offers/counter-offers — no general chat).
 export { submitLicenceRequest, respondToLicenceRequest, acceptExistingDeal, dismissLicenceRequest } from './licensing/requests.js'
 export { sendOffer, counterOffer, acceptOffer, rejectOffer, withdrawOffer } from './licensing/offers.js'
-export { sendMessage } from './messaging/messages.js'
 
 // Phase 4 — digital agreements, DJ licence payments, secure downloads.
 export { proposeAgreement, signAgreement, voidAgreement, getSignatureImageUrls } from './licensing/agreements.js'

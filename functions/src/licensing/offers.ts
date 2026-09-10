@@ -3,7 +3,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 import type { DocumentData } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
 import { requireActiveUser } from '../roles.js'
-import { writeSystemMessage } from '../messaging/messages.js'
+import { enforceRateLimit } from '../rateLimit.js'
 import { writeAgreementVersion, type AgreementTerms } from './agreements.js'
 import { writeRequestEvent } from './events.js'
 import { resolveLicencePartyRole, type LicencePartyRole } from './party.js'
@@ -79,6 +79,7 @@ export const sendOffer = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
+  await enforceRateLimit(`sendOffer_${uid}`, 30, 60 * 60)
   const { requestId, actingRole: requestedRole, ...terms } = request.data ?? {}
   validateTerms(terms)
 
@@ -101,9 +102,6 @@ export const sendOffer = onCall(async (request) => {
   await enforceTrackDealSettings(licenceRequest.trackId, terms.priceMinor, true, licenceRequest.status)
 
   const offerRef = db.collection('licenceOffers').doc()
-  const conversationRef = licenceRequest.conversationId
-    ? db.collection('conversations').doc(licenceRequest.conversationId)
-    : null
   const batch = db.batch()
 
   batch.set(offerRef, buildOfferDoc(offerRef.id, requestId, licenceRequest, uid, 'artist', terms, reissueVersion, null))
@@ -111,7 +109,6 @@ export const sendOffer = onCall(async (request) => {
   writeRequestEvent(batch, requestRef, {
     type: 'offer_sent', actorId: uid, actorRole: 'artist', summary: 'Artist sent revised terms.', offerId: offerRef.id,
   })
-  if (conversationRef) writeSystemMessage(batch, conversationRef, uid, 'offer_card', 'Artist sent an offer.', { offerId: offerRef.id })
   batch.set(db.collection('notifications').doc(), {
     userId: licenceRequest.djId,
     type: 'offer_sent',
@@ -131,6 +128,7 @@ export const counterOffer = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   await requireActiveUser(request.auth.uid)
   const uid = request.auth.uid
+  await enforceRateLimit(`counterOffer_${uid}`, 30, 60 * 60)
   const { requestId, actingRole: requestedRole, ...terms } = request.data ?? {}
   validateTerms(terms)
 
@@ -151,9 +149,6 @@ export const counterOffer = onCall(async (request) => {
   await enforceTrackDealSettings(licenceRequest.trackId, terms.priceMinor, false, licenceRequest.status)
 
   const offerRef = db.collection('licenceOffers').doc()
-  const conversationRef = licenceRequest.conversationId
-    ? db.collection('conversations').doc(licenceRequest.conversationId)
-    : null
   const batch = db.batch()
 
   batch.update(previousRef, { status: 'countered', supersededByOfferId: offerRef.id })
@@ -166,11 +161,6 @@ export const counterOffer = onCall(async (request) => {
     type: 'counter_offer', actorId: uid, actorRole: actingRole,
     summary: `${actingRole === 'artist' ? 'Artist' : 'DJ'} sent a counter-offer.`, offerId: offerRef.id,
   })
-  if (conversationRef) {
-    writeSystemMessage(batch, conversationRef, uid, 'offer_card', `${actingRole === 'artist' ? 'Artist' : 'DJ'} sent a counter-offer.`, {
-      offerId: offerRef.id,
-    })
-  }
   const notifyId = actingRole === 'artist' ? licenceRequest.djId : licenceRequest.artistId
   const notifyLink = actingRole === 'artist' ? '/dj/requests' : '/dashboard/artist/dj-requests'
   batch.set(db.collection('notifications').doc(), {
@@ -237,9 +227,6 @@ export const acceptOffer = onCall(async (request) => {
     rightsHolderDeclaration: true,
   }
 
-  const conversationRef = licenceRequest.conversationId
-    ? db.collection('conversations').doc(licenceRequest.conversationId)
-    : null
   const batch = db.batch()
   batch.update(offerRef, { status: 'accepted' })
   const { agreementRef } = await writeAgreementVersion(batch, requestRef, licenceRequest, terms, { acceptedOfferId: offerRef.id })
@@ -248,13 +235,6 @@ export const acceptOffer = onCall(async (request) => {
     summary: `${actingRole === 'artist' ? 'Artist' : 'DJ'} accepted offer v${offer.version}. Contract generated.`,
     offerId: offerRef.id, agreementId: agreementRef.id,
   })
-
-  if (conversationRef) {
-    writeSystemMessage(batch, conversationRef, uid, 'offer_card', 'Offer accepted.', { offerId: offerRef.id })
-    writeSystemMessage(batch, conversationRef, uid, 'contract_status', 'Contract generated — both parties can now sign.', {
-      agreementId: agreementRef.id,
-    })
-  }
   const notifyId = actingRole === 'artist' ? licenceRequest.djId : licenceRequest.artistId
   batch.set(db.collection('notifications').doc(), {
     userId: notifyId,
@@ -324,9 +304,6 @@ export const withdrawOffer = onCall(async (request) => {
   if (offer.status !== 'pending') throw new HttpsError('failed-precondition', 'This offer is no longer pending.')
   if (offer.createdByRole !== actingRole) throw new HttpsError('permission-denied', 'You can only withdraw your own offer.')
 
-  const conversationRef = licenceRequest.conversationId
-    ? db.collection('conversations').doc(licenceRequest.conversationId)
-    : null
   const batch = db.batch()
   batch.update(offerRef, { status: 'withdrawn' })
   batch.update(requestRef, { status: 'negotiating', currentOfferId: FieldValue.delete(), updatedAt: FieldValue.serverTimestamp() })
@@ -334,7 +311,6 @@ export const withdrawOffer = onCall(async (request) => {
     type: 'offer_withdrawn', actorId: uid, actorRole: actingRole,
     summary: `${actingRole === 'artist' ? 'Artist' : 'DJ'} withdrew the offer.`, offerId: offerRef.id,
   })
-  if (conversationRef) writeSystemMessage(batch, conversationRef, uid, 'system', 'The offer was withdrawn.', { offerId: offerRef.id })
 
   await batch.commit()
   return { ok: true }

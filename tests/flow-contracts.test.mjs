@@ -193,7 +193,6 @@ test('notifications use Firestore IDs and navigate their deep links', () => {
   assert.match(topBar, /\/admin\/notifications/)
   assert.match(nav, /label: 'Notifications', to: '\/admin\/notifications'/)
   assert.match(push, /if \(!token\) throw new Error/)
-  assert.doesNotMatch(read('functions/src/messaging/messages.ts'), /\/messages\/\$\{conversationId\}/)
 })
 
 test('DJ licensing has no chat page and ends in a signed downloadable contract', () => {
@@ -212,9 +211,15 @@ test('DJ licensing has no chat page and ends in a signed downloadable contract',
   assert.match(contract, /downloadLicensedTrack/)
 })
 
-test('account deletion cancels billing and removes supporter state', () => {
+test('account deletion cancels BOTH the fan and artist Stripe subscriptions (user-reported gap: an artist who deleted their account kept being billed for Artist Membership with no account left)', () => {
   const source = read('functions/src/account/deleteAccount.ts')
   assert.match(source, /subscriptions\.cancel/)
+  // A deleted artist has an entirely separate recurring subscription from any fan
+  // membership — both doc ids must be cancelled and cleaned up, not just one.
+  assert.match(source, /db\.collection\('subscriptions'\)\.doc\(`\$\{uid\}_fan`\)/)
+  assert.match(source, /db\.collection\('subscriptions'\)\.doc\(`\$\{uid\}_artist`\)/)
+  assert.match(source, /fanSubscriptionRef\.delete\(\)/)
+  assert.match(source, /artistSubscriptionRef\.delete\(\)/)
   for (const collection of ['subscriptions', 'supportAllocations', 'supportRelationships', 'fanOffers', 'fanOfferClaims', 'artistPosts']) {
     assert.match(source, new RegExp(collection))
   }
@@ -1291,4 +1296,49 @@ test('fan -> artist and fan -> DJ self-service upgrades work through trusted bac
   const settings = read('src/pages/fan/SettingsPage.tsx')
   assert.match(settings, /\+ Add an artist profile/)
   assert.match(settings, /\+ Add a DJ profile/)
+})
+
+test('restricted-tier Story media never persists a permanent, Storage-rules-bypassing download URL on the document (a currently-entitled viewer reading the raw doc must not keep working access forever after losing entitlement)', () => {
+  const stories = read('functions/src/stories/stories.ts')
+  assert.match(stories, /mediaUrl: visibility === 'public' && typeof mediaUrl === 'string' \? mediaUrl : null/)
+  // getStoryMediaUrl remains the only way to actually fetch restricted-tier media — a
+  // fresh, short-lived signed URL, re-checked against canViewStory on every single call.
+  assert.match(stories, /async function canViewStory\(uid: string \| null, story: FirebaseFirestore\.DocumentData\): Promise<boolean> \{/)
+  assert.match(stories, /export const getStoryMediaUrl = onCall/)
+  assert.match(stories, /if \(!\(await canViewStory\(request\.auth\?\.uid \?\? null, story\)\)\) \{/)
+  // The client only ever renders story.mediaUrl directly for public stories — every other
+  // tier always resolves through the signed-URL callable.
+  const viewer = read('src/components/stories/StoryViewer.tsx')
+  assert.match(viewer, /story\.visibility === 'public' \? story\.mediaUrl : \(mediaUrls\[story\.storyId\] \?\? null\)/)
+})
+
+test('the DJ<->artist licensing flow has no general-purpose chat anywhere in the stack — negotiation is exclusively structured offers/counter-offers and a server-owned event log', () => {
+  // The old conversations/messages system (sendMessage callable, writeSystemMessage helper,
+  // and every conversationId lookup that fed it) is fully removed, not just hidden — it was
+  // provably dead (no request ever sets conversationId, no UI ever read messages/sendMessage).
+  assert.doesNotMatch(read('functions/src/index.ts'), /sendMessage/)
+  for (const file of ['functions/src/licensing/offers.ts', 'functions/src/licensing/agreements.ts', 'functions/src/stripe/webhook.ts']) {
+    const src = read(file)
+    assert.doesNotMatch(src, /conversationId/)
+    assert.doesNotMatch(src, /writeSystemMessage/)
+  }
+  const messagingService = read('src/services/messagingService.ts')
+  assert.doesNotMatch(messagingService, /sendMessage/)
+  assert.doesNotMatch(messagingService, /subscribeConversation|subscribeMessages/)
+  assert.match(messagingService, /sendBulkDjOutreach/)
+})
+
+test('abuse-prone user-facing callables that write amplifying/broadcast data are all rate-limited: reports, Stories, DJ negotiation offers, and bulk DJ outreach', () => {
+  const cases = [
+    ['functions/src/admin/reports.ts', /await enforceRateLimit\(`submitReport_\$\{request\.auth\.uid\}`, 10, 60 \* 60\)/],
+    ['functions/src/stories/stories.ts', /await enforceRateLimit\(`createStory_\$\{artistId\}`, 30, 60 \* 60\)/],
+    ['functions/src/licensing/offers.ts', /await enforceRateLimit\(`sendOffer_\$\{uid\}`, 30, 60 \* 60\)/],
+    ['functions/src/licensing/offers.ts', /await enforceRateLimit\(`counterOffer_\$\{uid\}`, 30, 60 \* 60\)/],
+    // A "blast every opted-in DJ" broadcast needs a much tighter, day-scale
+    // limit — DJ opt-in consent is meaningless if an artist can spam it hourly.
+    ['functions/src/messaging/bulkOutreach.ts', /await enforceRateLimit\(`sendBulkDjOutreach_\$\{artistId\}`, 3, 24 \* 60 \* 60\)/],
+  ]
+  for (const [file, pattern] of cases) {
+    assert.match(read(file), pattern)
+  }
 })

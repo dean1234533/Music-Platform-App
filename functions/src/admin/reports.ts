@@ -2,6 +2,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
 import { requireActiveUser } from '../roles.js'
+import { enforceRateLimit } from '../rateLimit.js'
 import { requireAdmin, writeAuditLog } from './guard.js'
 
 const TARGET_TYPES = ['track', 'artist', 'dj', 'user', 'message', 'post', 'agreement'] as const
@@ -17,6 +18,7 @@ const TARGET_TYPES = ['track', 'artist', 'dj', 'user', 'message', 'post', 'agree
 export const submitReport = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   await requireActiveUser(request.auth.uid)
+  await enforceRateLimit(`submitReport_${request.auth.uid}`, 10, 60 * 60)
   const { targetType, targetId, reason, description } = request.data ?? {}
   if (!TARGET_TYPES.includes(targetType) || !targetId || !reason) {
     throw new HttpsError('invalid-argument', 'targetType, targetId, and reason are required.')

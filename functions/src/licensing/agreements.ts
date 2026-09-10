@@ -5,7 +5,6 @@ import { getStorage } from 'firebase-admin/storage'
 import type { WriteBatch, DocumentReference, DocumentData } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
 import { requireActiveUser } from '../roles.js'
-import { writeSystemMessage } from '../messaging/messages.js'
 import { writeRequestEvent } from './events.js'
 import { resolveLicencePartyRole } from './party.js'
 
@@ -194,9 +193,6 @@ export const signAgreement = onCall(async (request) => {
   if (!isArtist && agreement.djAcceptedAt) throw new HttpsError('failed-precondition', 'The DJ has already signed.')
 
   const requestRef = db.collection('licenceRequests').doc(agreement.licenceRequestId)
-  const requestSnap = await requestRef.get()
-  const conversationId = requestSnap.data()?.conversationId as string | undefined
-  const conversationRef = conversationId ? db.collection('conversations').doc(conversationId) : null
 
   const now = FieldValue.serverTimestamp()
   const acceptanceLogRef = db.collection('licenceAgreementAcceptances').doc(`${agreementId}_${actingRole}_${uid}`)
@@ -246,12 +242,6 @@ export const signAgreement = onCall(async (request) => {
     summary: `${isArtist ? 'Artist' : 'DJ'} signed the agreement.`,
     agreementId,
   })
-
-  if (conversationRef) {
-    writeSystemMessage(batch, conversationRef, uid, 'contract_status', `${isArtist ? 'Artist' : 'DJ'} signed the agreement.`, {
-      agreementId,
-    })
-  }
 
   if (bothWillBeAccepted) {
     const requiresPayment = (agreement.licenceFeeMinor ?? 0) > 0
@@ -303,16 +293,6 @@ export const signAgreement = onCall(async (request) => {
         createdAt: now,
       })
     }
-    if (conversationRef) {
-      writeSystemMessage(
-        batch,
-        conversationRef,
-        uid,
-        'contract_status',
-        requiresPayment ? 'Contract fully signed — payment required.' : 'Contract fully signed — track access unlocked.',
-        { agreementId },
-      )
-    }
   } else {
     const notifyId = isArtist ? agreement.djId : agreement.artistId
     batch.set(db.collection('notifications').doc(), {
@@ -360,9 +340,6 @@ export const voidAgreement = onCall(async (request) => {
   }
 
   const requestRef = db.collection('licenceRequests').doc(agreement.licenceRequestId)
-  const requestSnap = await requestRef.get()
-  const conversationId = requestSnap.data()?.conversationId as string | undefined
-  const conversationRef = conversationId ? db.collection('conversations').doc(conversationId) : null
 
   const now = FieldValue.serverTimestamp()
   const batch = db.batch()
@@ -389,17 +366,6 @@ export const voidAgreement = onCall(async (request) => {
     read: false,
     createdAt: now,
   })
-  if (conversationRef) {
-    writeSystemMessage(
-      batch,
-      conversationRef,
-      uid,
-      'contract_status',
-      `${isArtist ? 'Artist' : 'DJ'} voided the agreement${typeof reason === 'string' && reason ? `: ${reason.slice(0, 200)}` : '.'}`,
-      { agreementId },
-    )
-  }
-
   await batch.commit()
   return { ok: true }
 })

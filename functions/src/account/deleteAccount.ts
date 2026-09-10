@@ -109,14 +109,22 @@ async function performAccountDeletion(uid: string): Promise<void> {
     const userSnap = await db.collection('users').doc(uid).get()
     const roles = (userSnap.data()?.roles ?? []) as string[]
 
-    const subscriptionRef = db.collection('subscriptions').doc(`${uid}_fan`)
-    const subscriptionSnap = await subscriptionRef.get()
-    const stripeSubscriptionId = subscriptionSnap.data()?.stripeSubscriptionId as string | undefined
-    if (stripeSubscriptionId) {
-      try {
-        await getStripe().subscriptions.cancel(stripeSubscriptionId)
-      } catch (error) {
-        if ((error as { code?: string }).code !== 'resource_missing') throw error
+    // Cancel both the fan support membership AND the Artist Membership —
+    // an artist account has an entirely separate recurring subscription
+    // (subscriptions/{uid}_artist) from any fan membership it might also
+    // hold, and leaving it running would keep billing Stripe with no
+    // account left to show for it.
+    const fanSubscriptionRef = db.collection('subscriptions').doc(`${uid}_fan`)
+    const artistSubscriptionRef = db.collection('subscriptions').doc(`${uid}_artist`)
+    for (const subRef of [fanSubscriptionRef, artistSubscriptionRef]) {
+      const subSnap = await subRef.get()
+      const stripeSubscriptionId = subSnap.data()?.stripeSubscriptionId as string | undefined
+      if (stripeSubscriptionId) {
+        try {
+          await getStripe().subscriptions.cancel(stripeSubscriptionId)
+        } catch (error) {
+          if ((error as { code?: string }).code !== 'resource_missing') throw error
+        }
       }
     }
 
@@ -145,7 +153,8 @@ async function performAccountDeletion(uid: string): Promise<void> {
     await deleteQueryBatched(db.collection('supportRelationships').where('artistId', '==', uid))
     await deleteQueryBatched(db.collection('notifications').where('userId', '==', uid))
     await db.collection('supportAllocations').doc(uid).delete()
-    await subscriptionRef.delete()
+    await fanSubscriptionRef.delete()
+    await artistSubscriptionRef.delete()
 
     await db.collection('users').doc(uid).delete()
 

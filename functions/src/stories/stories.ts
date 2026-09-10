@@ -3,6 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore'
 import { getStorage } from 'firebase-admin/storage'
 import { db } from '../admin.js'
 import { requireActiveUser, userHasRole } from '../roles.js'
+import { enforceRateLimit } from '../rateLimit.js'
 
 // Mirrors src/constants/mediaConfig.ts's STORY_* constants — rules/Functions
 // can't import client TS, so these are hand-kept-in-sync (same convention
@@ -48,6 +49,7 @@ export const createStory = onCall(async (request) => {
   if (!(await userHasRole(artistId, 'artist'))) {
     throw new HttpsError('permission-denied', 'Only artists can post Stories.')
   }
+  await enforceRateLimit(`createStory_${artistId}`, 30, 60 * 60)
 
   const {
     mediaKind,
@@ -108,7 +110,13 @@ export const createStory = onCall(async (request) => {
     artistId,
     mediaKind,
     storyCategory,
-    mediaUrl: mediaUrl ?? null,
+    // A getDownloadURL() token is permanent and bypasses Storage rules
+    // entirely once issued (see getStoryMediaUrl's doc comment below) — only
+    // ever persist it for public stories, where that's already the intended
+    // access level. Restricted tiers keep only mediaStoragePath, so the only
+    // way to ever obtain a working URL is the audience-checked
+    // getStoryMediaUrl callable, re-verified on every call rather than once.
+    mediaUrl: visibility === 'public' && typeof mediaUrl === 'string' ? mediaUrl : null,
     mediaStoragePath: typeof mediaStoragePath === 'string' ? mediaStoragePath : null,
     caption: typeof caption === 'string' ? caption.slice(0, 500) : '',
     visibility,

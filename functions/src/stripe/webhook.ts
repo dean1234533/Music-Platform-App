@@ -6,7 +6,6 @@ import { db } from '../admin.js'
 import { getPlatformSettings } from '../platformSettings.js'
 import { getStripe, stripeSecretKey, stripeWebhookSecret } from './client.js'
 import { mapSubscriptionStatus } from '../entitlements.js'
-import { writeSystemMessage } from '../messaging/messages.js'
 import { writeRequestEvent } from '../licensing/events.js'
 
 const SUPPORTED_SUBSCRIPTION_ROLES = new Set(['fan', 'artist'])
@@ -317,9 +316,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     const agreement = snap.data()!
 
     const requestRef = db.collection('licenceRequests').doc(agreement.licenceRequestId)
-    const requestSnap = await tx.get(requestRef)
-    const conversationId = requestSnap.data()?.conversationId as string | undefined
-    const conversationRef = conversationId ? db.collection('conversations').doc(conversationId) : null
 
     const grossMinor = settlement.netRevenueMinor
     const txId = `licence_${agreementId}`
@@ -345,11 +341,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       summary: 'Payment completed. The licence is active and the track is ready to download.',
       agreementId,
     })
-    if (conversationRef) {
-      writeSystemMessage(tx, conversationRef, agreement.djId, 'payment_status', 'Payment completed — track access unlocked.', {
-        agreementId,
-      })
-    }
     tx.set(db.collection('transactions').doc(txId), {
       transactionId: txId,
       type: 'dj_licence_income',
