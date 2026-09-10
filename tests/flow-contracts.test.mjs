@@ -2376,3 +2376,19 @@ test('pressing back on a self-previewed profile returns to the settings page it 
     /const goBack = useSmartBack\(searchParams\.get\('preview'\) === '1' \? '\/dashboard\/artist\/settings' : '\/'\)/,
   )
 })
+
+test('the account email has its own labeled field instead of sitting unlabeled next to the avatar/role-badges/photo-upload control (user-reported: "in settings the email address has been randomly put anywhere")', () => {
+  const page = read('src/pages/fan/ProfilePage.tsx')
+  // No longer crammed into the avatar column with no label, stacked directly above the role
+  // pills and the "Change photo" button.
+  assert.doesNotMatch(page, /<p className="text-sm font-medium text-ink-0">\{firebaseUser\?\.email\}<\/p>/)
+  // A real labeled field, paired with Display name in the same grid row, styled to match the
+  // real <Input> component's own field classes exactly (rounded-xl border border-white\/10
+  // bg-white\/\[0.035\] px-4 py-3) so it doesn't look visually out of place next to a real input.
+  assert.match(page, /<Label>Email<\/Label>/)
+  assert.match(
+    page,
+    /<p className="w-full truncate rounded-xl border border-white\/10 bg-white\/\[0\.035\] px-4 py-3 text-base text-ink-2 sm:text-sm">\s*\n\s*\{firebaseUser\?\.email\}/,
+  )
+  assert.match(page, /<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">\s*\n\s*<div>\s*\n\s*<Label htmlFor="displayName">Display name<\/Label>/)
+})

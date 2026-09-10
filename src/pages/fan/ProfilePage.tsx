@@ -64,7 +64,7 @@ export function ProfilePage() {
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-surface-3 text-xl font-semibold text-ink-1">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-3 text-xl font-semibold text-ink-1">
           {profile?.photoURL ? (
             <img src={profile.photoURL} alt="" className="h-full w-full object-cover" />
           ) : (
@@ -72,8 +72,7 @@ export function ProfilePage() {
           )}
         </div>
         <div>
-          <p className="text-sm font-medium text-ink-0">{firebaseUser?.email}</p>
-          <div className="mt-1 flex gap-1.5">
+          <div className="flex gap-1.5">
             {(profile?.roles ?? []).map((role) => (
               <span key={role} className="rounded-full bg-surface-3 px-2 py-0.5 text-xs text-ink-1">
                 {ROLE_LABELS[role] ?? role}
@@ -88,9 +87,17 @@ export function ProfilePage() {
         </div>
       </div>
 
-      <div>
-        <Label htmlFor="displayName">Display name</Label>
-        <Input id="displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <Label htmlFor="displayName">Display name</Label>
+          <Input id="displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+        </div>
+        <div>
+          <Label>Email</Label>
+          <p className="w-full truncate rounded-xl border border-white/10 bg-white/[0.035] px-4 py-3 text-base text-ink-2 sm:text-sm">
+            {firebaseUser?.email}
+          </p>
+        </div>
       </div>
 
       {saved ? <p className="text-sm text-support-400">Saved.</p> : null}
