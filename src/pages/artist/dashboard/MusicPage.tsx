@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Handshake, Megaphone, Plus, Radio, Settings2, Trash2 } from 'lucide-react'
+import { Handshake, Megaphone, Pause, Play, Plus, Radio, Settings2, Trash2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeArtistTracks } from '@/services/artistService'
 import { subscribeArtistCopyrightClaims } from '@/services/moderationService'
+import { usePlayer } from '@/contexts/PlayerContext'
 import { Button } from '@/components/common/Button'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import { BulkDjOutreachModal } from '@/components/track/BulkDjOutreachModal'
@@ -28,6 +29,11 @@ const VISIBILITY_LABEL: Record<TrackDoc['visibility'], string> = {
 export function MusicPage() {
   const { firebaseUser } = useAuth()
   const { notify } = useToast()
+  // Full playback here is authorised the exact same way as anywhere else in
+  // the app: getTrackPlaybackUrl grants the owner (uid === track.artistId)
+  // the real streaming derivative — this button just gives artists a way to
+  // actually reach that, previously missing from their own track list.
+  const { playTrack, togglePlay, currentTrack, isPlaying } = usePlayer()
   const [tracks, setTracks] = useState<TrackDoc[] | null>(null)
   const [claims, setClaims] = useState<CopyrightClaimDoc[]>([])
   const [outreachTrack, setOutreachTrack] = useState<TrackDoc | null>(null)
@@ -101,9 +107,21 @@ export function MusicPage() {
         <div className="flex flex-col divide-y divide-surface-border rounded-xl border border-surface-border">
           {tracks.map((track) => (
             <div key={track.trackId} className="flex items-center gap-3 px-4 py-3">
-              <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-surface-2">
-                {track.artworkURL ? <img src={track.artworkURL} alt="" className="h-full w-full object-cover" /> : null}
-              </div>
+              <button
+                type="button"
+                onClick={() => (currentTrack?.trackId === track.trackId ? togglePlay() : playTrack(track, tracks))}
+                className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-surface-2 text-ink-0 transition active:opacity-60"
+                aria-label={currentTrack?.trackId === track.trackId && isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
+              >
+                {track.artworkURL ? <img src={track.artworkURL} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
+                <span className="relative flex h-full w-full items-center justify-center bg-black/35">
+                  {currentTrack?.trackId === track.trackId && isPlaying ? (
+                    <Pause className="h-4 w-4 text-white" fill="currentColor" />
+                  ) : (
+                    <Play className="h-4 w-4 translate-x-0.5 text-white" fill="currentColor" />
+                  )}
+                </span>
+              </button>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-ink-0">{track.title}</p>
                 <p className="truncate text-xs text-ink-2">{track.genre}</p>

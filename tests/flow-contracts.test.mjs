@@ -1416,3 +1416,110 @@ test('the "message" report target is gone with the chat system that created it �
     assert.match(reports, new RegExp(`'${target}'`))
   }
 })
+
+test('BUG 1 — an artist can actually reach playback of their own uploaded track: server-side owner entitlement already existed, but nothing in the UI called it from the artist\'s own Music page (user-reported)', () => {
+  const tracksFn = read('functions/src/tracks.ts')
+  // 1/2. Owner bypass is per-DOCUMENT (uid === THIS track's artistId), not a role check — an
+  // artist can never reach this branch for a track whose artistId is someone else's uid, so
+  // one artist's own-track access can never extend to another artist's private/full track.
+  for (const fn of ['canPreviewTrack', 'canPlayDjPreview', 'canStreamFullTrack']) {
+    const start = tracksFn.indexOf(`async function ${fn}(`)
+    const end = tracksFn.indexOf('\n}', start)
+    const body = tracksFn.slice(start, end)
+    assert.match(body, /if \(uid === track\.artistId\) return true/, `${fn} must grant the owner full access`)
+  }
+  // Owner bypass is checked before the takenDown/restrictedCapabilities short-circuit only in
+  // the sense that it's unreachable if that already returned false — moderation holds still
+  // apply to the owner too, which is correct: a takedown pulls the track from everyone.
+  assert.match(tracksFn, /if \(track\.takenDown === true \|\| \(track\.restrictedCapabilities \?\? \[\]\)\.includes\('streaming'\)\) return false\s*\n\s*if \(uid === track\.artistId\) return true/)
+
+  // getTrackPlaybackUrl derives uid exclusively from request.auth.uid — there is no
+  // trackId/uid/artistId field read from request.data that could let a client claim ownership.
+  assert.match(tracksFn, /const uid = request\.auth\?\.uid \?\? null/)
+  assert.doesNotMatch(tracksFn, /request\.data\?\.(uid|artistId|ownerId)\b/)
+
+  // The master is structurally unreachable through this function regardless of entitlement —
+  // 'kind' only ever resolves to previews/dj-previews/streaming directories, never originals.
+  assert.match(tracksFn, /type PlaybackKind = 'preview' \| 'dj_preview' \| 'stream'/)
+  assert.match(
+    tracksFn,
+    /const directory = kind === 'preview' \? 'previews' : kind === 'dj_preview' \? 'dj-previews' : 'streaming'/,
+  )
+  const getUrlStart = tracksFn.indexOf('export const getTrackPlaybackUrl = onCall')
+  const getUrlEnd = tracksFn.indexOf('\n})', getUrlStart)
+  assert.doesNotMatch(tracksFn.slice(getUrlStart, getUrlEnd), /originals/, 'getTrackPlaybackUrl must never resolve to the originals/ directory')
+
+  // DJ licensed downloads are a completely separate, untouched system (agreement/payment
+  // gated, not track-visibility gated) — owner playback here can't reach it either way.
+  const downloads = read('functions/src/licensing/downloads.ts')
+  assert.match(downloads, /export const downloadLicensedTrack = onRequest/)
+  assert.doesNotMatch(downloads, /getTrackPlaybackUrl/)
+
+  // The actual, verified root cause: the artist's own track-management page never called
+  // usePlayer()/playTrack() at all — there was no way to trigger playback from there, even
+  // though the server has always authorised it correctly for the owner.
+  const musicPage = read('src/pages/artist/dashboard/MusicPage.tsx')
+  assert.match(musicPage, /import \{ usePlayer \} from '@\/contexts\/PlayerContext'/)
+  assert.match(musicPage, /const \{ playTrack, togglePlay, currentTrack, isPlaying \} = usePlayer\(\)/)
+  assert.match(musicPage, /onClick=\{\(\) => \(currentTrack\?\.trackId === track\.trackId \? togglePlay\(\) : playTrack\(track, tracks\)\)\}/)
+})
+
+test('BUG 2 — public preview media is a physically separate, actually-clipped file, never the full stream with a client-side stop timer (user-reported: a 30s-configured preview played the full 4-minute track)', () => {
+  // Preview generation already exists and already physically clips the audio via ffmpeg's
+  // -ss/-t flags at upload time — it does not send the full file and rely on the UI to stop it.
+  const processing = read('src/services/audioProcessing.ts')
+  assert.match(processing, /'-ss', String\(opts\.previewStartSec\),/)
+  assert.match(processing, /'-i', inputName,/)
+  assert.match(processing, /'-t', String\(opts\.previewDurationSec\),/)
+  // Streaming derivative is a separate ffmpeg pass with no -ss/-t trim at all — full length.
+  const streamingExecStart = processing.indexOf("await ffmpeg.exec(['-i', inputName, '-b:a'")
+  assert.ok(streamingExecStart !== -1, 'the streaming derivative must be produced by its own untrimmed ffmpeg pass')
+
+  // Regenerating the preview after the artist edits timing re-clips from the real master —
+  // never reuses/extends the old preview file — and overwrites the exact same Storage path,
+  // uploaded BEFORE the new Firestore timing fields are written, so nothing can ever read a
+  // "new" previewDurationSec paired with an old, unclipped, or mismatched preview file.
+  assert.match(processing, /export async function derivePreviewAsset\(/)
+  const trackService = read('src/services/trackService.ts')
+  assert.match(trackService, /export async function regenerateTrackPreview\(/)
+  assert.match(trackService, /uploadBytesResumable\(ref\(storage, track\.previewAudioPath\), derivative\.file\)/)
+  const modal = read('src/components/track/TrackAccessSettingsModal.tsx')
+  const regenIndex = modal.indexOf('await regenerateTrackPreview(track, previewStartSec, previewDurationSec)')
+  const updateIndex = modal.indexOf('await updateTrackAccessSettings(track.trackId,')
+  assert.ok(regenIndex !== -1 && updateIndex !== -1 && regenIndex < updateIndex, 'the preview file must be rebuilt before the new timing is saved to Firestore')
+
+  // Upload writes preview/streaming/original to three distinct Storage paths — never the same object.
+  assert.match(trackService, /const originalPath = `artists\/\$\{artistId\}\/originals\/\$\{trackId\}\.\$\{extOf\(files\.master\)\}`/)
+  assert.match(trackService, /const streamingPath = `artists\/\$\{artistId\}\/streaming\/\$\{trackId\}\.\$\{extOf\(files\.streaming\)\}`/)
+  assert.match(trackService, /const previewPath = `artists\/\$\{artistId\}\/previews\/\$\{trackId\}\.\$\{extOf\(files\.preview\)\}`/)
+
+  // getTrackPlaybackUrl never reads previewStartSec/previewDurationSec from the request at
+  // playback time at all — a client has no channel to influence which bytes it gets back,
+  // only which of the three pre-generated, pre-clipped files (by kind) it's entitled to.
+  const tracksFn = read('functions/src/tracks.ts')
+  assert.doesNotMatch(tracksFn, /request\.data\?\.previewStartSec|request\.data\?\.previewDurationSec/)
+  assert.match(tracksFn, /const \{ trackId, kind \} = request\.data/)
+
+  // Firestore rules independently validate previewStartSec/previewDurationSec at write time —
+  // bounded, typed, and cross-checked against the track's own real duration, both on create
+  // and on later edit, rejecting NaN/Infinity/negative/excessive/out-of-range values either way.
+  const rules = read('firestore.rules')
+  assert.match(rules, /request\.resource\.data\.previewStartSec is number\s*\n\s*&& request\.resource\.data\.previewStartSec >= 0\s*\n\s*&& request\.resource\.data\.previewDurationSec is number\s*\n\s*&& request\.resource\.data\.previewDurationSec >= 5\s*\n\s*&& request\.resource\.data\.previewDurationSec <= 90/)
+  assert.match(rules, /request\.resource\.data\.previewStartSec \+ request\.resource\.data\.previewDurationSec <= request\.resource\.data\.durationSeconds\)/)
+  // Same bounds re-enforced on update, not just create.
+  assert.match(rules, /request\.resource\.data\.previewStartSec >= 0\s*\n\s*&& request\.resource\.data\.previewDurationSec >= 5\s*\n\s*&& request\.resource\.data\.previewDurationSec <= 90/)
+
+  // The full ladder: only an entitled listener (owner/admin/public-tier/eligible
+  // follower/active supporter/released early-access) ever gets kind:'stream'; everyone else's
+  // client-side fallback (PlayerContext) requests kind:'preview' instead — the server decides
+  // which, the client never does.
+  const player = read('src/contexts/PlayerContext.tsx')
+  assert.match(player, /let url: string\s*\n\s*try \{\s*\n\s*url = await getStreamPlaybackURL\(track\)/)
+  assert.match(player, /const denied = streamError instanceof FirebaseError && streamError\.code === 'functions\/permission-denied'/)
+  assert.match(player, /kind = 'preview'\s*\n\s*url = await getPreviewPlaybackURL\(track\)/)
+
+  assert.match(tracksFn, /if \(track\.visibility === 'followers'\) \{\s*const follow = await db\.collection\('follows'\)\.doc\(`\$\{uid\}_\$\{track\.artistId\}`\)\.get\(\)\s*return follow\.exists \|\| isActiveSupporter\(uid, track\.artistId\)/)
+  assert.match(tracksFn, /if \(track\.visibility === 'supporters'\) \{\s*return isActiveSupporter\(uid, track\.artistId\)/)
+  assert.match(tracksFn, /if \(!relSnap\.exists\) return false/)
+  assert.match(tracksFn, /return status === 'active' \|\| status === 'trialing'/)
+})
