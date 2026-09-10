@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
 import { createDjDeal, deleteDjDeal, newDealId, subscribeArtistDeals, updateDjDeal } from '@/services/dealService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
@@ -40,6 +41,7 @@ const EMPTY_FORM = {
 
 export function DjDealsPage() {
   const { firebaseUser } = useAuth()
+  const { notify } = useToast()
   const [deals, setDeals] = useState<DjDealDoc[] | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
@@ -79,6 +81,7 @@ export function DjDealsPage() {
         additionalTerms: form.additionalTerms.trim(),
       })
       setForm(EMPTY_FORM)
+      notify(`"${form.name.trim()}" created — assign it to a track from Music to make it visible to DJs.`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create this deal.')
     } finally {

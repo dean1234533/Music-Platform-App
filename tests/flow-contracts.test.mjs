@@ -1927,3 +1927,10 @@ test('a track with DJ requests enabled but no reusable deal assigned tells the a
   assert.match(modal, /<Link to="\/dashboard\/artist\/deals" className="font-medium text-brand-400 hover:underline">/)
   assert.match(modal, /Create a deal first →/)
 })
+
+test('creating a DJ deal shows a confirmation, which also reminds the artist it still needs assigning to a track (user-reported: "when the artist creats a deal there is no conformation")', () => {
+  const page = read('src/pages/artist/dashboard/DjDealsPage.tsx')
+  assert.match(page, /import \{ useToast \} from '@\/contexts\/ToastContext'/)
+  assert.match(page, /const \{ notify \} = useToast\(\)/)
+  assert.match(page, /notify\(`"\$\{form\.name\.trim\(\)\}" created — assign it to a track from Music to make it visible to DJs\.`\)/)
+})
