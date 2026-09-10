@@ -59,7 +59,7 @@ export interface CopyrightClaimDoc {
 export interface ReportDoc {
   reportId: string
   reporterId: string
-  targetType: 'track' | 'artist' | 'dj' | 'user' | 'message' | 'post' | 'story' | 'agreement'
+  targetType: 'track' | 'artist' | 'dj' | 'user' | 'post' | 'story' | 'agreement'
   targetId: string
   reason: string
   description: string

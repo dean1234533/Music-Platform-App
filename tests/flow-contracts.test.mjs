@@ -1342,3 +1342,46 @@ test('abuse-prone user-facing callables that write amplifying/broadcast data are
     assert.match(read(file), pattern)
   }
 })
+
+test('Story audience enforcement covers every tier server-side, and "expired" means immediately undiscoverable even though hard-deletion follows the same grace-period retention pattern used everywhere else in this codebase', () => {
+  const stories = read('functions/src/stories/stories.ts')
+  // Every tier's real check, traced: public/owner/admin bypass, followers (real
+  // follow doc OR active supporter), supporters (active subscription only), dj
+  // (role + the artist's own storiesDjEnabled flag) — never a client-asserted claim.
+  assert.match(stories, /if \(uid === story\.artistId\) return true/)
+  assert.match(stories, /if \(story\.visibility === 'public'\) return true/)
+  assert.match(stories, /if \(roles\.includes\('admin'\)\) return true/)
+  assert.match(stories, /if \(story\.visibility === 'followers'\) \{\s*const follow = await db\.collection\('follows'\)\.doc\(`\$\{uid\}_\$\{story\.artistId\}`\)\.get\(\)\s*return follow\.exists \|\| isActiveSupporter\(uid, story\.artistId\)/)
+  assert.match(stories, /if \(story\.visibility === 'supporters'\) \{\s*return isActiveSupporter\(uid, story\.artistId\)/)
+  assert.match(stories, /if \(story\.visibility === 'dj'\) \{\s*if \(!roles\.includes\('dj'\)\) return false/)
+  assert.match(stories, /return artistSnap\.data\(\)\?\.storiesDjEnabled === true\s*\}\s*return false\s*\}/)
+
+  // Discovery: every listing query a viewer can actually reach a Story through
+  // filters expiresAt > now, so an expired Story is never surfaced regardless of
+  // audience tier — this is the real "expired Stories cannot be viewed" guarantee,
+  // since there is no direct /story/:id deep-link route to bypass the listing query.
+  const svc = read('src/services/storyService.ts')
+  assert.match(svc, /where\('expiresAt', '>', Timestamp\.now\(\)\)/)
+  assert.doesNotMatch(read('src/App.tsx'), /path="\/story\/:/)
+
+  // The underlying document + media are hard-deleted by expireStories, but only
+  // after a further, admin-configurable recovery window (storyRecoveryDays) past
+  // the 24h mark — the same soft-delete-then-hard-delete retention shape used for
+  // notifications/abandoned requests elsewhere, not an accidental gap unique to Stories.
+  const cleanup = read('functions/src/retention/cleanup.ts')
+  assert.match(cleanup, /export const expireStories = onSchedule\('every 24 hours', async \(\) => \{/)
+  assert.match(cleanup, /const \{ storyRecoveryDays \} = await getDataRetentionSettings\(\)/)
+  assert.match(cleanup, /collection\('stories'\)\.where\('isHighlight', '==', false\)\.where\('expiresAt', '<=', cutoff\)/)
+})
+
+test('the "message" report target is gone with the chat system that created it — every other report target still works', () => {
+  const reports = read('functions/src/admin/reports.ts')
+  assert.doesNotMatch(reports, /'message'/)
+  assert.match(reports, /const TARGET_TYPES = \['track', 'artist', 'dj', 'user', 'post', 'agreement'\] as const/)
+  const moderationTypes = read('src/types/moderation.ts')
+  assert.doesNotMatch(moderationTypes, /'message'/)
+  // Every other target type this app actually supports is untouched.
+  for (const target of ['track', 'artist', 'dj', 'user', 'post', 'agreement']) {
+    assert.match(reports, new RegExp(`'${target}'`))
+  }
+})

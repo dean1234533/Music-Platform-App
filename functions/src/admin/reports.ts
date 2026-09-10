@@ -5,7 +5,7 @@ import { requireActiveUser } from '../roles.js'
 import { enforceRateLimit } from '../rateLimit.js'
 import { requireAdmin, writeAuditLog } from './guard.js'
 
-const TARGET_TYPES = ['track', 'artist', 'dj', 'user', 'message', 'post', 'agreement'] as const
+const TARGET_TYPES = ['track', 'artist', 'dj', 'user', 'post', 'agreement'] as const
 
 /**
  * A "Report Agreement Problem" on a licence contract lands here like any

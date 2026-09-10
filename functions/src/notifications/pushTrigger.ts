@@ -8,7 +8,7 @@ import { db } from '../admin.js'
  * Single dispatch point for push notifications: every existing call site
  * already writes a `notifications/{id}` doc (for the in-app bell), so this
  * trigger is the only place that needs to know about FCM — no need to touch
- * submitLicenceRequest, sendMessage, signAgreement, the Stripe webhooks, etc.
+ * submitLicenceRequest, sendOffer, signAgreement, the Stripe webhooks, etc.
  */
 export const onNotificationCreatePush = onDocumentCreated('notifications/{notificationId}', async (event) => {
   const notification = event.data?.data()
