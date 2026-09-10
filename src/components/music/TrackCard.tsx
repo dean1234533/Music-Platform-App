@@ -6,15 +6,24 @@ import { TrackActions } from '@/components/music/TrackActions'
 import { TRACK_ACCESS_LABEL } from '@/utils/trackAccess'
 import type { TrackDoc } from '@/types/track'
 
-/** locked is opt-in — only a caller that actually knows this viewer's follow/support status for this track's artist (e.g. the artist profile page) should pass it; everywhere else the tier badge shows on its own with no lock state. */
-export function TrackCard({ track, queue, locked }: { track: TrackDoc; queue?: TrackDoc[]; locked?: boolean }) {
+/**
+ * locked is opt-in — only a caller that actually knows this viewer's follow/support status for
+ * this track's artist (e.g. the artist profile page) should pass it; everywhere else the tier
+ * badge shows on its own with no lock state.
+ *
+ * fill is opt-in too — every existing caller renders TrackCard in a horizontal-scroll rail,
+ * where a fixed width is correct. A real multi-column grid (e.g. an artist's full catalogue)
+ * needs the card to fill its own grid cell instead, so the grid's column count — not this
+ * component's hardcoded width — is what determines how many fit per row at any viewport size.
+ */
+export function TrackCard({ track, queue, locked, fill }: { track: TrackDoc; queue?: TrackDoc[]; locked?: boolean; fill?: boolean }) {
   const { playTrack, togglePlay, currentTrack, isPlaying } = usePlayer()
   const artist = useArtistSummary(track.artistId)
   const isCurrent = currentTrack?.trackId === track.trackId
   const isCurrentlyPlaying = isCurrent && isPlaying
 
   return (
-    <div className="group w-44 shrink-0 sm:w-52">
+    <div className={fill ? 'group w-full min-w-0' : 'group w-44 shrink-0 sm:w-52'}>
       <button
         type="button"
         onClick={() => (isCurrent ? togglePlay() : playTrack(track, queue))}

@@ -2432,3 +2432,34 @@ test('empty public profiles get honest, neutral bio copy instead of fabricated e
   assert.match(djSettings, /placeholder="https:\/\/…"\s*\n\s*autoComplete="off"/)
   assert.match(djSettings, /placeholder="e\.g\. Fabric, Ministry of Sound"\s*\n\s*autoComplete="off"/)
 })
+
+test('an artist\'s track catalogue reflows into a real responsive grid instead of a fixed-width flex-wrap that fits only one card per row on a real phone viewport (user-reported: "what happens when a artist profile has alot of track how will this fit on the page" then "i am asking you have no space on the profile page as it is so if you upload 10 tracks how will this fit on the page ... on mobile would be even worse")', () => {
+  // Root cause, confirmed by the actual numbers: TrackCard is a fixed w-44 (176px) below the
+  // sm breakpoint, the page wraps it in flex flex-wrap gap-4 (16px), and the page's own side
+  // padding is px-5 (20px each side). At a real 375-400px phone viewport that leaves ~320-360px
+  // of usable width — enough for exactly one 176px card per row (2 would need 368px) — so with
+  // the platform's max of 10 tracks per artist, mobile rendered up to 10 tall, roughly
+  // half-empty rows stacked vertically instead of using the available width.
+  const trackCard = read('src/components/music/TrackCard.tsx')
+  assert.match(trackCard, /fill\?: boolean/)
+  assert.match(trackCard, /<div className=\{fill \? 'group w-full min-w-0' : 'group w-44 shrink-0 sm:w-52'\}>/)
+
+  const page = read('src/pages/artist/ArtistPublicProfilePage.tsx')
+  assert.match(page, /<div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">/)
+  assert.match(page, /<TrackCard\s*\n\s*key=\{track\.trackId\}\s*\n\s*track=\{track\}\s*\n\s*queue=\{publicTracks\}\s*\n\s*fill\s*\n/)
+
+  // Every other TrackCard caller (rail-style browsing surfaces — Discover, Home, Search,
+  // Library, DJ pages) never passes fill, so they keep the fixed-width rail card unchanged.
+  const railCallers = [
+    'src/pages/dj/DJRequestsPage.tsx',
+    'src/pages/dj/DJDiscoverPage.tsx',
+    'src/pages/fan/DiscoverPage.tsx',
+    'src/pages/fan/SearchPage.tsx',
+    'src/pages/fan/HomePage.tsx',
+    'src/pages/fan/LibraryPage.tsx',
+  ]
+  for (const path of railCallers) {
+    const caller = read(path)
+    assert.doesNotMatch(caller, /<TrackCard[^>]*\bfill\b/, `${path} should not pass fill to TrackCard`)
+  }
+})

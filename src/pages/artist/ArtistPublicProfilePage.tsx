@@ -325,12 +325,13 @@ export function ArtistPublicProfilePage() {
                 <div className="mt-7 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-brand-400"><MusicGlyph className="h-4 w-4" /> Be here from the beginning</div>
               </div>
             ) : (
-              <div className="flex flex-wrap gap-4">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
                 {publicTracks.map((track) => (
                   <TrackCard
                     key={track.trackId}
                     track={track}
                     queue={publicTracks}
+                    fill
                     locked={
                       !describeTrackAccess(track, {
                         isOwner: firebaseUser?.uid === artist.artistId,
