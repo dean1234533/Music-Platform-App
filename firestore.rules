@@ -32,6 +32,18 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_fan')).data.status in ['active', 'trialing'];
     }
 
+    // A free fan (no active fan-role subscription, or a plan that doesn't include this
+    // feature) fails every branch here — deliberately, since the free plan's seeded
+    // features map is {} (see functions/src/admin/seedPlans.ts).
+    function hasFanFeature(feature) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_fan'))
+        && get(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_fan')).data.status in ['active', 'trialing']
+        && get(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_fan')).data.planId is string
+        && exists(/databases/$(database)/documents/subscriptionPlans/$(get(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_fan')).data.planId))
+        && get(/databases/$(database)/documents/subscriptionPlans/$(get(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_fan')).data.planId)).data.features.get(feature, false) == true;
+    }
+
     // ---------------------------------------------------------------------
     // users/{userId} — private account document. Owner can read/update it,
     // but can never touch roles beyond fan/artist/dj, never grant themselves
@@ -366,7 +378,12 @@ service cloud.firestore {
               && exists(/databases/$(database)/documents/follows/$(request.auth.uid + '_' + request.resource.data.artistId)))
           || (get(/databases/$(database)/documents/fanOffers/$(request.resource.data.offerId)).data.audience == 'supporters'
               && hasActiveSupportFor(request.resource.data.artistId))
-        );
+        )
+        // Artist-defined perks are a paid Fan plan feature (see seedPlans.ts: the free
+        // fan_free plan's features map is {}) — per-artist audience above governs WHICH
+        // artist's offers a fan can see; this governs whether their own plan unlocks
+        // claiming ANY of them at all.
+        && hasFanFeature('artistDefinedPerks');
       allow update: if false;
       allow delete: if isSignedIn() && resource.data.fanId == request.auth.uid;
     }

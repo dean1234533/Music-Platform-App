@@ -2237,3 +2237,45 @@ test('StoryViewer preloads the next story\'s actual media bytes, not just its UR
   // resolves, not only for a public story where the URL was already known upfront.
   assert.match(page, /\}, \[group, groupIndex, storyIndex, mediaUrls\]\)/)
 })
+
+test('a free-plan fan cannot claim artist-defined perk offers, enforced server-side not just by the client (user-reported: "isnt fans that are on the free plan not ment to be able to get offers")', () => {
+  // Root cause: artistDefinedPerks ("Perks chosen by the artist" — the entire Fan Offers
+  // feature) is seeded as a paid-tier-only feature (fan_free's features map is {}, only
+  // fan_supporter has artistDefinedPerks: true — functions/src/admin/seedPlans.ts) and
+  // advertised as such on the Pricing/Subscription pages, but nothing anywhere actually
+  // checked it: claimFanOffer is a direct client Firestore write, and the existing
+  // fanOfferClaims create rule only checked the per-artist audience (everyone/followers/
+  // supporters-of-that-artist), never the fan's own plan. A free-plan fan following/
+  // supporting the right artist could claim any offer regardless of their own subscription.
+  const rules = read('firestore.rules')
+  assert.match(
+    rules,
+    /function hasFanFeature\(feature\) \{\s*\n\s*return isSignedIn\(\)\s*\n\s*&& exists\(\/databases\/\$\(database\)\/documents\/subscriptions\/\$\(request\.auth\.uid \+ '_fan'\)\)/,
+  )
+  assert.match(rules, /get\(\/databases\/\$\(database\)\/documents\/subscriptions\/\$\(request\.auth\.uid \+ '_fan'\)\)\.data\.status in \['active', 'trialing'\]/)
+  assert.match(rules, /\.data\.features\.get\(feature, false\) == true;/)
+  const claimsRule = rules.slice(rules.indexOf('match /fanOfferClaims'), rules.indexOf('match /fanOfferClaims') + 1800)
+  assert.match(claimsRule, /&& hasFanFeature\('artistDefinedPerks'\);/)
+
+  // Client: the offer card shows a clear upgrade CTA instead of either a silently-rejected
+  // claim attempt or an invisible feature gate the fan never finds out about.
+  const hook = read('src/hooks/useFanFeature.ts')
+  assert.match(hook, /export function useFanFeature\(feature: PlanFeatureKey\): boolean \| undefined/)
+  assert.match(hook, /const isActive = subscription\?\.status === 'active' \|\| subscription\?\.status === 'trialing'/)
+  assert.match(hook, /return Boolean\(isActive && activePlan\?\.features\[feature\]\)/)
+
+  const card = read('src/components/music/FanOfferCard.tsx')
+  assert.match(card, /locked && !claimed \? \(/)
+  assert.match(card, /Upgrade to claim/)
+  assert.match(card, /to="\/app\/subscription"/)
+
+  const page = read('src/pages/fan/FanOffersPage.tsx')
+  assert.match(page, /import \{ useFanFeature \} from '@\/hooks\/useFanFeature'/)
+  assert.match(page, /const hasArtistDefinedPerks = useFanFeature\('artistDefinedPerks'\)/)
+  assert.match(page, /locked=\{hasArtistDefinedPerks === false\}/)
+
+  // The artist-facing offers dashboard is untouched — ownerView still takes precedence and
+  // locked defaults to false, so nothing there needed to change.
+  const artistPage = read('src/pages/artist/dashboard/FanOffersPage.tsx')
+  assert.doesNotMatch(artistPage, /useFanFeature|locked=/)
+})

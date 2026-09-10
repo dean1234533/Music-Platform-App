@@ -1,4 +1,5 @@
-import { CalendarDays, Check, Gift, Tag, Trash2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { CalendarDays, Check, Gift, Lock, Tag, Trash2 } from 'lucide-react'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { Button } from '@/components/common/Button'
 import type { FanOfferDoc } from '@/types/fanOffer'
@@ -17,6 +18,8 @@ export function FanOfferCard({
   claimed,
   pending,
   ownerView = false,
+  /** True once we know the fan's own plan (not per-artist follow/support) doesn't include artistDefinedPerks. */
+  locked = false,
   onClaim,
   onDelete,
 }: {
@@ -24,6 +27,7 @@ export function FanOfferCard({
   claimed?: boolean
   pending?: boolean
   ownerView?: boolean
+  locked?: boolean
   onClaim?: () => void
   onDelete?: () => void
 }) {
@@ -52,6 +56,16 @@ export function FanOfferCard({
         ) : null}
         {ownerView ? (
           <Button variant="danger" size="sm" className="mt-5" onClick={onDelete}><Trash2 size={15} /> Delete offer</Button>
+        ) : locked && !claimed ? (
+          <div className="mt-5">
+            <Link
+              to="/app/subscription"
+              className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-4 py-2 text-sm font-semibold text-ink-1 hover:bg-white/[0.1]"
+            >
+              <Lock size={15} /> Upgrade to claim
+            </Link>
+            <p className="mt-2 text-xs text-ink-3">Artist perks like this one are a Supporter plan benefit.</p>
+          </div>
         ) : (
           <div className="mt-5">
             <Button variant={claimed ? 'secondary' : 'primary'} size="sm" onClick={onClaim} loading={pending}>
