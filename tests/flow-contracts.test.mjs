@@ -653,11 +653,20 @@ test('new artist profiles cannot claim reserved/impersonation-prone URLs like /a
   assert.match(slugUtil, /'support',/)
   assert.match(slugUtil, /'spotify',/)
 
-  const artistService = read('src/services/artistService.ts')
-  assert.match(artistService, /if \(!RESERVED_ARTIST_SLUGS\.has\(candidate\)\) \{/)
+  // Slug generation now happens server-side (createArtistProfile Cloud
+  // Function, inside its create-profile transaction) rather than in a
+  // client transaction — firestore.rules' artistProfiles/artistSlugs
+  // create rules are both `if false`, so this is the only place it can
+  // happen. functions/src/slug.ts mirrors the client's reserved-word list by hand.
+  const slugFn = read('functions/src/slug.ts')
+  assert.match(slugFn, /export const RESERVED_ARTIST_SLUGS = new Set\(\[/)
+  assert.match(slugFn, /'admin', 'administrator',/)
+
+  const profiles = read('functions/src/profiles.ts')
+  assert.match(profiles, /if \(!RESERVED_ARTIST_SLUGS\.has\(candidate\)\) \{/)
   // A reserved word falls through to the same numbered-suffix path as a
   // taken slug — never a hard rejection of the whole signup.
-  assert.match(artistService, /candidate = `\$\{baseSlug\}-\$\{attempt \+ 1\}`/)
+  assert.match(profiles, /candidate = `\$\{baseSlug\}-\$\{attempt \+ 1\}`/)
 })
 
 test('tracks get a clean per-artist-unique share slug; old trackId-based links keep resolving forever', () => {
@@ -1184,12 +1193,15 @@ test('only an admin account can change its own roles after signup (add or remove
   // An admin account, by contrast, can add or remove its own fan/artist/dj roles at any time, but never grant/revoke 'admin' via this client-writable path.
   assert.match(usersUpdateRule, /resource\.data\.roles\.removeAll\(\['admin'\]\)\.hasOnly\(\['fan', 'artist', 'dj'\]\)/)
 
-  // AddRolePage (the only client path that adds a role after signup) is
-  // itself admin-gated too, so an already-onboarded regular user never sees
-  // a form that would just fail on submit.
+  // Adding a role after signup (e.g. a fan becoming an artist too) is
+  // legitimate self-service for any account, not admin-only — AddRolePage
+  // requests the named action via the trusted createArtistProfile/
+  // createDJProfile Cloud Functions instead of writing roles directly, so
+  // it's unrestricted by account type, only by the backend's own checks.
   const addRolePage = read('src/pages/onboarding/AddRolePage.tsx')
-  assert.match(addRolePage, /hasRole\('admin'\)/)
-  assert.match(addRolePage, /This isn't self-service/)
+  assert.doesNotMatch(addRolePage, /This isn't self-service/)
+  assert.match(addRolePage, /createArtistProfile\(\{ name, bio, genres: genreList, location \}\)/)
+  assert.match(addRolePage, /createDJProfile\(\{ name, bio, genres: genreList, country: location, city \}\)/)
 
   const functions = read('functions/src/tracks.ts')
   assert.match(functions, /async function artistRoleActive\(artistId: string\): Promise<boolean> \{/)
@@ -1227,4 +1239,56 @@ test('only an admin account can change its own roles after signup (add or remove
   assert.match(artistPublic, /\.code === 'permission-denied'/)
   const djPublic = read('src/pages/dj/DJPublicProfilePage.tsx')
   assert.match(djPublic, /\.code === 'permission-denied'/)
+})
+
+test('fan -> artist and fan -> DJ self-service upgrades work through trusted backend actions, never a client role write (user-reported: freezing roles broke "+ Add an artist profile" / "Start free trial" / "+ Add a DJ profile" / "Create DJ profile")', () => {
+  const rules = read('firestore.rules')
+  // The only legitimate way to create these profiles is now Cloud-Function-only —
+  // a direct client create is refused outright, regardless of who's asking.
+  const artistBlock = rules.slice(rules.indexOf('match /artistProfiles/{artistId}'), rules.indexOf('match /artistSlugs/{slug}'))
+  assert.match(artistBlock, /allow create: if false;/)
+  const slugBlock = rules.slice(rules.indexOf('match /artistSlugs/{slug}'), rules.indexOf('match /djProfiles/{djId}'))
+  assert.match(slugBlock, /allow create: if false;/)
+  const djBlock = rules.slice(rules.indexOf('match /djProfiles/{djId}'), rules.indexOf('match /tracks/{trackId}'))
+  assert.match(djBlock, /allow create: if false;/)
+
+  const profiles = read('functions/src/profiles.ts')
+  assert.match(profiles, /export const createArtistProfile = onCall/)
+  assert.match(profiles, /export const createDJProfile = onCall/)
+  // Both must act only on the authenticated caller — never a client-supplied id — and never
+  // let the client name the role being granted (no request.data.role/roles/uid/artistId/djId anywhere).
+  assert.doesNotMatch(profiles, /request\.data\?\.(role|roles|uid|artistId|djId)\b/)
+  assert.match(profiles, /const uid = request\.auth\.uid/)
+  // The granted role is a hardcoded literal in server code, not derived from client input.
+  assert.match(profiles, /FieldValue\.arrayUnion\('artist'\)/)
+  assert.match(profiles, /FieldValue\.arrayUnion\('dj'\)/)
+  assert.match(profiles, /if \(!request\.auth\) throw new HttpsError\('unauthenticated', 'Sign in required\.'\)/)
+  assert.match(profiles, /await requireActiveUser\(uid\)/)
+  assert.match(profiles, /await enforceRateLimit\(`createArtistProfile_\$\{uid\}`, 5, 60 \* 60\)/)
+  assert.match(profiles, /await enforceRateLimit\(`createDJProfile_\$\{uid\}`, 5, 60 \* 60\)/)
+  // Idempotent: an account (or a retried call) that already has the profile
+  // just gets the role re-affirmed, never a second profile / a hard error.
+  assert.match(profiles, /if \(existingProfile\.exists\) \{\s*tx\.update\(userRef, \{ roles: FieldValue\.arrayUnion\('artist'\)/)
+  assert.match(profiles, /if \(existingProfile\.exists\) \{\s*tx\.update\(userRef, \{ roles: FieldValue\.arrayUnion\('dj'\)/)
+
+  assert.match(read('functions/src/index.ts'), /export \{ createArtistProfile, createDJProfile \} from '\.\/profiles\.js'/)
+
+  // Client services request the named action and can never pass a uid —
+  // there's no parameter for one, so nothing the caller sends can target another account.
+  const artistService = read('src/services/artistService.ts')
+  assert.match(artistService, /export async function createArtistProfile\(input: CreateArtistProfileInput\): Promise<string> \{/)
+  assert.match(artistService, /callable<CreateArtistProfileInput, \{ slug: string \}>\('createArtistProfile'\)/)
+  const djService = read('src/services/djService.ts')
+  assert.match(djService, /export async function createDJProfile\(input: CreateDJProfileInput\): Promise<void> \{/)
+  assert.match(djService, /callable<CreateDJProfileInput, \{ ok: true \}>\('createDJProfile'\)/)
+
+  // Pricing's "Start free trial" / "Create DJ profile" and Settings' "+ Add…"
+  // links still point at the self-service onboarding/add-role screen —
+  // restored to working (not gated behind admin / a "contact support" wall).
+  const pricing = read('src/pages/marketing/PricingPage.tsx')
+  assert.match(pricing, /\/onboarding\/add-role\?role=artist/)
+  assert.match(pricing, /\/onboarding\/add-role\?role=dj/)
+  const settings = read('src/pages/fan/SettingsPage.tsx')
+  assert.match(settings, /\+ Add an artist profile/)
+  assert.match(settings, /\+ Add a DJ profile/)
 })

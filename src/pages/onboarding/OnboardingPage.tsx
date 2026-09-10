@@ -51,7 +51,7 @@ export function OnboardingPage() {
       await completeOnboarding(firebaseUser.uid, [selectedRole])
 
       if (selectedRole === 'artist') {
-        await createArtistProfile(firebaseUser.uid, {
+        await createArtistProfile({
           name: artistForm.name || firebaseUser.displayName || 'Untitled Artist',
           bio: artistForm.bio,
           genres: artistForm.genres.split(',').map((g) => g.trim()).filter(Boolean),
@@ -60,7 +60,7 @@ export function OnboardingPage() {
       }
 
       if (selectedRole === 'dj') {
-        await createDJProfile(firebaseUser.uid, {
+        await createDJProfile({
           name: djForm.name || firebaseUser.displayName || 'Untitled DJ',
           bio: djForm.bio,
           genres: djForm.genres.split(',').map((g) => g.trim()).filter(Boolean),

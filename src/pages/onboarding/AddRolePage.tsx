@@ -1,22 +1,25 @@
 import { useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import { completeOnboarding } from '@/services/userService'
 import { createArtistProfile } from '@/services/artistService'
 import { createDJProfile } from '@/services/djService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
-import { EmptyState } from '@/components/common/StateViews'
 
 /**
  * Adds the artist or DJ role to an account that already has at least one
- * role. Admin-only — a regular already-onboarded account can never add a
- * role to itself past its initial signup choice (firestore.rules freezes
- * its roles field from that point on), so this page just explains that
- * instead of presenting a form that would fail on submit.
+ * role — legitimate self-service, e.g. a fan becoming an artist too. The
+ * client only ever requests a specific named action ("create my artist
+ * profile" / "create my DJ profile"); the createArtistProfile/
+ * createDJProfile Cloud Functions decide the resulting role and grant it
+ * server-side for request.auth.uid, never from anything this page sends.
+ * firestore.rules' users/{userId} update rule blocks a direct client write
+ * to roles after initial signup, so this callable path is the only way an
+ * already-onboarded account can gain another role — by design, nothing
+ * here lets the caller name an arbitrary role like "admin".
  */
 export function AddRolePage() {
-  const { firebaseUser, profile, hasRole } = useAuth()
+  const { firebaseUser, profile } = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const role: 'artist' | 'dj' = params.get('role') === 'dj' ? 'dj' : 'artist'
@@ -30,39 +33,25 @@ export function AddRolePage() {
   const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit() {
-    if (!firebaseUser || !profile) return
+    if (!firebaseUser) return
     setSaving(true)
     setError(null)
     try {
       const genreList = genres.split(',').map((g) => g.trim()).filter(Boolean)
       if (role === 'artist') {
-        await createArtistProfile(firebaseUser.uid, { name, bio, genres: genreList, location })
+        await createArtistProfile({ name, bio, genres: genreList, location })
       } else {
-        await createDJProfile(firebaseUser.uid, { name, bio, genres: genreList, country: location, city })
+        await createDJProfile({ name, bio, genres: genreList, country: location, city })
       }
-      const nextRoles = profile.roles.includes(role) ? profile.roles : [...profile.roles, role]
-      await completeOnboarding(firebaseUser.uid, nextRoles)
+      // users/{uid}.roles is updated by the Cloud Function via the Admin
+      // SDK — AuthContext's own onSnapshot listener on that doc picks the
+      // change up in real time, so no client-side role write happens here.
       navigate(role === 'artist' ? '/dashboard/artist' : '/dj/profile')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     } finally {
       setSaving(false)
     }
-  }
-
-  const canAddRole = hasRole('admin') || (profile?.roles.length ?? 0) === 0
-  if (!canAddRole) {
-    return (
-      <EmptyState
-        title="This isn't self-service"
-        description="Adding another role to an account that's already onboarded needs an admin. Reach out and we'll sort it out."
-        action={
-          <Link to="/support" className="text-sm font-medium text-brand-400 hover:underline">
-            Contact support →
-          </Link>
-        }
-      />
-    )
   }
 
   return (

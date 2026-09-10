@@ -2,20 +2,9 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import { db } from '../admin.js'
 import { requireAdmin, writeAuditLog } from './guard.js'
+import { RESERVED_ARTIST_SLUGS } from '../slug.js'
 
 const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/
-
-// Kept in sync with src/utils/slug.ts's RESERVED_ARTIST_SLUGS — this
-// callable is the only server-side path that can ever assign a slug after
-// creation, so it re-checks the same list rather than trusting the client.
-const RESERVED_ARTIST_SLUGS = new Set([
-  'admin', 'administrator', 'login', 'signin', 'sign-in', 'signup', 'sign-up', 'logout', 'settings', 'api', 'app',
-  'dashboard', 'support', 'help', 'contact', 'about', 'terms', 'privacy', 'legal', 'billing', 'account', 'onboarding',
-  'verify-email', 'forgot-password', 'reset-password', 'artist', 'artists', 'dj', 'djs', 'track', 'tracks', 'pricing',
-  'blog', 'faq', 'search', 'discover', 'official', 'staff', 'moderator', 'moderation', 'backthevibes', 'spotify',
-  'soundcloud', 'apple-music', 'youtube', 'tiktok', 'instagram', 'facebook', 'twitter', 'null', 'undefined', 'new',
-  'edit', 'delete',
-])
 
 /**
  * Slugs are otherwise permanent (frozen by firestore.rules on every

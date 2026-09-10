@@ -1,4 +1,5 @@
 export { onUserCreate } from './users.js'
+export { createArtistProfile, createDJProfile } from './profiles.js'
 export { onFollowCreate, onFollowDelete } from './follows.js'
 export { recordTrackPlay, getTrackPlaybackUrl, deleteTrack } from './tracks.js'
 export { recordProfileView, recordTrackView } from './analytics.js'

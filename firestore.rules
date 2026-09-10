@@ -99,9 +99,12 @@ service cloud.firestore {
       // — stepping back from it (removeRole) hides this from everyone but
       // the owner and admins, without deleting anything.
       allow read: if roleActiveFor(artistId, 'artist') || isSelf(artistId) || isAdmin();
-      allow create: if isSelf(artistId)
-        && request.resource.data.artistId == artistId
-        && request.resource.data.get('trackCount', 0) == 0;
+      // Creation is Cloud-Function-only (createArtistProfile) — it also
+      // grants the artist role in the same server-side transaction, which
+      // a direct client create here never could (users/{userId}'s own
+      // rules freeze a regular account's roles after signup). Admin SDK
+      // writes bypass these rules entirely, so this doesn't block that path.
+      allow create: if false;
       // trackCount is server-maintained. Perks are artist-writable.
       allow update: if isSelf(artistId)
         && request.resource.data.artistId == resource.data.artistId
@@ -120,15 +123,19 @@ service cloud.firestore {
     // artistSlugs/{slug} — reservation records; immutable once created.
     match /artistSlugs/{slug} {
       allow read: if true;
-      allow create: if isSignedIn() && request.resource.data.artistId == request.auth.uid;
+      // Reservation happens inside createArtistProfile's transaction (Admin
+      // SDK, bypasses this rule) or adminChangeArtistSlug — never a direct
+      // client write, so two artists can never race for the same slug
+      // outside a server-controlled transaction.
+      allow create: if false;
       allow update, delete: if false;
     }
 
     match /djProfiles/{djId} {
       // Same live-role gate as artistProfiles above.
       allow read: if roleActiveFor(djId, 'dj') || isSelf(djId) || isAdmin();
-      allow create: if isSelf(djId) && request.resource.data.djId == djId
-        && request.resource.data.verificationStatus == 'unverified';
+      // Creation is Cloud-Function-only (createDJProfile) — same reasoning as artistProfiles above.
+      allow create: if false;
       // Verification is server-maintained. bulkOutreachOptIn is DJ-writable.
       allow update: if isSelf(djId)
         && request.resource.data.djId == resource.data.djId

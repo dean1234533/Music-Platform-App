@@ -1,5 +1,6 @@
-import { doc, getDoc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
+import { doc, getDoc, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { callable } from '@/lib/callable'
 import type { DJProfile } from '@/types/dj'
 
 function djRef(djId: string) {
@@ -14,30 +15,17 @@ export interface CreateDJProfileInput {
   city: string
 }
 
-export async function createDJProfile(djId: string, input: CreateDJProfileInput): Promise<void> {
-  // Idempotent: a retried/queued call (e.g. a write that was offline when
-  // first submitted, replaying later) must not overwrite an existing profile.
-  const existing = await getDoc(djRef(djId))
-  if (existing.exists()) return
+const requestCreateDJProfile = callable<CreateDJProfileInput, { ok: true }>('createDJProfile')
 
-  await setDoc(djRef(djId), {
-    djId,
-    name: input.name,
-    realName: null,
-    photoURL: null,
-    coverURL: null,
-    bio: input.bio,
-    genres: input.genres,
-    country: input.country,
-    city: input.city,
-    venues: [],
-    website: null,
-    socialLinks: {},
-    verificationStatus: 'unverified',
-    bulkOutreachOptIn: false,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  })
+/**
+ * Requests the "create my DJ profile" action — the only legitimate way an
+ * already-onboarded account gains the DJ role (see createArtistProfile in
+ * artistService.ts for the full reasoning). Always acts on the calling
+ * account; the profile creation and role grant both happen server-side in
+ * the createDJProfile Cloud Function.
+ */
+export async function createDJProfile(input: CreateDJProfileInput): Promise<void> {
+  await requestCreateDJProfile(input)
 }
 
 export async function getDJProfile(djId: string): Promise<DJProfile | null> {
