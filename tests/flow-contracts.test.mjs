@@ -1691,3 +1691,31 @@ test('a new service worker taking control no longer force-reloads the page out f
   assert.match(player, /import \{ setPlaybackActive \} from '@\/lib\/playbackActivity'/)
   assert.match(player, /setPlaybackActive\(isPlaying\)\s*\n\s*return \(\) => setPlaybackActive\(false\)\s*\n\s*\}, \[isPlaying\]\)/)
 })
+
+test('DJ discovery surfaces a track open for DJ promotion regardless of its fan-facing visibility tier (user-reported: "the artist has a DJ promo but the DJ can not see it") — a followers/supporters/early_access track promoted to DJs is no longer silently excluded before isTrackAcceptingDjRequests ever runs', () => {
+  const svc = read('src/services/trackService.ts')
+  // Root cause: the query filtered visibility in ['public'] (or ['public','dj_only'] for DJ
+  // callers) BEFORE isTrackAcceptingDjRequests ever ran — a real track (djPromotion: true,
+  // djDealSettings.acceptDjRequests: true) with visibility 'followers' was excluded at the
+  // query stage and never reached that check at all, even though the check itself was correct.
+  assert.match(svc, /const baseVisibilities = \['public', 'followers', 'supporters', 'early_access'\]/)
+  assert.match(svc, /const visibilities = opts\.includeDjOnly \? \[\.\.\.baseVisibilities, 'dj_only'\] : baseVisibilities/)
+  // 'private' stays excluded — DJ promotion never overrides a track the owner marked private.
+  assert.doesNotMatch(svc, /baseVisibilities = \[.*'private'/)
+  assert.match(svc, /\.filter\(isTrackAcceptingDjRequests\)/)
+
+  // The composite index this broadened query needs (visibility in [...] + orderBy createdAt)
+  // already exists — reused, not newly added, from the identical pattern listNewReleaseTracks
+  // already uses successfully.
+  const indexes = read('firestore.indexes.json')
+  assert.match(
+    indexes,
+    /"collectionGroup": "tracks"[\s\S]*?"fieldPath": "visibility", "order": "ASCENDING" \}[\s\S]*?"fieldPath": "createdAt", "order": "DESCENDING"/,
+  )
+
+  // Every DJ-facing (and fan-facing "seeking DJ exposure") surface goes through this one
+  // function — a single fix covers DJDiscoverPage, DJRequestsPage, and Discover's DJ section.
+  for (const file of ['src/pages/dj/DJDiscoverPage.tsx', 'src/pages/dj/DJRequestsPage.tsx', 'src/pages/fan/DiscoverPage.tsx']) {
+    assert.match(read(file), /listArtistsSeekingDJExposure/)
+  }
+})

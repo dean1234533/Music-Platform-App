@@ -375,7 +375,18 @@ export async function listDJPromotionTracksFiltered(
   filters: DjTrackFilters = {},
   opts: { includeProPlusOnly?: boolean; includeDjOnly?: boolean; count?: number } = {},
 ): Promise<TrackDoc[]> {
-  const visibilities = opts.includeDjOnly ? ['public', 'dj_only'] : ['public']
+  // DJ promotion is deliberately independent of fan-facing visibility (the
+  // same reason TrackDjAccessModal is a separate flow from
+  // TrackAccessSettingsModal) — a followers/supporters/early_access track
+  // can still be wide open for DJ licensing. Restricting this query to only
+  // 'public' (and 'dj_only') tracks meant an artist's DJ promo on any other
+  // tier was invisible to every DJ (user-reported), even though
+  // isTrackAcceptingDjRequests below was already correctly evaluating it —
+  // the track just never reached that check because this query excluded it
+  // first. 'private' stays excluded: nobody outside the owner should
+  // discover it via any channel.
+  const baseVisibilities = ['public', 'followers', 'supporters', 'early_access']
+  const visibilities = opts.includeDjOnly ? [...baseVisibilities, 'dj_only'] : baseVisibilities
   const constraints = [where('visibility', 'in', visibilities)]
 
   // Pull a bounded discovery window, then apply requestability and optional
