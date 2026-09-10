@@ -60,6 +60,12 @@ export function DJRequestsPage() {
   const [openTracks, setOpenTracks] = useState<TrackDoc[] | null>(null)
   const [dealOpportunities, setDealOpportunities] = useState<DealOpportunity[] | null>(null)
   const [promoOptIn, setPromoOptIn] = useState<boolean | null>(null)
+  // A dj-role account can reach this page without a djProfiles doc existing yet (e.g. the role
+  // was granted without ever completing DJ profile setup) — updateDJProfile would then fail
+  // with permission-denied (the update rule requires the doc to already exist), so this is
+  // tracked separately from promoOptIn's own true/false to show a real prompt instead of a
+  // control that silently fails.
+  const [hasDjProfile, setHasDjProfile] = useState<boolean | null>(null)
   const [enablingPromos, setEnablingPromos] = useState(false)
   const [requestTarget, setRequestTarget] = useState<RequestTarget | null>(null)
   const [acceptingDealId, setAcceptingDealId] = useState<string | null>(null)
@@ -77,7 +83,10 @@ export function DJRequestsPage() {
 
   useEffect(() => {
     if (!firebaseUser) return
-    return subscribeDJProfile(firebaseUser.uid, (profile) => setPromoOptIn(profile?.bulkOutreachOptIn ?? false))
+    return subscribeDJProfile(firebaseUser.uid, (profile) => {
+      setHasDjProfile(profile !== null)
+      setPromoOptIn(profile?.bulkOutreachOptIn ?? false)
+    })
   }, [firebaseUser])
 
   async function enableArtistPromos() {
@@ -86,6 +95,8 @@ export function DJRequestsPage() {
     try {
       await updateDJProfile(firebaseUser.uid, { bulkOutreachOptIn: true })
       setPromoOptIn(true)
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Could not turn on artist promos.', 'error')
     } finally {
       setEnablingPromos(false)
     }
@@ -217,7 +228,20 @@ export function DJRequestsPage() {
           <p className="mt-1 text-sm text-ink-2">Licence packages artists have attached to tracks for DJs.</p>
         </div>
 
-        {promoOptIn === false ? (
+        {hasDjProfile === false ? (
+          <div className="flex flex-col gap-4 rounded-2xl border border-dj-500/30 bg-dj-500/[0.07] p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-ink-0">Finish setting up your DJ profile</p>
+              <p className="mt-1 text-sm text-ink-2">Artist promos, deals, and requests need a DJ profile first.</p>
+            </div>
+            <Link
+              to="/dj/profile"
+              className="inline-flex shrink-0 items-center rounded-full bg-dj-400 px-4 py-2 text-sm font-semibold text-surface-0 hover:bg-dj-300"
+            >
+              Complete DJ profile
+            </Link>
+          </div>
+        ) : promoOptIn === false ? (
           <div className="flex flex-col gap-4 rounded-2xl border border-dj-500/30 bg-dj-500/[0.07] p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold text-ink-0">Artist promo messages are turned off</p>

@@ -1617,3 +1617,23 @@ test('BUG 4 — Discover never shows the same artist twice across Rising/Most Su
   // across navigation, which is existing, intentional behaviour, not something introduced here.
   assert.doesNotMatch(page, /usePlayer|playTrack\(/)
 })
+
+test('DJ Requests never presents a promo-opt-in control that silently fails for a dj-role account with no djProfiles doc yet, and the write itself no longer becomes an uncaught rejection (user-reported console error: "Uncaught (in promise) FirebaseError: Missing or insufficient permissions")', () => {
+  const page = read('src/pages/dj/DJRequestsPage.tsx')
+  // Root cause: a dj-role account can reach this page without ever having completed DJ
+  // profile setup (djProfiles/{uid} doesn't exist) — updateDJProfile then fails because the
+  // update rule requires the doc to already exist, and enableArtistPromos had no catch at
+  // all, so the rejection went uncaught instead of being shown to the user.
+  assert.match(page, /const \[hasDjProfile, setHasDjProfile\] = useState<boolean \| null>\(null\)/)
+  assert.match(page, /setHasDjProfile\(profile !== null\)/)
+  assert.match(page, /await updateDJProfile\(firebaseUser\.uid, \{ bulkOutreachOptIn: true \}\)\s*\n\s*setPromoOptIn\(true\)\s*\n\s*\} catch \(error\) \{\s*\n\s*notify\(error instanceof Error \? error\.message : 'Could not turn on artist promos\.', 'error'\)/)
+
+  // When there's no profile yet, the page offers the real fix (finish DJ profile setup,
+  // matching DJProfilePage's own established "no profile" messaging) instead of a button
+  // that would just fail again.
+  assert.match(page, /hasDjProfile === false \? \(/)
+  assert.match(page, /Finish setting up your DJ profile/)
+  assert.match(page, /to="\/dj\/profile"/)
+  const djProfilePage = read('src/pages/dj/DJProfilePage.tsx')
+  assert.match(djProfilePage, /No DJ profile found/)
+})
