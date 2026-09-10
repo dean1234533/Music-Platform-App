@@ -1992,3 +1992,18 @@ test('a deal can be reassigned across tracks directly from the DJ Deals page, no
   assert.match(page, /const assigned = track\.djDealSettings\?\.allowedDealIds\?\.includes\(deal\.dealId\) \?\? false/)
   assert.match(page, /onChange=\{\(e\) => void handleToggleAssignment\(track, deal\.dealId, e\.target\.checked\)\}/)
 })
+
+test('the track-assignment list collapses into a dropdown instead of wrapping a checkbox per track (user-reported: "for mobile this shoild have a dropdown or something as if you had 10 tracks for example this would look messy")', () => {
+  const page = read('src/pages/artist/dashboard/DjDealsPage.tsx')
+  // A native <details>/<summary> — no popover/portal library needed, collapses to one
+  // compact row by default, and the checklist itself scrolls instead of growing the page
+  // when there are many tracks.
+  assert.match(page, /<details className="group">/)
+  assert.match(page, /<summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-lg border border-surface-border bg-surface-2 px-3 py-2 text-xs text-ink-1 marker:content-none \[&::-webkit-details-marker\]:hidden">/)
+  assert.match(page, /Assigned to \{tracks\.filter\(\(t\) => t\.djDealSettings\?\.allowedDealIds\?\.includes\(deal\.dealId\)\)\.length\} of \{tracks\.length\}/)
+  assert.match(page, /import \{ ChevronDown, Trash2 \} from 'lucide-react'/)
+  assert.match(page, /<ChevronDown className="h-3\.5 w-3\.5 shrink-0 text-ink-3 transition group-open:rotate-180" \/>/)
+  assert.match(page, /className="mt-1\.5 flex max-h-56 flex-col gap-0\.5 overflow-y-auto rounded-lg border border-surface-border bg-surface-1 p-1\.5"/)
+  // No longer a flex-wrap pile of pill checkboxes.
+  assert.doesNotMatch(page, /flex flex-wrap gap-1\.5/)
+})

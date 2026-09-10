@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { ChevronDown, Trash2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { createDjDeal, deleteDjDeal, newDealId, subscribeArtistDeals, updateDjDeal } from '@/services/dealService'
@@ -272,32 +272,36 @@ export function DjDealsPage() {
                     Upload a track first, then it'll appear here to assign this deal to.
                   </p>
                 ) : (
-                  <div>
-                    <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-ink-3">Assigned tracks</p>
-                    <div className="flex flex-wrap gap-1.5">
+                  <details className="group">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-lg border border-surface-border bg-surface-2 px-3 py-2 text-xs text-ink-1 marker:content-none [&::-webkit-details-marker]:hidden">
+                      <span>
+                        Assigned to {tracks.filter((t) => t.djDealSettings?.allowedDealIds?.includes(deal.dealId)).length} of {tracks.length}{' '}
+                        {tracks.length === 1 ? 'track' : 'tracks'}
+                      </span>
+                      <ChevronDown className="h-3.5 w-3.5 shrink-0 text-ink-3 transition group-open:rotate-180" />
+                    </summary>
+                    <div className="mt-1.5 flex max-h-56 flex-col gap-0.5 overflow-y-auto rounded-lg border border-surface-border bg-surface-1 p-1.5">
                       {tracks.map((track) => {
                         const assigned = track.djDealSettings?.allowedDealIds?.includes(deal.dealId) ?? false
                         const key = `${track.trackId}_${deal.dealId}`
                         return (
                           <label
                             key={track.trackId}
-                            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${
-                              assigned ? 'border-brand-500/40 bg-brand-500/10 text-brand-400' : 'border-surface-border bg-surface-2 text-ink-2'
-                            }`}
+                            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-ink-1 hover:bg-surface-2"
                           >
                             <input
                               type="checkbox"
                               checked={assigned}
                               disabled={togglingKey === key}
                               onChange={(e) => void handleToggleAssignment(track, deal.dealId, e.target.checked)}
-                              className="h-3 w-3"
+                              className="h-3.5 w-3.5 shrink-0"
                             />
-                            {track.title}
+                            <span className="truncate">{track.title}</span>
                           </label>
                         )
                       })}
                     </div>
-                  </div>
+                  </details>
                 )}
               </div>
             ))}
