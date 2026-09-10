@@ -192,7 +192,7 @@ export function ArtistSettingsPage() {
   }
 
   return (
-    <div className="flex max-w-lg flex-col gap-8">
+    <div className="mx-auto flex w-full max-w-lg flex-col gap-8">
       <h1 className="text-2xl font-semibold text-ink-0">Artist settings</h1>
 
       <section className="flex flex-col gap-4">

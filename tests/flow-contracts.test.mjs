@@ -1197,7 +1197,7 @@ test('public mobile pages respect the device safe area and cannot widen the view
 
 test('the shared mobile navigation keeps home-indicator clearance without a double-height footer', () => {
   const nav = read('src/components/layout/MobileNav.tsx')
-  assert.match(nav, /calc\(env\(safe-area-inset-bottom\)-1rem\)/)
+  assert.match(nav, /pb-\[max\(0\.375rem,env\(safe-area-inset-bottom\)\)\]/)
   assert.match(nav, /flex flex-1 translate-y-1 flex-col/)
   assert.doesNotMatch(nav, /style=\{\{ paddingBottom: 'env\(safe-area-inset-bottom\)' \}\}/)
 })
@@ -2278,4 +2278,24 @@ test('a free-plan fan cannot claim artist-defined perk offers, enforced server-s
   // locked defaults to false, so nothing there needed to change.
   const artistPage = read('src/pages/artist/dashboard/FanOffersPage.tsx')
   assert.doesNotMatch(artistPage, /useFanFeature|locked=/)
+})
+
+test('every settings page is centered and width-constrained inside the shared 1440px content area, instead of pinning left with a large empty gap or stretching edge to edge (user-reported: "all the settings pages need to be centered and fit the screen better")', () => {
+  // Root cause: AppShell already centers a wide max-w-[1440px] content area for every
+  // dashboard page (mx-auto on <main>'s inner div) — but three settings pages set their own
+  // max-w-lg form container with no mx-auto of its own, so on a wide screen that narrow form
+  // sat flush against the LEFT edge of the already-centered 1440px area instead of being
+  // centered within it. AdminSettingsPage had no width constraint at all, so its 4-column
+  // grids stretched edge to edge on a wide screen.
+  const fan = read('src/pages/fan/SettingsPage.tsx')
+  assert.match(fan, /<div className="mx-auto flex w-full max-w-lg flex-col gap-8">/)
+
+  const artist = read('src/pages/artist/dashboard/ArtistSettingsPage.tsx')
+  assert.match(artist, /<div className="mx-auto flex w-full max-w-lg flex-col gap-8">/)
+
+  const dj = read('src/pages/dj/DJProfilePage.tsx')
+  assert.match(dj, /<div className="mx-auto flex w-full max-w-lg flex-col gap-6">/)
+
+  const admin = read('src/pages/admin/AdminSettingsPage.tsx')
+  assert.match(admin, /<div className="mx-auto flex w-full max-w-3xl flex-col gap-8">/)
 })
