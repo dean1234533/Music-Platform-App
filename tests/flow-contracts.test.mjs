@@ -1660,11 +1660,15 @@ test('Discover\'s "Artists seeking DJ exposure" section shows artist cards, not 
   // restriction that broke every broad browsing query earlier this session.
   assert.match(page, /import \{ getArtistProfile \} from '@\/services\/artistService'/)
 
-  // Same self-exclusion-unless-it-would-empty-the-section and cross-section dedup as
-  // Rising/Most Supported — an artist already shown above doesn't reappear here, and this
-  // section claims last, matching its position at the bottom of the page.
-  assert.match(page, /const djArtistCandidates = excludeSelfUnlessEmpty\(djArtistProfiles\)/)
-  assert.match(page, /const dedupedDjArtists = djArtistCandidates\.filter\(\(artist\) => !shown\.has\(artist\.artistId\)\)/)
+  // Same self-exclusion-unless-it-would-empty-the-section as Rising/Most Supported, but
+  // deliberately NOT cross-section deduped against them — "seeking DJ exposure" is a
+  // distinct fact (a track opted into DJ licensing), true independently of whether the
+  // artist also ranks in Rising or Most Supported, so an artist already shown above must
+  // still appear here too (user-reported: "for fan nothing shows in Artists seeking DJ
+  // exposure" — caused by exactly this cross-dedup incorrectly emptying the section
+  // whenever the platform's only qualifying artist had already been claimed by Rising).
+  assert.match(page, /const dedupedDjArtists = excludeSelfUnlessEmpty\(djArtistProfiles\)/)
+  assert.doesNotMatch(page, /dedupedDjArtists\.filter\(\(artist\) => !shown\.has/)
 
   assert.match(
     page,

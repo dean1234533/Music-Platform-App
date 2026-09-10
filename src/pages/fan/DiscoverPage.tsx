@@ -75,9 +75,14 @@ export function DiscoverPage() {
       const shown = new Set<string>(dedupedRising.map((artist) => artist.artistId))
       const supportedCandidates = excludeSelfUnlessEmpty(supported)
       const dedupedSupported = supportedCandidates.filter((artist) => !shown.has(artist.artistId))
-      for (const artist of dedupedSupported) shown.add(artist.artistId)
-      const djArtistCandidates = excludeSelfUnlessEmpty(djArtistProfiles)
-      const dedupedDjArtists = djArtistCandidates.filter((artist) => !shown.has(artist.artistId))
+      // "Artists seeking DJ exposure" doesn't compete with Rising/Most Supported for a
+      // dedup slot — those two are both popularity rankings that can legitimately overlap
+      // (the same artist genuinely ranking in both), which is what cross-section dedup was
+      // built for. "Seeking DJ exposure" is a different kind of fact (this artist has a
+      // track opted into DJ licensing), true independently of whether they also rank as
+      // Rising or Most Supported — hiding it because they appeared above defeats the
+      // section's purpose rather than avoiding a real duplicate.
+      const dedupedDjArtists = excludeSelfUnlessEmpty(djArtistProfiles)
 
       setNewReleases(releases)
       setRisingEmptyReason(rising.length === 0 ? 'none' : dedupedRising.length === 0 ? 'claimed' : null)
