@@ -137,11 +137,11 @@ export function DiscoverPage() {
   }
 
   return (
-    <div className="flex flex-col gap-12">
-      <div className="border-b border-white/[0.08] pb-8 pt-2">
+    <div className="flex flex-col gap-8 sm:gap-12">
+      <div className="border-b border-white/[0.08] pb-6 pt-2 sm:pb-8">
         <p className="eyebrow">Beyond the algorithm</p>
-        <h1 className="mt-3 text-4xl font-medium tracking-[-0.045em] text-ink-0 sm:text-5xl">Find your next obsession.</h1>
-        <p className="mt-3 text-base text-ink-2">Independent releases, real momentum, no fabricated charts.</p>
+        <h1 className="mt-2 text-3xl font-medium tracking-[-0.045em] text-ink-0 sm:mt-3 sm:text-5xl">Find your next obsession.</h1>
+        <p className="mt-2 text-sm leading-6 text-ink-2 sm:mt-3 sm:text-base">Independent releases, real momentum, no fabricated charts.</p>
       </div>
 
       {storiesByArtist.size > 0 ? (

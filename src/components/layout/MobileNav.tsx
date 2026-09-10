@@ -25,7 +25,7 @@ export function MobileNav({ items, moreExclude = [] }: { items: NavItem[]; moreE
   return (
     <>
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 flex border-t border-white/[0.07] bg-surface-1/95 pb-[max(0.375rem,calc(env(safe-area-inset-bottom)-1rem))] shadow-[0_-14px_40px_rgba(0,0,0,.3)] backdrop-blur-xl md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 flex min-h-16 border-t border-white/[0.07] bg-surface-1/95 pb-[max(0.375rem,env(safe-area-inset-bottom))] shadow-[0_-14px_40px_rgba(0,0,0,.3)] backdrop-blur-xl md:hidden"
       >
         {primary.map((item) => (
           <NavLink

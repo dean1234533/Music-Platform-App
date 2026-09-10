@@ -53,21 +53,27 @@ export function DJPublicProfilePage() {
         </button>
       </header>
 
-      <div className="relative h-44 w-full overflow-hidden border-y border-white/[0.06] bg-surface-2 sm:h-52 lg:h-56">
+      <div className="relative h-60 w-full overflow-hidden border-y border-white/[0.06] bg-surface-2 sm:h-72 lg:h-96">
         <img
           src={profile.coverURL || '/dj-requests-empty-bg.png'}
           alt=""
-          className="h-full w-full object-cover object-[center_56%]"
+          className="h-full w-full object-cover object-center"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-surface-0 via-surface-0/20 to-surface-0/10" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,7,.08)_0%,rgba(5,6,7,.16)_42%,rgba(5,6,7,.76)_100%)]" />
       </div>
 
-      <main className="relative z-10 mx-auto -mt-12 max-w-6xl px-5 sm:-mt-14 sm:px-8 lg:-mt-16 lg:px-10">
-        <section className="premium-panel rounded-[2rem] p-5 sm:p-7 lg:p-9">
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-end">
+      <main className="relative z-10 mx-auto -mt-12 max-w-6xl px-5 sm:-mt-16 sm:px-8 lg:-mt-24 lg:px-10">
+        <section className="premium-panel relative overflow-hidden rounded-[2rem] p-5 sm:p-7 lg:p-9">
+          <img
+            src={profile.coverURL || '/dj-requests-empty-bg.png'}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover object-center opacity-55"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,6,7,.88),rgba(5,6,7,.58)_58%,rgba(5,6,7,.38)),linear-gradient(0deg,rgba(5,6,7,.66),transparent_72%)]" />
+          <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-end">
           <div className="h-28 w-28 shrink-0 overflow-hidden rounded-[1.6rem] border border-dj-400/35 bg-surface-3 shadow-[0_24px_70px_rgba(0,0,0,.45)] sm:h-36 sm:w-36">
             {profile.photoURL ? (
-              <img src={profile.photoURL} alt="" className="h-full w-full object-cover" />
+              <img src={profile.photoURL} alt="" className="h-full w-full object-cover object-center" />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_30%_20%,rgba(56,189,248,.24),transparent_42%),linear-gradient(145deg,#172333,#090c10)] font-serif text-5xl text-white sm:text-6xl">
                 {profile.name.charAt(0).toUpperCase()}

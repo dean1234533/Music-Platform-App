@@ -17,7 +17,7 @@ export function PlayerBar() {
   if (!currentTrack) return null
 
   return (
-    <div className="fixed inset-x-0 bottom-14 z-40 border-t border-white/[0.08] bg-[#090b0d]/90 px-3 py-2 shadow-[0_-20px_50px_rgba(0,0,0,.2)] backdrop-blur-2xl md:bottom-0 md:left-[264px] md:px-6 md:py-3">
+    <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-50 border-t border-white/[0.08] bg-[#090b0d]/95 px-3 py-2 shadow-[0_-20px_50px_rgba(0,0,0,.2)] backdrop-blur-2xl md:bottom-0 md:left-[264px] md:z-40 md:px-6 md:py-3">
       <div className="mb-1.5 flex items-center gap-2 md:hidden">
         <input
           type="range"
@@ -59,7 +59,7 @@ export function PlayerBar() {
           <button
             onClick={togglePlay}
             disabled={isLoading}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-ink-0 text-surface-0 shadow-lg transition hover:scale-105 hover:bg-brand-400 disabled:opacity-60"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-400 text-surface-0 shadow-lg transition hover:scale-105 hover:bg-brand-500 disabled:bg-brand-500 disabled:opacity-90"
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isLoading ? (
