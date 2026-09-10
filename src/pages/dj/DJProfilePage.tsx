@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ChangeEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { BadgeCheck } from 'lucide-react'
+import { BadgeCheck, ExternalLink } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeDJProfile, updateDJProfile } from '@/services/djService'
 import { submitVerificationRequest } from '@/services/verificationService'
 import { signOut } from '@/services/authService'
 import { removeRole } from '@/services/userService'
+import { uploadUserAvatar } from '@/services/profileMediaService'
+import { validateImageFile } from '@/utils/uploadLimits'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
 import { LoadingState, EmptyState, ErrorState } from '@/components/common/StateViews'
@@ -26,6 +28,8 @@ export function DJProfilePage() {
   const [verificationError, setVerificationError] = useState<string | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [removingRole, setRemovingRole] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!firebaseUser) return
@@ -104,6 +108,26 @@ export function DJProfilePage() {
     }
   }
 
+  async function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !firebaseUser) return
+    const validationError = validateImageFile(file)
+    if (validationError) {
+      setPhotoError(validationError)
+      return
+    }
+    setPhotoError(null)
+    setUploadingPhoto(true)
+    try {
+      const photoURL = await uploadUserAvatar(firebaseUser.uid, file)
+      await updateDJProfile(firebaseUser.uid, { photoURL })
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : 'Could not upload photo.')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
   async function handleSave() {
     setSaving(true)
     setSaved(false)
@@ -132,11 +156,36 @@ export function DJProfilePage() {
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
-      <div className="flex items-center gap-2">
-        <h1 className="text-2xl font-semibold text-ink-0">DJ settings</h1>
-        {profile.verificationStatus === 'verified' ? <BadgeCheck className="h-5 w-5 text-brand-400" /> : null}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-semibold text-ink-0">DJ settings</h1>
+          {profile.verificationStatus === 'verified' ? <BadgeCheck className="h-5 w-5 text-brand-400" /> : null}
+        </div>
+        <Link
+          to={`/djs/${profile.djId}`}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-1.5 rounded-full border border-surface-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-ink-1 hover:bg-surface-3"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          Preview live profile
+        </Link>
       </div>
-      <p className="-mt-4 text-sm text-ink-2">
+
+      <div className="-mt-2 flex items-center gap-4">
+        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full bg-surface-2">
+          {profile.photoURL ? <img src={profile.photoURL} alt="" className="h-full w-full object-cover" /> : null}
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="w-fit cursor-pointer rounded-full border border-surface-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-ink-1 hover:bg-surface-3">
+            {uploadingPhoto ? 'Uploading…' : profile.photoURL ? 'Change photo' : 'Add photo'}
+            <input type="file" accept="image/*" className="hidden" disabled={uploadingPhoto} onChange={handlePhotoChange} />
+          </label>
+          {photoError ? <p className="text-xs text-danger-500">{photoError}</p> : <p className="text-xs text-ink-3">Resized and compressed automatically.</p>}
+        </div>
+      </div>
+
+      <p className="text-sm text-ink-2">
         Verification status: <span className="text-ink-0">{profile.verificationStatus}</span>.{' '}
         {profile.verificationStatus === 'verified'
           ? 'The badge next to your name is visible to every artist you request tracks from.'

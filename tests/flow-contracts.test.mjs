@@ -2299,3 +2299,30 @@ test('every settings page is centered and width-constrained inside the shared 14
   const admin = read('src/pages/admin/AdminSettingsPage.tsx')
   assert.match(admin, /<div className="mx-auto flex w-full max-w-3xl flex-col gap-8">/)
 })
+
+test('a DJ can set a profile photo, and both artist and DJ settings link to a live preview of their public profile (user-reported: "the dj has no profile image. they should be able to set one. also anyone with a profile should be able to preveiw it to see what it will look like live")', () => {
+  // Root cause: uploadUserAvatar in profileMediaService.ts was already generic (uid-keyed
+  // Storage path, its own comment says "Fan/DJ avatar") and DJPublicProfilePage.tsx already
+  // rendered profile.photoURL — but nothing in DJProfilePage's edit form ever called it, so
+  // there was no way for a DJ to actually set the photo the public page was ready to show.
+  const dj = read('src/pages/dj/DJProfilePage.tsx')
+  assert.match(dj, /import \{ uploadUserAvatar \} from '@\/services\/profileMediaService'/)
+  assert.match(dj, /const photoURL = await uploadUserAvatar\(firebaseUser\.uid, file\)/)
+  assert.match(dj, /await updateDJProfile\(firebaseUser\.uid, \{ photoURL \}\)/)
+  assert.match(dj, /\{uploadingPhoto \? 'Uploading…' : profile\.photoURL \? 'Change photo' : 'Add photo'\}/)
+
+  // Storage rules already scope this path by uid, not role — confirmed no rules change
+  // needed for a DJ (vs a fan) to write here.
+  const storageRules = read('storage.rules')
+  assert.match(storageRules, /match \/users\/\{userId\}\/profile\/\{fileName\} \{\s*\n\s*allow read: if true;\s*\n\s*allow write: if isSignedIn\(\) && request\.auth\.uid == userId/)
+
+  // Preview links on both settings pages, opening the real public route in a new tab so
+  // in-progress edits aren't lost.
+  assert.match(dj, /to=\{`\/djs\/\$\{profile\.djId\}`\}/)
+  assert.match(dj, /Preview live profile/)
+  assert.match(dj, /target="_blank"/)
+
+  const artist = read('src/pages/artist/dashboard/ArtistSettingsPage.tsx')
+  assert.match(artist, /to=\{`\/artist\/\$\{artist\.slug\}`\}/)
+  assert.match(artist, /Preview live profile/)
+})

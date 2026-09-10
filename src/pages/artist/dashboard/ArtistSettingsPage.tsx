@@ -1,5 +1,6 @@
 import { useEffect, useState, type ChangeEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { ExternalLink } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeArtistProfile, updateArtistProfile } from '@/services/artistService'
 import { subscribeOwnVerificationRequests, submitVerificationRequest } from '@/services/verificationService'
@@ -193,7 +194,18 @@ export function ArtistSettingsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-8">
-      <h1 className="text-2xl font-semibold text-ink-0">Artist settings</h1>
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-2xl font-semibold text-ink-0">Artist settings</h1>
+        <Link
+          to={`/artist/${artist.slug}`}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-1.5 rounded-full border border-surface-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-ink-1 hover:bg-surface-3"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          Preview live profile
+        </Link>
+      </div>
 
       <section className="flex flex-col gap-4">
         <div className="flex items-center gap-5">
