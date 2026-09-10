@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useSmartBack } from '@/hooks/useSmartBack'
+import { homeFallbackPath } from '@/lib/workspaceRoute'
 import { ArrowLeft, BadgeCheck, Disc3, Flag, MapPin } from 'lucide-react'
 import { subscribeDJProfile } from '@/services/djService'
 import { useAuth } from '@/contexts/AuthContext'
@@ -12,11 +13,11 @@ import type { DJProfile } from '@/types/dj'
 export function DJPublicProfilePage() {
   const { djId } = useParams<{ djId: string }>()
   const [searchParams] = useSearchParams()
+  const { firebaseUser, profile: viewerProfile } = useAuth()
   // Opened as a self-preview from DJ settings (target="_blank", so this tab's own history
-  // never included Settings — useSmartBack's usual "no history" fallback of "/" would
-  // otherwise send the DJ to the public homepage instead of back to what they were editing).
-  const goBack = useSmartBack(searchParams.get('preview') === '1' ? '/dj/profile' : '/')
-  const { firebaseUser } = useAuth()
+  // never included Settings — useSmartBack's usual "no history" fallback would otherwise
+  // send the DJ to their own workspace instead of back to what they were editing).
+  const goBack = useSmartBack(searchParams.get('preview') === '1' ? '/dj/profile' : homeFallbackPath(viewerProfile))
   const [profile, setProfile] = useState<DJProfile | null | undefined>(undefined)
   const [loadError, setLoadError] = useState(false)
   const [showReport, setShowReport] = useState(false)

@@ -1894,17 +1894,15 @@ test('back buttons fall back to a real destination instead of silently doing not
   // worker reload — exactly how a DJ public profile link like this one is normally reached.
   const hook = read('src/hooks/useSmartBack.ts')
   assert.match(hook, /export function useSmartBack\(fallbackPath: string\)/)
-  assert.match(hook, /if \(location\.key === 'default'\) \{/)
   assert.match(hook, /navigate\(fallbackPath\)/)
   assert.match(hook, /navigate\(-1\)/)
 
   // Every page that previously called navigate(-1) directly for its back button now routes
   // through the shared hook with a real fallback destination instead.
-  // DJPublicProfilePage/ArtistPublicProfilePage moved to a conditional fallback (see the
-  // preview-link test below) — still routed through useSmartBack, just no longer a bare
-  // useSmartBack('/') call, so they're asserted separately instead of in this generic loop.
+  // DJPublicProfilePage/ArtistPublicProfilePage/TrackPage moved to a role-aware fallback (see
+  // the preview-link and PWA-back-button tests below) — still routed through useSmartBack,
+  // just no longer a bare useSmartBack('/') call, so they're asserted separately.
   const usages = [
-    ['src/pages/track/TrackPage.tsx', "useSmartBack('/')"],
     ['src/pages/agreements/RequestTimelinePage.tsx', "useSmartBack('/agreements')"],
     ['src/pages/agreements/ContractPage.tsx', "useSmartBack('/agreements')"],
     ['src/pages/agreements/MyAgreementsPage.tsx', "useSmartBack('/app')"],
@@ -2367,15 +2365,50 @@ test('pressing back on a self-previewed profile returns to the settings page it 
   const djPublic = read('src/pages/dj/DJPublicProfilePage.tsx')
   assert.match(djPublic, /import \{ Link, useParams, useSearchParams \} from 'react-router-dom'/)
   assert.match(djPublic, /const \[searchParams\] = useSearchParams\(\)/)
-  assert.match(djPublic, /const goBack = useSmartBack\(searchParams\.get\('preview'\) === '1' \? '\/dj\/profile' : '\/'\)/)
+  assert.match(
+    djPublic,
+    /const goBack = useSmartBack\(searchParams\.get\('preview'\) === '1' \? '\/dj\/profile' : homeFallbackPath\(viewerProfile\)\)/,
+  )
 
   const artistLink = read('src/pages/artist/dashboard/ArtistSettingsPage.tsx')
   assert.match(artistLink, /to=\{`\/artist\/\$\{artist\.slug\}\?preview=1`\}/)
   const artistPublic = read('src/pages/artist/ArtistPublicProfilePage.tsx')
   assert.match(
     artistPublic,
-    /const goBack = useSmartBack\(searchParams\.get\('preview'\) === '1' \? '\/dashboard\/artist\/settings' : '\/'\)/,
+    /const goBack = useSmartBack\(searchParams\.get\('preview'\) === '1' \? '\/dashboard\/artist\/settings' : homeFallbackPath\(viewerProfile\)\)/,
   )
+})
+
+test('the PWA back button returns to the actual previous page instead of always landing on home (user-reported: "on the pwa download the back button on bobile takes me to the home page and not the page that i came from")', () => {
+  // Root cause: useSmartBack decided whether real in-app history exists purely from React
+  // Router's in-memory location.key. iOS/Android routinely discard and recreate an installed
+  // PWA's WebView JS context while keeping the browser's real session-history stack intact —
+  // e.g. resuming from the OS app switcher, or reopening after the OS reclaimed memory while
+  // backgrounded — which hands the fresh Router instance a location.key of 'default' even
+  // though there's a real previous page one entry back. window.history.state (where React
+  // Router persists { idx, key }) is tied to the browser's history entry, not the JS context,
+  // so it survives that recreation — check it first, falling back to location.key only when
+  // it's unavailable (a genuinely fresh tab/deep link with no history at all).
+  const hook = read('src/hooks/useSmartBack.ts')
+  assert.match(hook, /const historyState = window\.history\.state as \{ idx\?: number \} \| null/)
+  assert.match(
+    hook,
+    /const hasRealHistory = typeof historyState\?\.idx === 'number' \? historyState\.idx > 0 : location\.key !== 'default'/,
+  )
+  assert.match(hook, /if \(hasRealHistory\) \{\s*navigate\(-1\)/)
+  assert.match(hook, /\} else \{\s*navigate\(fallbackPath\)/)
+
+  // Separately, when there truly is no history to recover (a fresh PWA launch, a notification
+  // tap, a shared link), the fallback itself now sends a signed-in user to their own workspace
+  // instead of the public marketing homepage — landing there reads exactly like "back sent me
+  // to the wrong home page".
+  const workspaceRoute = read('src/lib/workspaceRoute.ts')
+  assert.match(workspaceRoute, /export function homeFallbackPath\(profile: UserProfile \| null\): string/)
+  assert.match(workspaceRoute, /if \(!profile\?\.onboardingComplete\) return '\/'/)
+  assert.match(workspaceRoute, /return workspaceHomeForRoles\(profile\.roles\)/)
+
+  const trackPage = read('src/pages/track/TrackPage.tsx')
+  assert.match(trackPage, /const goBack = useSmartBack\(homeFallbackPath\(profile\)\)/)
 })
 
 test('the account email has its own labeled field instead of sitting unlabeled next to the avatar/role-badges/photo-upload control (user-reported: "in settings the email address has been randomly put anywhere")', () => {

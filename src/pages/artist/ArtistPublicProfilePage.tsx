@@ -9,6 +9,7 @@ import { subscribeIsFollowing } from '@/services/followService'
 import { subscribeIsSupporting } from '@/services/supportService'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSmartBack } from '@/hooks/useSmartBack'
+import { homeFallbackPath } from '@/lib/workspaceRoute'
 import { FollowButton } from '@/components/music/FollowButton'
 import { SupportButton } from '@/components/music/SupportButton'
 import { TrackCard } from '@/components/music/TrackCard'
@@ -35,11 +36,11 @@ export function ArtistPublicProfilePage() {
   const { slug } = useParams<{ slug: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const { firebaseUser, hasRole, profile: viewerProfile } = useAuth()
   // Opened as a self-preview from Settings (target="_blank", so this tab's own history never
-  // included Settings — useSmartBack's usual "no history" fallback of "/" would otherwise
-  // send the artist to the public homepage instead of back to what they were editing).
-  const goBack = useSmartBack(searchParams.get('preview') === '1' ? '/dashboard/artist/settings' : '/')
-  const { firebaseUser, hasRole } = useAuth()
+  // included Settings — useSmartBack's usual "no history" fallback would otherwise send the
+  // artist to their own workspace instead of back to what they were editing).
+  const goBack = useSmartBack(searchParams.get('preview') === '1' ? '/dashboard/artist/settings' : homeFallbackPath(viewerProfile))
   const { notify } = useToast()
   const [artistId, setArtistId] = useState<string | null | undefined>(undefined)
   const [artist, setArtist] = useState<ArtistProfile | null>(null)

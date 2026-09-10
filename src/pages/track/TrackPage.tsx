@@ -10,6 +10,7 @@ import { usePlayer } from '@/contexts/PlayerContext'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { useSmartBack } from '@/hooks/useSmartBack'
 import { useAuth } from '@/contexts/AuthContext'
+import { homeFallbackPath } from '@/lib/workspaceRoute'
 import { FollowButton } from '@/components/music/FollowButton'
 import { SupportButton } from '@/components/music/SupportButton'
 import { TrackActions } from '@/components/music/TrackActions'
@@ -32,12 +33,12 @@ export function TrackPage() {
   const { trackId: rawParam, slug } = useParams<{ trackId: string; slug?: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const goBack = useSmartBack('/')
   const [resolvedTrackId, setResolvedTrackId] = useState<string | null | undefined>(undefined)
   const [track, setTrack] = useState<TrackDoc | null | undefined>(undefined)
   const { playTrack, currentTrack, isPlaying, playbackKind, togglePlay } = usePlayer()
   const artist = useArtistSummary(track?.artistId ?? null)
-  const { firebaseUser, hasRole } = useAuth()
+  const { firebaseUser, hasRole, profile } = useAuth()
+  const goBack = useSmartBack(homeFallbackPath(profile))
   const [showDjRequest, setShowDjRequest] = useState(false)
   const [requestDealId, setRequestDealId] = useState<string | null>(null)
   const [showReport, setShowReport] = useState(false)
