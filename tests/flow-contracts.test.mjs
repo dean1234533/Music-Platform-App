@@ -1138,3 +1138,9 @@ test('public mobile pages respect the device safe area and cannot widen the view
   assert.match(artistProfile, /flex min-w-0 flex-wrap gap-2/)
   assert.match(landing, /env\(safe-area-inset-top\)/)
 })
+
+test('the shared mobile navigation keeps home-indicator clearance without a double-height footer', () => {
+  const nav = read('src/components/layout/MobileNav.tsx')
+  assert.match(nav, /calc\(env\(safe-area-inset-bottom\)-1rem\)/)
+  assert.doesNotMatch(nav, /style=\{\{ paddingBottom: 'env\(safe-area-inset-bottom\)' \}\}/)
+})
