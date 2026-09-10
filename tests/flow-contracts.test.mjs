@@ -1215,10 +1215,12 @@ test('an admin can never suspend or delete their own account (user-reported: app
 
 test('only an admin account can change its own roles after signup (add or remove, going invisible in the process) — a regular fan/artist/dj account is frozen at whatever roles it picked during onboarding (user-reported: "no users should not be able to do this only admin")', () => {
   const rules = read('firestore.rules')
-  assert.match(rules, /function roleActiveFor\(uid, role\) \{\s*return exists\(\/databases\/\$\(database\)\/documents\/users\/\$\(uid\)\)\s*&& role in get\(\/databases\/\$\(database\)\/documents\/users\/\$\(uid\)\)\.data\.roles;/)
-  assert.match(rules, /allow read: if roleActiveFor\(artistId, 'artist'\) \|\| isSelf\(artistId\) \|\| isAdmin\(\);/)
-  assert.match(rules, /allow read: if roleActiveFor\(djId, 'dj'\) \|\| isSelf\(djId\) \|\| isAdmin\(\);/)
-  assert.match(rules, /roleActiveFor\(resource\.data\.artistId, 'artist'\)/)
+  // Denormalized field, not a live cross-document roleActiveFor() check —
+  // see the dedicated "a fan can not see artist profile cards" regression
+  // test below for why that check was replaced.
+  assert.match(rules, /allow read: if resource\.data\.get\('roleActive', true\) == true \|\| isSelf\(artistId\) \|\| isAdmin\(\);/)
+  assert.match(rules, /allow read: if resource\.data\.get\('roleActive', true\) == true \|\| isSelf\(djId\) \|\| isAdmin\(\);/)
+  assert.match(rules, /resource\.data\.get\('artistRoleActive', true\) == true/)
 
   // A non-admin account may only ever set its own roles ONCE, at initial
   // signup (roles still []) — after that, this path freezes roles exactly
@@ -1718,4 +1720,41 @@ test('DJ discovery surfaces a track open for DJ promotion regardless of its fan-
   for (const file of ['src/pages/dj/DJDiscoverPage.tsx', 'src/pages/dj/DJRequestsPage.tsx', 'src/pages/fan/DiscoverPage.tsx']) {
     assert.match(read(file), /listArtistsSeekingDJExposure/)
   }
+})
+
+test('a fan can see artist profile cards and browse tracks again (user-reported) — Discover/new-releases/DJ-discovery list queries no longer fail outright because their security rule needed a cross-document get() call with no narrowing filter', () => {
+  const rules = read('firestore.rules')
+  // Root cause: Firestore rejects an entire list-style query outright (permission-denied
+  // for every candidate, not just an inactive one) when its rule needs a get()/exists() call
+  // and the query has no equality filter narrow enough to bound the candidate set. The live
+  // roleActiveFor(uid, role) check (a cross-document get()) on artistProfiles/djProfiles/tracks
+  // read rules broke every broad query against them — listRisingArtists, listMostSupportedArtists,
+  // listNewReleaseTracks, listDJPromotionTracksFiltered — confirmed live via direct Firestore
+  // REST calls before the fix (403 PERMISSION_DENIED) and after (200, real documents returned).
+  // The helper function itself is gone (comments below still name it, for context on why).
+  assert.doesNotMatch(rules, /function roleActiveFor\(uid, role\)/)
+  assert.match(rules, /allow read: if resource\.data\.get\('roleActive', true\) == true \|\| isSelf\(artistId\) \|\| isAdmin\(\);/)
+  assert.match(rules, /allow read: if resource\.data\.get\('roleActive', true\) == true \|\| isSelf\(djId\) \|\| isAdmin\(\);/)
+  assert.match(rules, /resource\.data\.get\('status', 'published'\) == 'published'\)\s*&& resource\.data\.get\('artistRoleActive', true\) == true/)
+  // Both fields default to visible when absent — no data migration/backfill needed for any
+  // pre-existing document, and they're frozen from every other client write.
+  assert.match(rules, /request\.resource\.data\.get\('roleActive', true\) == resource\.data\.get\('roleActive', true\)/)
+  assert.match(rules, /request\.resource\.data\.get\('artistRoleActive', true\) == resource\.data\.get\('artistRoleActive', true\)/)
+
+  // A dedicated trigger — not any of the existing role-changing callables/rules paths — is the
+  // one and only thing that ever sets these fields, keeping them in sync with users/{uid}.roles
+  // regardless of which of the several paths actually changed it (initial onboarding, self-service
+  // add-role, or the admin-only step-back/reinstate rules path).
+  const fn = read('functions/src/users.ts')
+  assert.match(fn, /export const onUserRolesChange = onDocumentWritten\('users\/\{uid\}', async \(event\) => \{/)
+  assert.match(fn, /const wasArtist = beforeRoles\.includes\('artist'\)/)
+  assert.match(fn, /const isArtist = afterRoles\.includes\('artist'\)/)
+  assert.match(fn, /if \(wasArtist !== isArtist\) \{/)
+  assert.match(fn, /await artistRef\.update\(\{ roleActive: isArtist \}\)/)
+  assert.match(fn, /const tracksSnap = await db\.collection\('tracks'\)\.where\('artistId', '==', uid\)\.get\(\)/)
+  assert.match(fn, /batch\.update\(doc\.ref, \{ artistRoleActive: isArtist \}\)/)
+  assert.match(fn, /if \(wasDj !== isDj\) \{/)
+  assert.match(fn, /await djRef\.update\(\{ roleActive: isDj \}\)/)
+
+  assert.match(read('functions/src/index.ts'), /export \{ onUserCreate, onUserRolesChange \} from '\.\/users\.js'/)
 })

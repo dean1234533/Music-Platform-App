@@ -25,17 +25,6 @@ service cloud.firestore {
       return hasRole('admin');
     }
 
-    // Whether uid's account currently holds `role` — the live source of
-    // truth for public profile visibility, not just "does a profile doc
-    // exist". Stepping back from the artist/dj role (removeRole) hides the
-    // public profile immediately without touching or deleting the profile
-    // doc itself, so re-adding the role (AddRolePage) restores it exactly
-    // as it was.
-    function roleActiveFor(uid, role) {
-      return exists(/databases/$(database)/documents/users/$(uid))
-        && role in get(/databases/$(database)/documents/users/$(uid)).data.roles;
-    }
-
     function hasActiveSupportFor(artistId) {
       return isSignedIn()
         && exists(/databases/$(database)/documents/supportRelationships/$(request.auth.uid + '_' + artistId))
@@ -98,7 +87,20 @@ service cloud.firestore {
       // Public only while the account still actually holds the artist role
       // — stepping back from it (removeRole) hides this from everyone but
       // the owner and admins, without deleting anything.
-      allow read: if roleActiveFor(artistId, 'artist') || isSelf(artistId) || isAdmin();
+      //
+      // A denormalized field, not a live roleActiveFor(artistId, 'artist')
+      // cross-document check: Firestore rejects an ENTIRE list-style query
+      // outright (permission-denied for every candidate, not just an
+      // inactive one) when its security rule needs a get()/exists() call
+      // and the query has no equality filter narrow enough to bound the
+      // candidate set — confirmed live, this broke listRisingArtists,
+      // listMostSupportedArtists, listNewReleaseTracks, and DJ discovery
+      // for every caller, signed in or not (user-reported: "a fan can not
+      // see artist profile cards"). roleActive defaults to true when absent
+      // so every pre-existing document needs no backfill; it's kept in sync
+      // going forward by onUserRolesChange, which is the only thing that
+      // may ever set it (frozen from every other client write below).
+      allow read: if resource.data.get('roleActive', true) == true || isSelf(artistId) || isAdmin();
       // Creation is Cloud-Function-only (createArtistProfile) — it also
       // grants the artist role in the same server-side transaction, which
       // a direct client create here never could (users/{userId}'s own
@@ -116,7 +118,8 @@ service cloud.firestore {
         && request.resource.data.get('profileViews', 0) == resource.data.get('profileViews', 0)
         && request.resource.data.get('referralViews', {}) == resource.data.get('referralViews', {})
         && request.resource.data.get('followConversions', 0) == resource.data.get('followConversions', 0)
-        && request.resource.data.get('supportConversions', 0) == resource.data.get('supportConversions', 0);
+        && request.resource.data.get('supportConversions', 0) == resource.data.get('supportConversions', 0)
+        && request.resource.data.get('roleActive', true) == resource.data.get('roleActive', true);
       allow delete: if false;
     }
 
@@ -132,14 +135,15 @@ service cloud.firestore {
     }
 
     match /djProfiles/{djId} {
-      // Same live-role gate as artistProfiles above.
-      allow read: if roleActiveFor(djId, 'dj') || isSelf(djId) || isAdmin();
+      // Same denormalized-field gate as artistProfiles above, for the same reason.
+      allow read: if resource.data.get('roleActive', true) == true || isSelf(djId) || isAdmin();
       // Creation is Cloud-Function-only (createDJProfile) — same reasoning as artistProfiles above.
       allow create: if false;
       // Verification is server-maintained. bulkOutreachOptIn is DJ-writable.
       allow update: if isSelf(djId)
         && request.resource.data.djId == resource.data.djId
-        && request.resource.data.verificationStatus == resource.data.verificationStatus;
+        && request.resource.data.verificationStatus == resource.data.verificationStatus
+        && request.resource.data.get('roleActive', true) == resource.data.get('roleActive', true);
       allow delete: if false;
     }
 
@@ -160,9 +164,13 @@ service cloud.firestore {
       // The artist-still-holds-the-role gate also applies here — the same
       // stepping-back that hides artistProfiles hides their tracks too, not
       // just the profile page, so a bookmarked/shared track link goes dark
-      // along with everything else.
+      // along with everything else. Denormalized (artistRoleActive), not a
+      // live roleActiveFor() cross-document check, for the same list-query
+      // reason documented on artistProfiles above — this exact check broke
+      // every broad tracks query (new releases, DJ discovery, genre search)
+      // for every caller before switching to a plain per-document field.
       allow read: if ((resource.data.get('status', 'published') == 'published')
-        && roleActiveFor(resource.data.artistId, 'artist')
+        && resource.data.get('artistRoleActive', true) == true
         && (
            resource.data.visibility == 'public'
         || resource.data.visibility == 'followers'
@@ -242,7 +250,8 @@ service cloud.firestore {
         && request.resource.data.get('restrictedCapabilities', []) == resource.data.get('restrictedCapabilities', [])
         && request.resource.data.get('legalHold', false) == resource.data.get('legalHold', false)
         && request.resource.data.get('trackSlug', null) == resource.data.get('trackSlug', null)
-        && request.resource.data.get('viewCount', 0) == resource.data.get('viewCount', 0);
+        && request.resource.data.get('viewCount', 0) == resource.data.get('viewCount', 0)
+        && request.resource.data.get('artistRoleActive', true) == resource.data.get('artistRoleActive', true);
 
       // Server callable performs licence/legal-hold checks and media cleanup.
       allow delete: if false;
