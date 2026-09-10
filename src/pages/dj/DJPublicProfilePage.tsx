@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useSmartBack } from '@/hooks/useSmartBack'
-import { ArrowLeft, BadgeCheck, Flag, MapPin } from 'lucide-react'
+import { ArrowLeft, BadgeCheck, Disc3, Flag, MapPin } from 'lucide-react'
 import { subscribeDJProfile } from '@/services/djService'
 import { useAuth } from '@/contexts/AuthContext'
 import { BrandMark } from '@/components/common/BrandMark'
@@ -37,43 +37,47 @@ export function DJPublicProfilePage() {
   if (profile === null) return <ErrorState title="DJ not found" description="This DJ profile doesn't exist." />
 
   return (
-    <div className="min-h-svh overflow-x-hidden bg-surface-0 text-ink-0">
-      <header className="mx-auto flex max-w-3xl items-center justify-between px-5 pb-6 pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-8">
+    <div className="min-h-svh overflow-hidden bg-surface-0 pb-24 text-ink-0">
+      <header className="relative z-30 mx-auto flex min-h-20 max-w-[1440px] items-center justify-between px-5 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8 lg:px-12">
         <Link to="/" aria-label="BackTheVibes home"><BrandMark /></Link>
-        <button onClick={goBack} className="flex items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0 active:opacity-60">
+        <button
+          type="button"
+          onClick={goBack}
+          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-ink-1 transition hover:border-white/20 hover:text-white active:opacity-60"
+        >
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
       </header>
 
-      <main className="mx-auto flex max-w-3xl flex-col gap-6 px-5 pb-24 sm:px-8">
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-end">
-          <div className="h-28 w-28 shrink-0 overflow-hidden rounded-[1.6rem] border border-white/15 bg-surface-3 sm:h-36 sm:w-36">
+      <div className="relative h-44 w-full overflow-hidden border-y border-white/[0.06] bg-surface-2 sm:h-52 lg:h-56">
+        <img
+          src={profile.coverURL || '/dj-requests-empty-bg.png'}
+          alt=""
+          className="h-full w-full object-cover object-[center_56%]"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-surface-0 via-surface-0/20 to-surface-0/10" />
+      </div>
+
+      <main className="relative z-10 mx-auto -mt-12 max-w-6xl px-5 sm:-mt-14 sm:px-8 lg:-mt-16 lg:px-10">
+        <section className="premium-panel rounded-[2rem] p-5 sm:p-7 lg:p-9">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-end">
+          <div className="h-28 w-28 shrink-0 overflow-hidden rounded-[1.6rem] border border-dj-400/35 bg-surface-3 shadow-[0_24px_70px_rgba(0,0,0,.45)] sm:h-36 sm:w-36">
             {profile.photoURL ? (
               <img src={profile.photoURL} alt="" className="h-full w-full object-cover" />
             ) : (
-              <div className="flex h-full w-full items-center justify-center font-serif text-5xl text-ink-2">
+              <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_30%_20%,rgba(56,189,248,.24),transparent_42%),linear-gradient(145deg,#172333,#090c10)] font-serif text-5xl text-white sm:text-6xl">
                 {profile.name.charAt(0).toUpperCase()}
               </div>
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-dj-400">DJ</p>
+            <p className="mb-2 flex items-center gap-2 text-[0.7rem] font-bold uppercase tracking-[0.18em] text-dj-400"><Disc3 className="h-3.5 w-3.5" /> DJ profile</p>
             <div className="flex items-center gap-2.5">
-              <h1 className="truncate text-3xl font-semibold text-ink-0 sm:text-4xl">{profile.name}</h1>
+              <h1 className="truncate text-3xl font-medium tracking-[-0.045em] text-ink-0 sm:text-5xl">{profile.name}</h1>
               {profile.verificationStatus === 'verified' ? <BadgeCheck className="h-6 w-6 shrink-0 text-brand-400" /> : null}
-              {firebaseUser ? (
-                <button
-                  type="button"
-                  onClick={() => setShowReport(true)}
-                  aria-label="Report this DJ"
-                  className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-ink-3 transition hover:border-white/20 hover:text-ink-1"
-                >
-                  <Flag className="h-4 w-4" />
-                </button>
-              ) : null}
             </div>
             {profile.city || profile.country ? (
-              <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-2">
+              <p className="mt-3 flex items-center gap-1.5 text-sm text-ink-2">
                 <MapPin className="h-3.5 w-3.5" />
                 {[profile.city, profile.country].filter(Boolean).join(', ')}
               </p>
@@ -88,16 +92,42 @@ export function DJPublicProfilePage() {
               </div>
             ) : null}
           </div>
-        </div>
-
-        {profile.bio ? <p className="text-base leading-7 text-ink-1">{profile.bio}</p> : null}
-
-        {profile.venues.length > 0 ? (
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-ink-3">Has played</p>
-            <p className="mt-1 text-sm text-ink-1">{profile.venues.join(', ')}</p>
+          {firebaseUser ? (
+            <button
+              type="button"
+              onClick={() => setShowReport(true)}
+              aria-label="Report this DJ"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-ink-3 transition hover:border-white/20 hover:text-ink-1"
+            >
+              <Flag className="h-4 w-4" />
+            </button>
+          ) : null}
           </div>
-        ) : null}
+        </section>
+
+        <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(17rem,.7fr)]">
+          <section className="rounded-[1.75rem] border border-white/[0.08] bg-gradient-to-br from-white/[0.055] to-white/[0.015] p-7 sm:p-9">
+            <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-dj-400">About the DJ</p>
+            <p className="mt-5 max-w-2xl text-base leading-7 text-ink-1">
+              {profile.bio || `${profile.name} is building their BackTheVibes profile. Check back for their sound, story and latest sets.`}
+            </p>
+          </section>
+
+          <aside className="rounded-[1.75rem] border border-dj-400/15 bg-dj-400/[0.045] p-7">
+            <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-dj-400">Played at</p>
+            {profile.venues.length > 0 ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {profile.venues.map((venue) => (
+                  <span key={venue} className="rounded-full border border-white/[0.08] bg-black/20 px-3 py-1.5 text-sm text-ink-1">
+                    {venue}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm leading-6 text-ink-2">Venue history will appear here as this profile grows.</p>
+            )}
+          </aside>
+        </div>
       </main>
       {showReport ? <ReportUserModal userId={profile.djId} subjectLabel={profile.name} onClose={() => setShowReport(false)} /> : null}
     </div>
