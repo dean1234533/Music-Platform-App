@@ -1948,3 +1948,29 @@ test('the DJ Deals list keeps flagging an active deal that isn\'t assigned to an
   assert.match(page, /Not assigned to any track yet — DJs can't see it\./)
   assert.match(page, /<Link to="\/dashboard\/artist\/music" className="underline hover:text-warning-400">/)
 })
+
+test('an artist can edit an uploaded track\'s metadata and re-upload artwork after the fact (user-reported: "but as a artist i am unable to edit the music i upload")', () => {
+  // Root cause: MusicPage only ever offered fan-access settings, DJ-access settings, DJ-deal
+  // settings, and delete — there was no path back to title/genre/description/credits/artwork
+  // once a track was uploaded, and no service function to write them even existed.
+  const service = read('src/services/trackService.ts')
+  assert.match(service, /export async function updateTrackDetails\(trackId: string, input: TrackDetailsInput, artworkURL\?: string\): Promise<void>/)
+  // Only ever the editable metadata fields — never audio/Storage paths, visibility, play
+  // counts, or any other field firestore.rules freezes on update (confirmed none of title,
+  // titleLower, genre, subgenre, bpm, mood, key, description, explicit, credits, artworkURL
+  // appear in that frozen-fields list).
+  assert.doesNotMatch(service.slice(service.indexOf('function updateTrackDetails'), service.indexOf('function uploadTrackArtwork')), /originalAudioPath|streamAudioPath|previewAudioPath|playCount|visibility:/)
+  assert.match(service, /export async function uploadTrackArtwork\(artistId: string, trackId: string, file: File\): Promise<string>/)
+  assert.match(service, /const artworkPath = `artists\/\$\{artistId\}\/artwork\/\$\{trackId\}\.\$\{extOf\(file\)\}`/)
+
+  const modal = read('src/components/track/EditTrackModal.tsx')
+  assert.match(modal, /import \{ updateTrackDetails, uploadTrackArtwork \} from '@\/services\/trackService'/)
+  assert.match(modal, /const compressed = await compressImage\(artworkFile, 'artwork'\)/)
+  assert.match(modal, /notify\('Track details saved\.'\)/)
+
+  const musicPage = read('src/pages/artist/dashboard/MusicPage.tsx')
+  assert.match(musicPage, /import \{ EditTrackModal \} from '@\/components\/track\/EditTrackModal'/)
+  assert.match(musicPage, /const \[editTrack, setEditTrack\] = useState<TrackDoc \| null>\(null\)/)
+  assert.match(musicPage, /onClick=\{\(\) => setEditTrack\(track\)\}/)
+  assert.match(musicPage, /\{editTrack \? <EditTrackModal track=\{editTrack\} onClose=\{\(\) => setEditTrack\(null\)\} \/> : null\}/)
+})

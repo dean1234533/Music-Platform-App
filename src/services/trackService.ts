@@ -245,6 +245,40 @@ export function subscribeTrack(
   )
 }
 
+export interface TrackDetailsInput {
+  title: string
+  genre: string
+  subgenre: string | null
+  bpm: number | null
+  mood: string | null
+  key: string | null
+  description: string
+  explicit: boolean
+  credits: TrackCredits
+}
+
+/**
+ * Editable metadata only — never audio/Storage paths, visibility, or any of
+ * the other fields firestore.rules freezes on update. artworkURL is passed
+ * separately (only present when the artist actually chose a new image) so a
+ * details-only edit never touches it.
+ */
+export async function updateTrackDetails(trackId: string, input: TrackDetailsInput, artworkURL?: string): Promise<void> {
+  await updateDoc(trackRef(trackId), {
+    ...input,
+    titleLower: input.title.toLowerCase(),
+    ...(artworkURL ? { artworkURL } : {}),
+    updatedAt: serverTimestamp(),
+  })
+}
+
+/** Re-uploads cover artwork to the same owner-only Storage path used at creation, overwriting it. */
+export async function uploadTrackArtwork(artistId: string, trackId: string, file: File): Promise<string> {
+  const artworkPath = `artists/${artistId}/artwork/${trackId}.${extOf(file)}`
+  const snap = await uploadBytesResumable(ref(storage, artworkPath), file)
+  return getDownloadURL(snap.ref)
+}
+
 export async function updateTrackDealSettings(trackId: string, settings: TrackDjDealSettings): Promise<void> {
   await updateDoc(trackRef(trackId), { djDealSettings: settings, updatedAt: serverTimestamp() })
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Handshake, Megaphone, Pause, Play, Plus, Radio, Settings2, Trash2 } from 'lucide-react'
+import { Handshake, Megaphone, Pause, PencilLine, Play, Plus, Radio, Settings2, Trash2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeArtistTracks } from '@/services/artistService'
 import { subscribeArtistCopyrightClaims } from '@/services/moderationService'
@@ -10,6 +10,7 @@ import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import { BulkDjOutreachModal } from '@/components/track/BulkDjOutreachModal'
 import { CopyrightClaimBanner } from '@/components/track/CopyrightClaimBanner'
 import { TrackAccessSettingsModal } from '@/components/track/TrackAccessSettingsModal'
+import { EditTrackModal } from '@/components/track/EditTrackModal'
 import { TrackDealSettingsModal } from '@/components/licence/TrackDealSettingsModal'
 import { TrackDjAccessModal } from '@/components/licence/TrackDjAccessModal'
 import type { TrackDoc } from '@/types/track'
@@ -38,6 +39,7 @@ export function MusicPage() {
   const [claims, setClaims] = useState<CopyrightClaimDoc[]>([])
   const [outreachTrack, setOutreachTrack] = useState<TrackDoc | null>(null)
   const [dealsTrack, setDealsTrack] = useState<TrackDoc | null>(null)
+  const [editTrack, setEditTrack] = useState<TrackDoc | null>(null)
   const [djAccessTrack, setDjAccessTrack] = useState<TrackDoc | null>(null)
   const [accessSettingsTrack, setAccessSettingsTrack] = useState<TrackDoc | null>(null)
   const [deletingTrackId, setDeletingTrackId] = useState<string | null>(null)
@@ -144,6 +146,15 @@ export function MusicPage() {
               ) : null}
               <button
                 type="button"
+                onClick={() => setEditTrack(track)}
+                className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-surface-3 hover:text-ink-0"
+                title="Edit track details"
+                aria-label={`Edit ${track.title}`}
+              >
+                <PencilLine className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
                 onClick={() => setAccessSettingsTrack(track)}
                 className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-surface-3 hover:text-ink-0"
                 title="Fan access settings"
@@ -185,6 +196,7 @@ export function MusicPage() {
         <BulkDjOutreachModal trackId={outreachTrack.trackId} trackTitle={outreachTrack.title} onClose={() => setOutreachTrack(null)} />
       ) : null}
       {dealsTrack ? <TrackDealSettingsModal track={dealsTrack} onClose={() => setDealsTrack(null)} /> : null}
+      {editTrack ? <EditTrackModal track={editTrack} onClose={() => setEditTrack(null)} /> : null}
       {djAccessTrack ? <TrackDjAccessModal track={djAccessTrack} onClose={() => setDjAccessTrack(null)} /> : null}
       {accessSettingsTrack ? <TrackAccessSettingsModal track={accessSettingsTrack} onClose={() => setAccessSettingsTrack(null)} /> : null}
     </div>
