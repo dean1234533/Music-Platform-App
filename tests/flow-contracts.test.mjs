@@ -2007,3 +2007,28 @@ test('the track-assignment list collapses into a dropdown instead of wrapping a 
   // No longer a flex-wrap pile of pill checkboxes.
   assert.doesNotMatch(page, /flex flex-wrap gap-1\.5/)
 })
+
+test('DJ Deals shows a deal\'s own request activity instead of nothing, once a DJ requests/accepts it (user-reported: "the dj accepted the artist deal but this does not show anywhere for the artist")', () => {
+  // Root cause: the underlying flow was already correct (submitLicenceRequest writes the
+  // licenceRequests doc and notifies the artist regardless of whether the DJ arrived via
+  // RequestDjAccessModal or the DJ-side "Accept deal" button — traced through both call
+  // sites). The actual gap was that DJ Deals had zero connection to licenceRequests, so
+  // nothing about a deal being requested/accepted ever appeared on the page the artist was
+  // looking at when checking on that specific deal.
+  const page = read('src/pages/artist/dashboard/DjDealsPage.tsx')
+  assert.match(page, /import \{ subscribeRequestsForArtist \} from '@\/services\/licenceService'/)
+  assert.match(page, /import type \{ LicenceRequestDoc \} from '@\/types\/licence'/)
+  assert.match(page, /return subscribeRequestsForArtist\(firebaseUser\.uid, setRequests\)/)
+  assert.match(page, /const dealRequests = requests\.filter\(\(r\) => r\.dealId === deal\.dealId\)/)
+  assert.match(page, /const needsReview = dealRequests\.filter\(\(r\) => \['submitted', 'artist_review'\]\.includes\(r\.status\)\)\.length/)
+  assert.match(page, /needsReview > 0 \? <span className="font-medium text-brand-400"> · \{needsReview\} needs your review<\/span> : null/)
+  assert.match(page, /<Link to="\/dashboard\/artist\/dj-requests" className="underline hover:text-ink-0">/)
+
+  // Confirms the underlying flow (both entry points) really does notify the artist — this
+  // wasn't a silent-write bug, just missing cross-page visibility.
+  const djPage = read('src/pages/dj/DJRequestsPage.tsx')
+  assert.match(djPage, /async function acceptArtistDeal\(deal: DjDealDoc, track: TrackDoc\)/)
+  assert.match(djPage, /await submitLicenceRequest\(\{/)
+  const fn = read('functions/src/licensing/requests.ts')
+  assert.match(fn, /userId: artistId,\s*\n\s*type: 'dj_request',/)
+})

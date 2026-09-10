@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { ChevronDown, Trash2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { createDjDeal, deleteDjDeal, newDealId, subscribeArtistDeals, updateDjDeal } from '@/services/dealService'
 import { toggleDealOnTrack } from '@/services/trackService'
 import { subscribeArtistTracks } from '@/services/artistService'
+import { subscribeRequestsForArtist } from '@/services/licenceService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import { formatCurrency } from '@/utils/format'
 import type { DealPriceType, DjDealDoc } from '@/types/deal'
 import type { TrackDoc } from '@/types/track'
+import type { LicenceRequestDoc } from '@/types/licence'
 
 const PRICE_TYPES: { value: DealPriceType; label: string }[] = [
   { value: 'free', label: 'Free' },
@@ -47,6 +50,7 @@ export function DjDealsPage() {
   const { notify } = useToast()
   const [deals, setDeals] = useState<DjDealDoc[] | null>(null)
   const [tracks, setTracks] = useState<TrackDoc[]>([])
+  const [requests, setRequests] = useState<LicenceRequestDoc[]>([])
   const [form, setForm] = useState(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -55,6 +59,18 @@ export function DjDealsPage() {
   useEffect(() => {
     if (!firebaseUser) return
     return subscribeArtistDeals(firebaseUser.uid, setDeals)
+  }, [firebaseUser])
+
+  // A DJ requesting/accepting a deal (submitLicenceRequest) never shows up here at all —
+  // this page has zero connection to licenceRequests, so the only way to notice was a
+  // separate trip to DJ Requests, and the notification bell (user-reported: "the dj
+  // accepted the artist deal but this does not show anywhere for the artist"). The request
+  // itself and its notification were already correct (confirmed in code: submitLicenceRequest
+  // writes the request and notifies the artist either way) — the gap was purely that DJ Deals
+  // gave no hint any of that had happened for a deal specifically.
+  useEffect(() => {
+    if (!firebaseUser) return
+    return subscribeRequestsForArtist(firebaseUser.uid, setRequests)
   }, [firebaseUser])
 
   // A deal existing isn't the same as it being live — a DJ only sees it once it's checked
@@ -258,6 +274,21 @@ export function DjDealsPage() {
                     {deal.active && !assignedDealIds.has(deal.dealId) ? (
                       <p className="mt-1 text-xs font-medium text-warning-500">Not assigned to any track yet — DJs can't see it.</p>
                     ) : null}
+                    {(() => {
+                      const dealRequests = requests.filter((r) => r.dealId === deal.dealId)
+                      if (dealRequests.length === 0) return null
+                      const needsReview = dealRequests.filter((r) => ['submitted', 'artist_review'].includes(r.status)).length
+                      return (
+                        <p className="mt-1 text-xs text-ink-2">
+                          {dealRequests.length} DJ {dealRequests.length === 1 ? 'request' : 'requests'}
+                          {needsReview > 0 ? <span className="font-medium text-brand-400"> · {needsReview} needs your review</span> : null}
+                          {' — '}
+                          <Link to="/dashboard/artist/dj-requests" className="underline hover:text-ink-0">
+                            View in DJ Requests
+                          </Link>
+                        </p>
+                      )
+                    })()}
                   </div>
                   <Button size="sm" variant="secondary" onClick={() => updateDjDeal(deal.dealId, { active: !deal.active })}>
                     {deal.active ? 'Deactivate' : 'Activate'}
