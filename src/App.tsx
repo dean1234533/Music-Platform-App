@@ -289,6 +289,7 @@ function App() {
               <Route path="users" element={<AdminUsersPage />} />
               <Route path="verification" element={<AdminVerificationPage />} />
               <Route path="reports" element={<AdminReportsPage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
               <Route path="settings" element={<AdminSettingsPage />} />
               <Route path="audit-log" element={<AdminAuditLogPage />} />
               <Route path="security-incidents" element={<AdminSecurityIncidentsPage />} />

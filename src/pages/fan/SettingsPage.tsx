@@ -1,23 +1,14 @@
-import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { updateBasicProfile } from '@/services/userService'
 import { signOut } from '@/services/authService'
-import { currentPushPermission, disablePushNotifications, enablePushNotifications } from '@/services/pushNotificationService'
 import { Button } from '@/components/common/Button'
 import { AccountSecuritySection } from '@/components/account/AccountSecuritySection'
+import { PushNotificationControl } from '@/components/notifications/PushNotificationControl'
 
 export function SettingsPage() {
   const { firebaseUser, profile } = useAuth()
   const navigate = useNavigate()
-  const [pushPermission, setPushPermission] = useState<NotificationPermission | 'unsupported'>('default')
-  const [pushBusy, setPushBusy] = useState(false)
-  const [pushError, setPushError] = useState<string | null>(null)
-
-  useEffect(() => {
-    setPushPermission(currentPushPermission())
-  }, [])
-
   async function toggleEmailNotifications() {
     if (!firebaseUser || !profile) return
     await updateBasicProfile(firebaseUser.uid, {
@@ -26,34 +17,6 @@ export function SettingsPage() {
         email: !profile.notificationPreferences.email,
       },
     })
-  }
-
-  async function handleEnablePush() {
-    if (!firebaseUser) return
-    setPushBusy(true)
-    setPushError(null)
-    try {
-      const result = await enablePushNotifications(firebaseUser.uid)
-      if (result === 'unsupported') {
-        setPushError("Push notifications aren't supported in this browser.")
-      } else {
-        setPushPermission(result === 'granted' ? 'granted' : 'denied')
-      }
-    } catch (err) {
-      setPushError(err instanceof Error ? err.message : 'Could not enable push notifications.')
-    } finally {
-      setPushBusy(false)
-    }
-  }
-
-  async function handleDisablePush() {
-    if (!firebaseUser) return
-    setPushBusy(true)
-    try {
-      await disablePushNotifications(firebaseUser.uid)
-    } finally {
-      setPushBusy(false)
-    }
   }
 
   return (
@@ -73,30 +36,7 @@ export function SettingsPage() {
             />
           </label>
 
-          <div className="flex items-center justify-between rounded-xl border border-surface-border bg-surface-1 px-4 py-3">
-            <div>
-              <p className="text-sm text-ink-0">Push notifications</p>
-              <p className="text-xs text-ink-2">
-                {pushPermission === 'granted'
-                  ? 'Enabled on this device'
-                  : pushPermission === 'denied'
-                    ? 'Blocked — allow notifications for this site in your browser settings'
-                    : pushPermission === 'unsupported'
-                      ? 'Not supported in this browser'
-                      : 'Get notified even when the tab is closed'}
-              </p>
-            </div>
-            {pushPermission === 'granted' ? (
-              <Button size="sm" variant="secondary" loading={pushBusy} onClick={handleDisablePush}>
-                Turn off
-              </Button>
-            ) : pushPermission === 'denied' || pushPermission === 'unsupported' ? null : (
-              <Button size="sm" loading={pushBusy} onClick={handleEnablePush}>
-                Enable
-              </Button>
-            )}
-          </div>
-          {pushError ? <p className="text-xs text-danger-500">{pushError}</p> : null}
+          <PushNotificationControl />
         </div>
       </section>
 

@@ -7,6 +7,7 @@ import type { NotificationDoc } from '@/types/notification'
 import { clsx } from 'clsx'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '@/contexts/ToastContext'
+import { PushNotificationControl } from '@/components/notifications/PushNotificationControl'
 
 export function NotificationsPage() {
   const { firebaseUser } = useAuth()
@@ -31,6 +32,7 @@ export function NotificationsPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold text-ink-0">Notifications</h1>
+      <PushNotificationControl />
       {notifications === null ? (
         <LoadingState />
       ) : notifications.length === 0 ? (

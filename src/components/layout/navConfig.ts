@@ -94,6 +94,7 @@ export const adminNavItems: NavItem[] = [
   { label: 'Users', to: '/admin/users', icon: Users, end: true },
   { label: 'Verification', to: '/admin/verification', icon: BadgeCheck },
   { label: 'Reports', to: '/admin/reports', icon: AlertTriangle },
+  { label: 'Notifications', to: '/admin/notifications', icon: Bell },
   { label: 'Plans & fees', to: '/admin/settings', icon: Sliders },
   { label: 'Audit log', to: '/admin/audit-log', icon: FileClock },
   { label: 'Security incidents', to: '/admin/security-incidents', icon: ShieldAlert },

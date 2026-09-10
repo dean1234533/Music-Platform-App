@@ -34,7 +34,7 @@ export function MobileNav({ items, moreExclude = [] }: { items: NavItem[]; moreE
             end={item.end}
             className={({ isActive }) =>
               clsx(
-                'flex flex-1 flex-col items-center justify-center gap-1 px-2 py-2 text-[0.6875rem] font-semibold leading-none transition-colors',
+                'flex flex-1 translate-y-1 flex-col items-center justify-center gap-1 px-2 py-2 text-[0.6875rem] font-semibold leading-none transition-colors',
                 isActive ? 'text-brand-400' : 'text-ink-3 active:bg-white/[0.05]',
               )
             }
@@ -47,7 +47,7 @@ export function MobileNav({ items, moreExclude = [] }: { items: NavItem[]; moreE
           <button
             onClick={() => setShowMore(true)}
             className={clsx(
-              'flex flex-1 flex-col items-center justify-center gap-1 px-2 py-2 text-[0.6875rem] font-semibold leading-none transition-colors',
+              'flex flex-1 translate-y-1 flex-col items-center justify-center gap-1 px-2 py-2 text-[0.6875rem] font-semibold leading-none transition-colors',
               isMoreActive ? 'text-brand-400' : 'text-ink-3 active:bg-white/[0.05]',
             )}
           >

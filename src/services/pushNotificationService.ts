@@ -26,9 +26,8 @@ export async function enablePushNotifications(uid: string): Promise<PushPermissi
     serviceWorkerRegistration: registration,
   })
 
-  if (token) {
-    await updateDoc(doc(db, 'users', uid), { fcmTokens: arrayUnion(token) })
-  }
+  if (!token) throw new Error('This device did not create a notification token. Please close and reopen the installed app, then try again.')
+  await updateDoc(doc(db, 'users', uid), { fcmTokens: arrayUnion(token) })
 
   return 'granted'
 }

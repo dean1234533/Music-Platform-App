@@ -55,7 +55,10 @@ service cloud.firestore {
         && request.resource.data.subscriptionStatus == resource.data.subscriptionStatus
         && request.resource.data.get('stripeCustomerId', null) == resource.data.get('stripeCustomerId', null)
         && request.resource.data.get('suspended', false) == resource.data.get('suspended', false)
-        && request.resource.data.roles.hasOnly(['fan', 'artist', 'dj']);
+        && (
+          request.resource.data.roles.hasOnly(['fan', 'artist', 'dj'])
+          || (resource.data.roles.hasAny(['admin']) && request.resource.data.roles == resource.data.roles)
+        );
 
       allow delete: if false;
     }

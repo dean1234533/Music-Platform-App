@@ -6,6 +6,7 @@ const rules = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8
 
 test('users cannot grant themselves admin or paid status', () => {
   assert.match(rules, /roles\.hasOnly\(\['fan', 'artist', 'dj'\]\)/)
+  assert.match(rules, /resource\.data\.roles\.hasAny\(\['admin'\]\)[\s\S]*?request\.resource\.data\.roles == resource\.data\.roles/)
   assert.match(rules, /subscriptionStatus == resource\.data\.subscriptionStatus/)
   assert.match(rules, /stripeCustomerId[\s\S]*?== resource\.data/)
 })
