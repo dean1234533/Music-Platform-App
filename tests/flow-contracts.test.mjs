@@ -1934,3 +1934,17 @@ test('creating a DJ deal shows a confirmation, which also reminds the artist it 
   assert.match(page, /const \{ notify \} = useToast\(\)/)
   assert.match(page, /notify\(`"\$\{form\.name\.trim\(\)\}" created — assign it to a track from Music to make it visible to DJs\.`\)/)
 })
+
+test('the DJ Deals list keeps flagging an active deal that isn\'t assigned to any track, not just at creation time (user-reported: "also i just put up a deal for the dj as a artist and the dj cant see it")', () => {
+  // Root cause confirmed live: a real, active djDeals doc existed (artist did create one) but
+  // the one DJ-promoted track's allowedDealIds was still empty — the deal was never actually
+  // assigned. A one-time creation toast doesn't help once the artist has navigated away and
+  // forgotten, so the list itself now keeps surfacing the same fact for as long as it's true.
+  const page = read('src/pages/artist/dashboard/DjDealsPage.tsx')
+  assert.match(page, /import \{ subscribeArtistTracks \} from '@\/services\/artistService'/)
+  assert.match(page, /return subscribeArtistTracks\(firebaseUser\.uid, setTracks\)/)
+  assert.match(page, /const assignedDealIds = new Set\(tracks\.flatMap\(\(t\) => t\.djDealSettings\?\.allowedDealIds \?\? \[\]\)\)/)
+  assert.match(page, /\{deal\.active && !assignedDealIds\.has\(deal\.dealId\) \? \(/)
+  assert.match(page, /Not assigned to any track yet — DJs can't see it\./)
+  assert.match(page, /<Link to="\/dashboard\/artist\/music" className="underline hover:text-warning-400">/)
+})

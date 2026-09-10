@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { createDjDeal, deleteDjDeal, newDealId, subscribeArtistDeals, updateDjDeal } from '@/services/dealService'
+import { subscribeArtistTracks } from '@/services/artistService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import { formatCurrency } from '@/utils/format'
 import type { DealPriceType, DjDealDoc } from '@/types/deal'
+import type { TrackDoc } from '@/types/track'
 
 const PRICE_TYPES: { value: DealPriceType; label: string }[] = [
   { value: 'free', label: 'Free' },
@@ -43,6 +46,7 @@ export function DjDealsPage() {
   const { firebaseUser } = useAuth()
   const { notify } = useToast()
   const [deals, setDeals] = useState<DjDealDoc[] | null>(null)
+  const [tracks, setTracks] = useState<TrackDoc[]>([])
   const [form, setForm] = useState(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -51,6 +55,19 @@ export function DjDealsPage() {
     if (!firebaseUser) return
     return subscribeArtistDeals(firebaseUser.uid, setDeals)
   }, [firebaseUser])
+
+  // A deal existing isn't the same as it being live — a DJ only sees it once it's checked
+  // under a track's own "Allowed deals" list (TrackDealSettingsModal). Creating a deal alone
+  // never made one live before either, but the confirmation toast is easy to miss and there
+  // was previously no ongoing way to notice an assigned-to-nothing deal (user-reported: "i
+  // just put up a deal for the dj as a artist and the dj cant see it" — confirmed live the
+  // deal existed but no track's allowedDealIds referenced it).
+  useEffect(() => {
+    if (!firebaseUser) return
+    return subscribeArtistTracks(firebaseUser.uid, setTracks)
+  }, [firebaseUser])
+
+  const assignedDealIds = new Set(tracks.flatMap((t) => t.djDealSettings?.allowedDealIds ?? []))
 
   const needsPrice = form.priceType === 'fixed' || form.priceType === 'starting_from'
 
@@ -224,6 +241,14 @@ export function DjDealsPage() {
                     {' · '}
                     {deal.active ? 'Active' : 'Inactive'}
                   </p>
+                  {deal.active && !assignedDealIds.has(deal.dealId) ? (
+                    <p className="mt-1 text-xs font-medium text-warning-500">
+                      Not assigned to any track yet — DJs can't see it.{' '}
+                      <Link to="/dashboard/artist/music" className="underline hover:text-warning-400">
+                        Assign it
+                      </Link>
+                    </p>
+                  ) : null}
                 </div>
                 <Button size="sm" variant="secondary" onClick={() => updateDjDeal(deal.dealId, { active: !deal.active })}>
                   {deal.active ? 'Deactivate' : 'Activate'}
