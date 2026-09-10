@@ -48,6 +48,7 @@ export function RequestTimelinePage() {
   const [loadError, setLoadError] = useState(false)
   const [counterTarget, setCounterTarget] = useState<LicenceOfferDoc | null>(null)
   const [showSendOffer, setShowSendOffer] = useState(false)
+  const [eventFilter, setEventFilter] = useState<'all' | 'artist' | 'dj' | 'system'>('all')
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
 
@@ -132,7 +133,9 @@ export function RequestTimelinePage() {
     }
   }
 
-  const events = requestEvents.map((event) => ({
+  const filteredRequestEvents = eventFilter === 'all' ? requestEvents : requestEvents.filter((event) => event.actorRole === eventFilter)
+  const events = filteredRequestEvents.map((event) => ({
+    eventId: event.eventId,
     label: event.summary,
     date: formatEventDate(event.createdAt),
     icon: event.type.includes('rejected') || event.type.includes('cancelled') || event.type.includes('voided')
@@ -141,6 +144,12 @@ export function RequestTimelinePage() {
         ? <Clock className="h-3.5 w-3.5" />
         : <Check className="h-3.5 w-3.5" />,
   }))
+  const EVENT_FILTERS: { key: typeof eventFilter; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'artist', label: 'Artist' },
+    { key: 'dj', label: 'DJ' },
+    { key: 'system', label: 'System' },
+  ]
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-8">
@@ -260,20 +269,48 @@ export function RequestTimelinePage() {
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold text-ink-0">Activity timeline</h2>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-ink-0">Activity timeline</h2>
+          {requestEvents.length > 0 ? (
+            <div className="flex gap-1">
+              {EVENT_FILTERS.map((f) => (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setEventFilter(f.key)}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
+                    eventFilter === f.key ? 'bg-brand-500/15 text-brand-400' : 'text-ink-3 hover:text-ink-1'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
         <ol className="flex flex-col gap-3">
-          {events.length === 0 ? <li className="text-sm text-ink-2">Activity will appear here as the request progresses.</li> : events.map((event, i) => (
-            <li key={requestEvents[i]?.eventId ?? i} className="flex items-start gap-3 text-sm">
-              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-3 text-ink-2">
-                {event.icon}
-              </span>
-              <div>
-                <p className="text-ink-0">{event.label}</p>
-                <p className="text-xs text-ink-3">{event.date}</p>
-              </div>
+          {events.length === 0 ? (
+            <li className="text-sm text-ink-2">
+              {requestEvents.length === 0 ? 'Activity will appear here as the request progresses.' : `No ${eventFilter} activity yet.`}
             </li>
-          ))}
+          ) : (
+            events.map((event) => (
+              <li key={event.eventId} className="flex items-start gap-3 text-sm">
+                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-3 text-ink-2">
+                  {event.icon}
+                </span>
+                <div>
+                  <p className="text-ink-0">{event.label}</p>
+                  <p className="text-xs text-ink-3">{event.date}</p>
+                </div>
+              </li>
+            ))
+          )}
         </ol>
+        {/* Old, abandoned (rejected/cancelled/expired) requests — and this timeline with them
+            — are removed by cleanupAbandonedRequests after the admin-configured retention
+            window (Admin -> Settings -> Data retention -> "Abandoned DJ requests"). An active
+            or approved request's timeline is kept indefinitely, same as its contract. */}
       </section>
 
       {['submitted', 'artist_review', 'negotiating', 'offer_sent', 'counter_offer', 'agreement_ready'].includes(licenceRequest.status) ? (

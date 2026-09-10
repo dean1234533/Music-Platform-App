@@ -2060,3 +2060,33 @@ test('the "Accept deal" card reflects the request\'s actual status instead of ge
   // ?as=dj convention already used elsewhere on this same page for a dual-role test account.
   assert.match(page, /to=\{`\/dj-requests\/\$\{request\.requestId\}\?as=dj`\}/)
 })
+
+test('the request Activity timeline has a filter by who acted, and its events are no longer orphaned forever when the request itself is cleaned up (user-reported: "Activity timeline need a filter and a set time it stays before deleting")', () => {
+  const page = read('src/pages/agreements/RequestTimelinePage.tsx')
+  assert.match(page, /const \[eventFilter, setEventFilter\] = useState<'all' \| 'artist' \| 'dj' \| 'system'>\('all'\)/)
+  assert.match(page, /const filteredRequestEvents = eventFilter === 'all' \? requestEvents : requestEvents\.filter\(\(event\) => event\.actorRole === eventFilter\)/)
+  assert.match(page, /const events = filteredRequestEvents\.map\(\(event\) => \(\{/)
+  assert.match(
+    page,
+    /const EVENT_FILTERS: \{ key: typeof eventFilter; label: string \}\[\] = \[\s*\n\s*\{ key: 'all', label: 'All' \},\s*\n\s*\{ key: 'artist', label: 'Artist' \},\s*\n\s*\{ key: 'dj', label: 'DJ' \},\s*\n\s*\{ key: 'system', label: 'System' \},/,
+  )
+  assert.match(page, /`No \$\{eventFilter\} activity yet\.`/)
+  // Filtering never breaks the list key — it was previously indexed into the unfiltered
+  // requestEvents array by position, which would have silently mismatched once filtering
+  // could remove items from the middle.
+  assert.match(page, /eventId: event\.eventId,/)
+  assert.match(page, /<li key=\{event\.eventId\}/)
+
+  // Root cause of "no set time it stays before deleting": a retention job for abandoned
+  // requests already existed (cleanupAbandonedRequests, admin-configurable, defaults to 12
+  // months), but it only deleted the parent licenceRequests doc — Firestore never cascades a
+  // subcollection deletion, so every event on that request's own Activity timeline was left
+  // permanently orphaned: unreachable (its read rule get()s a now-missing parent) and never
+  // swept by anything else.
+  const cleanup = read('functions/src/retention/cleanup.ts')
+  assert.match(cleanup, /await deleteSubcollectionBatched\(requestDoc\.ref\.path, 'events'\)/)
+  // Runs before the parent doc itself is deleted, using the same batched-delete helper
+  // already used for a request's conversation messages.
+  const deleteFnBody = cleanup.slice(cleanup.indexOf('async function deleteRequestAndConversation'), cleanup.indexOf('export const cleanupAbandonedRequests'))
+  assert.match(deleteFnBody, /deleteSubcollectionBatched\(requestDoc\.ref\.path, 'events'\)[\s\S]*await requestDoc\.ref\.delete\(\)/)
+})

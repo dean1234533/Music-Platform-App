@@ -94,6 +94,11 @@ async function deleteRequestAndConversation(requestDoc: QueryDocumentSnapshot): 
     await deleteSubcollectionBatched(`conversations/${conversationId}`, 'messages')
     await db.collection('conversations').doc(conversationId).delete()
   }
+  // Firestore never cascades a subcollection when its parent doc is deleted — without this,
+  // every event on the request's own Activity timeline (licenceRequests/{id}/events) was
+  // orphaned forever: unreachable (its read rule get()s a now-missing parent) and never
+  // swept by any other cleanup job.
+  await deleteSubcollectionBatched(requestDoc.ref.path, 'events')
   await requestDoc.ref.delete()
 }
 
