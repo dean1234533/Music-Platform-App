@@ -13,6 +13,7 @@ import { getDjPreviewPlaybackURL, getPreviewPlaybackURL, getStreamPlaybackURL, r
 import type { TrackDoc } from '@/types/track'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
+import { setPlaybackActive } from '@/lib/playbackActivity'
 
 /** null while nothing has loaded yet; otherwise which derivative the currently-loaded track actually is. */
 type PlaybackKind = 'preview' | 'dj_preview' | 'stream' | null
@@ -110,6 +111,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     playbackKindRef.current = playbackKind
   }, [playbackKind])
+
+  // Lets registerServiceWorker.ts (outside React, no access to this context)
+  // know whether to defer its post-deploy reload rather than yanking one out
+  // from under someone mid-playback.
+  useEffect(() => {
+    setPlaybackActive(isPlaying)
+    return () => setPlaybackActive(false)
+  }, [isPlaying])
 
   useEffect(() => {
     const previousUserId = previousUserIdRef.current

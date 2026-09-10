@@ -1670,3 +1670,24 @@ test('a role held without a matching profile document is never a dead end — Se
   assert.match(artistSettingsPage, /to="\/onboarding\/add-role\?role=artist"/)
   assert.match(artistSettingsPage, /Complete artist profile/)
 })
+
+test('a new service worker taking control no longer force-reloads the page out from under active playback (user-reported: "when I click on the track the page reloads" — actually a deploy landing mid-playback, not the click itself)', () => {
+  const sw = read('src/lib/registerServiceWorker.ts')
+  assert.match(sw, /import \{ isPlaybackActive \} from '\.\/playbackActivity'/)
+  assert.match(sw, /navigator\.serviceWorker\.addEventListener\('controllerchange', \(\) => \{/)
+  assert.match(sw, /deferReloadUntilPlaybackStops\(\(\) => \{/)
+  assert.match(sw, /function deferReloadUntilPlaybackStops\(reload: \(\) => void\): void \{/)
+  assert.match(sw, /if \(!isPlaybackActive\(\)\) \{\s*reload\(\)\s*return\s*\}/)
+  // Bounded wait — never defers forever if something goes wrong with the flag.
+  assert.match(sw, /const maxWaitMs = 10 \* 60 \* 1000/)
+
+  const activity = read('src/lib/playbackActivity.ts')
+  assert.match(activity, /export function setPlaybackActive\(value: boolean\): void \{/)
+  assert.match(activity, /export function isPlaybackActive\(\): boolean \{/)
+
+  // PlayerContext is the only writer — kept accurate to real HTMLAudioElement
+  // playback state (isPlaying), not just "a track is loaded".
+  const player = read('src/contexts/PlayerContext.tsx')
+  assert.match(player, /import \{ setPlaybackActive \} from '@\/lib\/playbackActivity'/)
+  assert.match(player, /setPlaybackActive\(isPlaying\)\s*\n\s*return \(\) => setPlaybackActive\(false\)\s*\n\s*\}, \[isPlaying\]\)/)
+})
