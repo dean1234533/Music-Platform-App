@@ -79,6 +79,30 @@ export function StoryViewer({
     resolveMediaUrl(nextStory)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [story, groupIndex, storyIndex])
+
+  // Resolving the URL only solves half the delay — a <video>/<img> doesn't start downloading
+  // its actual bytes until it mounts with that src, which only happens once the story becomes
+  // current. Warming the browser's HTTP cache for the next story's real media here, the moment
+  // its URL is known (immediately for a public story, after the round-trip above for a
+  // restricted one), means the real element hits cache instead of starting a fresh download.
+  useEffect(() => {
+    const nextInGroup = group?.stories[storyIndex + 1]
+    const nextStory = nextInGroup ?? groups[groupIndex + 1]?.stories[0]
+    if (!nextStory) return
+    const nextUrl = nextStory.visibility === 'public' ? nextStory.mediaUrl : mediaUrls[nextStory.storyId]
+    if (!nextUrl) return
+    if (nextStory.mediaKind === 'image') {
+      const img = new Image()
+      img.src = nextUrl
+    } else if (nextStory.mediaKind === 'video' || nextStory.mediaKind === 'audio') {
+      const el = document.createElement(nextStory.mediaKind)
+      el.preload = 'auto'
+      el.muted = true
+      el.src = nextUrl
+      el.load()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [group, groupIndex, storyIndex, mediaUrls])
   const durationMs = useMemo(() => {
     if (!story) return DEFAULT_TEXT_DURATION_SEC * 1000
     return (story.durationSec || DEFAULT_TEXT_DURATION_SEC) * 1000

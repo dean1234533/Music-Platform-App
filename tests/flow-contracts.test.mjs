@@ -2214,3 +2214,26 @@ test('platform revenue-split settings auto-configure with placeholder defaults i
   assert.match(adminPage, /import \{ DEFAULT_DATA_RETENTION, DEFAULT_PLATFORM_FEES, type DataRetentionSettings, type SubscriptionPlan \} from '@\/types\/platformSettings'/)
   assert.match(adminPage, /platformFeePercent: String\(settings\?\.platformFeePercent \?\? DEFAULT_PLATFORM_FEES\.platformFeePercent\)/)
 })
+
+test('StoryViewer preloads the next story\'s actual media bytes, not just its URL, so playback advances without a fresh download starting cold (user-reported: "the story play back is really delayed")', () => {
+  // Root cause: the existing prefetch only resolved the NEXT story's signed URL ahead of
+  // time (a real fix for a different, earlier delay — the Cloud Function round-trip) but a
+  // <video>/<img>/<audio> element still doesn't start downloading its actual bytes until it
+  // mounts with that src, which only happens once the story becomes current. So every
+  // advance still paid for a fresh download before anything appeared, even with the URL
+  // already in hand.
+  const page = read('src/components/stories/StoryViewer.tsx')
+  assert.match(
+    page,
+    /const nextUrl = nextStory\.visibility === 'public' \? nextStory\.mediaUrl : mediaUrls\[nextStory\.storyId\]/,
+  )
+  assert.match(page, /if \(nextStory\.mediaKind === 'image'\) \{\s*\n\s*const img = new Image\(\)\s*\n\s*img\.src = nextUrl/)
+  assert.match(
+    page,
+    /\} else if \(nextStory\.mediaKind === 'video' \|\| nextStory\.mediaKind === 'audio'\) \{\s*\n\s*const el = document\.createElement\(nextStory\.mediaKind\)\s*\n\s*el\.preload = 'auto'/,
+  )
+  assert.match(page, /el\.src = nextUrl\s*\n\s*el\.load\(\)/)
+  // Depends on mediaUrls so a restricted-tier story's preload fires once its URL round-trip
+  // resolves, not only for a public story where the URL was already known upfront.
+  assert.match(page, /\}, \[group, groupIndex, storyIndex, mediaUrls\]\)/)
+})
