@@ -129,7 +129,7 @@ export function ContractPage() {
       <style>{`@media print { nav, header, .no-print { display: none !important; } }`}</style>
       <div className="mb-6 flex items-center justify-between no-print">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-ink-2 hover:text-ink-0">
+          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0 active:opacity-60">
             <ArrowLeft className="h-4 w-4" /> Back
           </button>
           <Link to={isDj ? '/dj/requests' : '/dashboard/artist/dj-requests'} className="text-sm text-ink-2 hover:text-ink-0">

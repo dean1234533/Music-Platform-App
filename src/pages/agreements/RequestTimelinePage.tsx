@@ -143,7 +143,7 @@ export function RequestTimelinePage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-8">
-      <button onClick={() => navigate(-1)} className="flex w-fit items-center gap-2 text-sm text-ink-2 hover:text-ink-0">
+      <button onClick={() => navigate(-1)} className="flex w-fit items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0 active:opacity-60">
         <ArrowLeft className="h-4 w-4" /> Back
       </button>
 

@@ -144,7 +144,7 @@ export function TrackPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8 overflow-x-hidden px-4 pb-10 pt-[max(2.5rem,env(safe-area-inset-top))]">
-      <button onClick={() => navigate(-1)} className="flex w-fit items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0">
+      <button onClick={() => navigate(-1)} className="flex w-fit items-center gap-2 text-sm text-ink-2 transition hover:text-ink-0 active:opacity-60">
         <ArrowLeft className="h-4 w-4" /> Back
       </button>
       <div className="flex flex-col gap-6 sm:flex-row">
