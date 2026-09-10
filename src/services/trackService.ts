@@ -283,6 +283,35 @@ export async function updateTrackDealSettings(trackId: string, settings: TrackDj
   await updateDoc(trackRef(trackId), { djDealSettings: settings, updatedAt: serverTimestamp() })
 }
 
+const DEFAULT_DEAL_SETTINGS: TrackDjDealSettings = {
+  acceptDjRequests: true,
+  allowedDealIds: [],
+  defaultDealId: null,
+  minimumPriceMinor: null,
+  verifiedDjsOnly: false,
+  customApprovalRequired: false,
+}
+
+/**
+ * Assigns/unassigns one deal on one track without disturbing the track's other deal settings
+ * (minimumPriceMinor, verifiedDjsOnly, etc.) or its other assigned deals — lets a deal be
+ * reassigned across tracks directly from the deal-centric DJ Deals page, not only from each
+ * track's own settings modal. Assigning also turns acceptDjRequests on, since checking this
+ * box only makes sense if the artist wants the deal live; unassigning leaves it as-is (other
+ * deals or manual-approval requests on that track may still be wanted).
+ */
+export async function toggleDealOnTrack(track: TrackDoc, dealId: string, assign: boolean): Promise<void> {
+  const current = track.djDealSettings ?? DEFAULT_DEAL_SETTINGS
+  const allowedDealIds = assign
+    ? [...new Set([...current.allowedDealIds, dealId])]
+    : current.allowedDealIds.filter((id) => id !== dealId)
+  await updateTrackDealSettings(track.trackId, {
+    ...current,
+    allowedDealIds,
+    acceptDjRequests: assign ? true : current.acceptDjRequests,
+  })
+}
+
 export interface TrackAccessSettingsInput {
   visibility: TrackVisibility
   previewEnabled: boolean

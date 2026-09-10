@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { createDjDeal, deleteDjDeal, newDealId, subscribeArtistDeals, updateDjDeal } from '@/services/dealService'
+import { toggleDealOnTrack } from '@/services/trackService'
 import { subscribeArtistTracks } from '@/services/artistService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
@@ -50,6 +50,7 @@ export function DjDealsPage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [togglingKey, setTogglingKey] = useState<string | null>(null)
 
   useEffect(() => {
     if (!firebaseUser) return
@@ -70,6 +71,18 @@ export function DjDealsPage() {
   const assignedDealIds = new Set(tracks.flatMap((t) => t.djDealSettings?.allowedDealIds ?? []))
 
   const needsPrice = form.priceType === 'fixed' || form.priceType === 'starting_from'
+
+  async function handleToggleAssignment(track: TrackDoc, dealId: string, assign: boolean) {
+    const key = `${track.trackId}_${dealId}`
+    setTogglingKey(key)
+    try {
+      await toggleDealOnTrack(track, dealId, assign)
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Could not update this assignment.', 'error')
+    } finally {
+      setTogglingKey(null)
+    }
+  }
 
   async function handleCreate() {
     if (!firebaseUser || !form.name.trim()) return
@@ -225,37 +238,67 @@ export function DjDealsPage() {
         ) : (
           <div className="flex flex-col divide-y divide-surface-border rounded-xl border border-surface-border">
             {deals.map((deal) => (
-              <div key={deal.dealId} className="flex items-center gap-3 px-4 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-ink-0">{deal.name}</p>
-                  <p className="text-xs text-ink-2">
-                    {deal.priceType === 'free'
-                      ? 'Free'
-                      : deal.priceType === 'fixed'
-                        ? formatCurrency(deal.priceMinor ?? 0, deal.currency)
-                        : deal.priceType === 'starting_from'
-                          ? `From ${formatCurrency(deal.priceMinor ?? 0, deal.currency)}`
-                          : deal.priceType === 'negotiable'
-                            ? 'Negotiable'
-                            : 'Custom quote'}
-                    {' · '}
-                    {deal.active ? 'Active' : 'Inactive'}
-                  </p>
-                  {deal.active && !assignedDealIds.has(deal.dealId) ? (
-                    <p className="mt-1 text-xs font-medium text-warning-500">
-                      Not assigned to any track yet — DJs can't see it.{' '}
-                      <Link to="/dashboard/artist/music" className="underline hover:text-warning-400">
-                        Assign it
-                      </Link>
+              <div key={deal.dealId} className="flex flex-col gap-3 px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-ink-0">{deal.name}</p>
+                    <p className="text-xs text-ink-2">
+                      {deal.priceType === 'free'
+                        ? 'Free'
+                        : deal.priceType === 'fixed'
+                          ? formatCurrency(deal.priceMinor ?? 0, deal.currency)
+                          : deal.priceType === 'starting_from'
+                            ? `From ${formatCurrency(deal.priceMinor ?? 0, deal.currency)}`
+                            : deal.priceType === 'negotiable'
+                              ? 'Negotiable'
+                              : 'Custom quote'}
+                      {' · '}
+                      {deal.active ? 'Active' : 'Inactive'}
                     </p>
-                  ) : null}
+                    {deal.active && !assignedDealIds.has(deal.dealId) ? (
+                      <p className="mt-1 text-xs font-medium text-warning-500">Not assigned to any track yet — DJs can't see it.</p>
+                    ) : null}
+                  </div>
+                  <Button size="sm" variant="secondary" onClick={() => updateDjDeal(deal.dealId, { active: !deal.active })}>
+                    {deal.active ? 'Deactivate' : 'Activate'}
+                  </Button>
+                  <button onClick={() => deleteDjDeal(deal.dealId)} className="rounded-full p-2 text-ink-3 hover:text-danger-500" title="Delete">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
-                <Button size="sm" variant="secondary" onClick={() => updateDjDeal(deal.dealId, { active: !deal.active })}>
-                  {deal.active ? 'Deactivate' : 'Activate'}
-                </Button>
-                <button onClick={() => deleteDjDeal(deal.dealId)} className="rounded-full p-2 text-ink-3 hover:text-danger-500" title="Delete">
-                  <Trash2 className="h-4 w-4" />
-                </button>
+
+                {tracks.length === 0 ? (
+                  <p className="text-xs text-ink-3">
+                    Upload a track first, then it'll appear here to assign this deal to.
+                  </p>
+                ) : (
+                  <div>
+                    <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-ink-3">Assigned tracks</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {tracks.map((track) => {
+                        const assigned = track.djDealSettings?.allowedDealIds?.includes(deal.dealId) ?? false
+                        const key = `${track.trackId}_${deal.dealId}`
+                        return (
+                          <label
+                            key={track.trackId}
+                            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${
+                              assigned ? 'border-brand-500/40 bg-brand-500/10 text-brand-400' : 'border-surface-border bg-surface-2 text-ink-2'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={assigned}
+                              disabled={togglingKey === key}
+                              onChange={(e) => void handleToggleAssignment(track, deal.dealId, e.target.checked)}
+                              className="h-3 w-3"
+                            />
+                            {track.title}
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

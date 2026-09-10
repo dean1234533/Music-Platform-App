@@ -1946,7 +1946,6 @@ test('the DJ Deals list keeps flagging an active deal that isn\'t assigned to an
   assert.match(page, /const assignedDealIds = new Set\(tracks\.flatMap\(\(t\) => t\.djDealSettings\?\.allowedDealIds \?\? \[\]\)\)/)
   assert.match(page, /\{deal\.active && !assignedDealIds\.has\(deal\.dealId\) \? \(/)
   assert.match(page, /Not assigned to any track yet — DJs can't see it\./)
-  assert.match(page, /<Link to="\/dashboard\/artist\/music" className="underline hover:text-warning-400">/)
 })
 
 test('an artist can edit an uploaded track\'s metadata and re-upload artwork after the fact (user-reported: "but as a artist i am unable to edit the music i upload")', () => {
@@ -1973,4 +1972,23 @@ test('an artist can edit an uploaded track\'s metadata and re-upload artwork aft
   assert.match(musicPage, /const \[editTrack, setEditTrack\] = useState<TrackDoc \| null>\(null\)/)
   assert.match(musicPage, /onClick=\{\(\) => setEditTrack\(track\)\}/)
   assert.match(musicPage, /\{editTrack \? <EditTrackModal track=\{editTrack\} onClose=\{\(\) => setEditTrack\(null\)\} \/> : null\}/)
+})
+
+test('a deal can be reassigned across tracks directly from the DJ Deals page, not only from each track\'s own settings modal (user-reported: "there is no way to reasign a deal")', () => {
+  // Root cause: assignment only ever went one direction — a track's own TrackDealSettingsModal
+  // could pick from the artist's deals, but the deal-centric DJ Deals page had no way to see or
+  // change which track(s) a given deal was attached to; reassigning meant hunting down whichever
+  // track currently held it, unchecking it there, then finding the new track to check it there.
+  const service = read('src/services/trackService.ts')
+  assert.match(service, /export async function toggleDealOnTrack\(track: TrackDoc, dealId: string, assign: boolean\): Promise<void>/)
+  // Never clobbers the track's other deal settings or its other assigned deals — only this
+  // one dealId's membership in allowedDealIds changes.
+  assert.match(service, /const allowedDealIds = assign\s*\n\s*\? \[\.\.\.new Set\(\[\.\.\.current\.allowedDealIds, dealId\]\)\]\s*\n\s*: current\.allowedDealIds\.filter\(\(id\) => id !== dealId\)/)
+  assert.match(service, /await updateTrackDealSettings\(track\.trackId, \{\s*\n\s*\.\.\.current,\s*\n\s*allowedDealIds,/)
+
+  const page = read('src/pages/artist/dashboard/DjDealsPage.tsx')
+  assert.match(page, /import \{ toggleDealOnTrack \} from '@\/services\/trackService'/)
+  assert.match(page, /await toggleDealOnTrack\(track, dealId, assign\)/)
+  assert.match(page, /const assigned = track\.djDealSettings\?\.allowedDealIds\?\.includes\(deal\.dealId\) \?\? false/)
+  assert.match(page, /onChange=\{\(e\) => void handleToggleAssignment\(track, deal\.dealId, e\.target\.checked\)\}/)
 })
