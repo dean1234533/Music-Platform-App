@@ -2188,3 +2188,29 @@ test('createLicencePaymentSession surfaces the real underlying error to the clie
   const page = read('src/pages/agreements/ContractPage.tsx')
   assert.match(page, /setActionError\(error instanceof Error \? error\.message : 'Could not start payment\.'\)/)
 })
+
+test('platform revenue-split settings auto-configure with placeholder defaults instead of hard-failing every payment (user-reported: "Could not start payment: platformSettings/default must be configured before payments can be processed." then "no this should auto set")', () => {
+  // getPlatformSettings previously threw whenever platformSettings/default didn't exist at
+  // all, by deliberate design ("Billing stops safely if it is not configured") — every real
+  // caller (createLicencePaymentSession, support allocations, payouts, the Stripe webhook)
+  // hard-failed until an admin manually filled in Admin -> Settings. User explicitly asked
+  // for this to auto-set instead, matching the DEFAULT_DATA_RETENTION fallback pattern
+  // already used elsewhere in this same file — a missing doc gets safe placeholder defaults,
+  // but a doc that exists with partial/invalid data still fails loudly (never silently mixes
+  // saved and default values for a value someone was actively trying to configure).
+  const fn = read('functions/src/platformSettings.ts')
+  assert.match(fn, /export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = \{\s*\n\s*platformFeePercent: 15,\s*\n\s*artistAllocationPercent: 85,\s*\n\s*djServiceFeePercent: 10,\s*\n\s*minimumPayoutMinor: 2000,/)
+  assert.match(fn, /if \(!snap\.exists\) return DEFAULT_PLATFORM_SETTINGS/)
+  assert.doesNotMatch(fn, /must be configured before payments can be processed/)
+  // Still validates a doc that exists but is malformed.
+  assert.match(fn, /throw new Error\('platformSettings\/default contains missing or invalid payment settings\.'\)/)
+  assert.match(fn, /throw new Error\('Fan revenue platform and artist percentages must total 100\.'\)/)
+
+  // The admin form pre-fills with these same effective defaults rather than blank fields
+  // that would misleadingly suggest nothing is configured.
+  const types = read('src/types/platformSettings.ts')
+  assert.match(types, /export const DEFAULT_PLATFORM_FEES: Pick</)
+  const adminPage = read('src/pages/admin/AdminSettingsPage.tsx')
+  assert.match(adminPage, /import \{ DEFAULT_DATA_RETENTION, DEFAULT_PLATFORM_FEES, type DataRetentionSettings, type SubscriptionPlan \} from '@\/types\/platformSettings'/)
+  assert.match(adminPage, /platformFeePercent: String\(settings\?\.platformFeePercent \?\? DEFAULT_PLATFORM_FEES\.platformFeePercent\)/)
+})

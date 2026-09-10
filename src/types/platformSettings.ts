@@ -47,6 +47,23 @@ export interface DataRetentionSettings {
   copyrightClaimYears: number
 }
 
+/**
+ * Placeholder revenue-split defaults the Cloud Function side now falls back to when
+ * platformSettings/default hasn't been configured yet — mirrored here so the admin form
+ * pre-fills with the values actually in effect right now, not blank fields that look
+ * unconfigured when the system is really running on these defaults. Not a considered
+ * business decision: review and adjust before relying on these for real payouts.
+ */
+export const DEFAULT_PLATFORM_FEES: Pick<
+  PlatformSettings,
+  'platformFeePercent' | 'artistAllocationPercent' | 'djServiceFeePercent' | 'minimumPayoutMinor'
+> = {
+  platformFeePercent: 15,
+  artistAllocationPercent: 85,
+  djServiceFeePercent: 10,
+  minimumPayoutMinor: 2000,
+}
+
 export const DEFAULT_DATA_RETENTION: DataRetentionSettings = {
   notificationsDays: 90,
   storyRecoveryDays: 7,

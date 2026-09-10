@@ -12,7 +12,7 @@ import { getDataRetentionSettings, getPlatformSettings } from '@/services/platfo
 import { Button } from '@/components/common/Button'
 import { Input, Label } from '@/components/common/Input'
 import { formatCurrency } from '@/utils/format'
-import { DEFAULT_DATA_RETENTION, type DataRetentionSettings, type SubscriptionPlan } from '@/types/platformSettings'
+import { DEFAULT_DATA_RETENTION, DEFAULT_PLATFORM_FEES, type DataRetentionSettings, type SubscriptionPlan } from '@/types/platformSettings'
 import { PLAN_TIERS, type PlanFeatureKey, type PlanLimitKey, type PlanTier } from '@/types/entitlements'
 import { AccountSecuritySection } from '@/components/account/AccountSecuritySection'
 import { PREVIEW_DEFAULT_DURATION_SEC, SUGGESTED_PREVIEW_DURATIONS_SEC } from '@/constants/mediaConfig'
@@ -98,17 +98,20 @@ export function AdminSettingsPage() {
   useEffect(() => {
     void listAllSubscriptionPlans().then((rows) => setPlans(rows.sort((a, b) => a.displayOrder - b.displayOrder)))
     void getPlatformSettings().then((settings) => {
-      if (!settings) return
+      // The Cloud Function side now falls back to these same defaults when
+      // platformSettings/default doesn't exist yet, so payments/payouts work out of the box —
+      // pre-fill with what's actually in effect rather than leaving the form blank, which
+      // would misleadingly suggest nothing is configured.
       setFeeForm({
-        platformFeePercent: String(settings.platformFeePercent),
-        artistAllocationPercent: String(settings.artistAllocationPercent),
-        djServiceFeePercent: String(settings.djServiceFeePercent),
-        minimumPayoutMinor: String(settings.minimumPayoutMinor),
+        platformFeePercent: String(settings?.platformFeePercent ?? DEFAULT_PLATFORM_FEES.platformFeePercent),
+        artistAllocationPercent: String(settings?.artistAllocationPercent ?? DEFAULT_PLATFORM_FEES.artistAllocationPercent),
+        djServiceFeePercent: String(settings?.djServiceFeePercent ?? DEFAULT_PLATFORM_FEES.djServiceFeePercent),
+        minimumPayoutMinor: String(settings?.minimumPayoutMinor ?? DEFAULT_PLATFORM_FEES.minimumPayoutMinor),
       })
       setTrackDefaultsForm({
-        defaultTrackVisibility: settings.defaultTrackVisibility ?? 'followers',
-        defaultPreviewDurationSec: String(settings.defaultPreviewDurationSec ?? PREVIEW_DEFAULT_DURATION_SEC),
-        allowedPreviewDurationsSec: (settings.allowedPreviewDurationsSec ?? SUGGESTED_PREVIEW_DURATIONS_SEC).join(', '),
+        defaultTrackVisibility: settings?.defaultTrackVisibility ?? 'followers',
+        defaultPreviewDurationSec: String(settings?.defaultPreviewDurationSec ?? PREVIEW_DEFAULT_DURATION_SEC),
+        allowedPreviewDurationsSec: (settings?.allowedPreviewDurationsSec ?? SUGGESTED_PREVIEW_DURATIONS_SEC).join(', '),
       })
     })
     void getDataRetentionSettings().then((settings) => {

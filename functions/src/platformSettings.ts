@@ -49,10 +49,24 @@ export async function getDataRetentionSettings(): Promise<DataRetentionSettings>
   return merged
 }
 
-/** Single source of truth for every revenue split. Billing stops safely if it is not configured. */
+/**
+ * Placeholder revenue-split defaults — used until an admin sets real values via Admin ->
+ * Settings, same pattern as DEFAULT_DATA_RETENTION, so billing works out of the box instead
+ * of hard-failing on a doc nobody has touched yet (user-reported: "no this should auto set").
+ * Not a considered business decision: review and adjust in Admin -> Settings before relying
+ * on these for real payouts.
+ */
+export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
+  platformFeePercent: 15,
+  artistAllocationPercent: 85,
+  djServiceFeePercent: 10,
+  minimumPayoutMinor: 2000,
+}
+
+/** Single source of truth for every revenue split. Falls back to DEFAULT_PLATFORM_SETTINGS until an admin configures real values. */
 export async function getPlatformSettings(): Promise<PlatformSettings> {
   const snap = await db.collection('platformSettings').doc('default').get()
-  if (!snap.exists) throw new Error('platformSettings/default must be configured before payments can be processed.')
+  if (!snap.exists) return DEFAULT_PLATFORM_SETTINGS
   const data = snap.data() ?? {}
   const settings = {
     platformFeePercent: data.platformFeePercent,
@@ -60,6 +74,9 @@ export async function getPlatformSettings(): Promise<PlatformSettings> {
     djServiceFeePercent: data.djServiceFeePercent,
     minimumPayoutMinor: data.minimumPayoutMinor,
   }
+  // A doc that exists but is only partially filled in (an admin mid-edit, or a stray write)
+  // still fails loudly rather than silently mixing saved and default values — the fallback
+  // above is only for "never configured at all".
   if (Object.values(settings).some((value) => typeof value !== 'number' || !Number.isFinite(value))) {
     throw new Error('platformSettings/default contains missing or invalid payment settings.')
   }
