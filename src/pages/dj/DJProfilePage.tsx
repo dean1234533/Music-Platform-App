@@ -162,7 +162,7 @@ export function DJProfilePage() {
           {profile.verificationStatus === 'verified' ? <BadgeCheck className="h-5 w-5 text-brand-400" /> : null}
         </div>
         <Link
-          to={`/djs/${profile.djId}`}
+          to={`/djs/${profile.djId}?preview=1`}
           target="_blank"
           rel="noreferrer"
           className="flex items-center gap-1.5 rounded-full border border-surface-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-ink-1 hover:bg-surface-3"

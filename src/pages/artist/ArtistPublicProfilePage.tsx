@@ -35,7 +35,10 @@ export function ArtistPublicProfilePage() {
   const { slug } = useParams<{ slug: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const goBack = useSmartBack('/')
+  // Opened as a self-preview from Settings (target="_blank", so this tab's own history never
+  // included Settings — useSmartBack's usual "no history" fallback of "/" would otherwise
+  // send the artist to the public homepage instead of back to what they were editing).
+  const goBack = useSmartBack(searchParams.get('preview') === '1' ? '/dashboard/artist/settings' : '/')
   const { firebaseUser, hasRole } = useAuth()
   const { notify } = useToast()
   const [artistId, setArtistId] = useState<string | null | undefined>(undefined)
@@ -196,7 +199,7 @@ export function ArtistPublicProfilePage() {
         </button>
       </header>
 
-      <div className="relative h-44 w-full overflow-hidden border-y border-white/[0.06] bg-surface-2 sm:h-52 lg:h-56">
+      <div className="relative h-14 w-full overflow-hidden border-y border-white/[0.06] bg-surface-2 sm:h-52 lg:h-56">
         {artist.coverURL ? (
           <img src={artist.coverURL} alt="" className="h-full w-full object-cover" />
         ) : (
@@ -209,12 +212,12 @@ export function ArtistPublicProfilePage() {
         <div className="absolute inset-0 bg-gradient-to-t from-surface-0 via-surface-0/10 to-transparent" />
       </div>
 
-      <main className="relative z-10 mx-auto -mt-12 max-w-6xl px-5 sm:-mt-14 sm:px-8 lg:-mt-16 lg:px-10">
+      <main className="relative z-10 mx-auto -mt-4 max-w-6xl px-5 sm:-mt-14 sm:px-8 lg:-mt-16 lg:px-10">
         <section className="premium-panel relative overflow-hidden rounded-[2rem] p-5 sm:p-7 lg:p-9">
           <img
-            src="/artist-profile-card-bg.png"
+            src={artist.coverURL || '/artist-profile-card-bg.png'}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover object-[68%_center]"
+            className="absolute inset-0 h-full w-full object-cover object-center sm:object-[68%_center]"
           />
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,6,7,.82),rgba(5,6,7,.46)_58%,rgba(5,6,7,.58)),linear-gradient(0deg,rgba(5,6,7,.55),transparent_70%)]" />
           <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-end">
@@ -227,7 +230,7 @@ export function ArtistPublicProfilePage() {
             )}
           >
             {artist.photoURL ? (
-              <img src={artist.photoURL} alt="" className="h-full w-full object-cover" />
+              <img src={artist.photoURL} alt="" className="h-full w-full object-cover object-center" />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_30%_20%,rgba(200,243,63,.22),transparent_42%),linear-gradient(145deg,#1c2430,#0b0e12)] font-serif text-5xl text-white sm:text-6xl">
                 {artist.name.charAt(0).toUpperCase()}

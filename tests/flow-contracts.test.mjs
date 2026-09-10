@@ -1899,15 +1899,16 @@ test('back buttons fall back to a real destination instead of silently doing not
 
   // Every page that previously called navigate(-1) directly for its back button now routes
   // through the shared hook with a real fallback destination instead.
+  // DJPublicProfilePage/ArtistPublicProfilePage moved to a conditional fallback (see the
+  // preview-link test below) — still routed through useSmartBack, just no longer a bare
+  // useSmartBack('/') call, so they're asserted separately instead of in this generic loop.
   const usages = [
     ['src/pages/track/TrackPage.tsx', "useSmartBack('/')"],
     ['src/pages/agreements/RequestTimelinePage.tsx', "useSmartBack('/agreements')"],
     ['src/pages/agreements/ContractPage.tsx', "useSmartBack('/agreements')"],
     ['src/pages/agreements/MyAgreementsPage.tsx', "useSmartBack('/app')"],
     ['src/pages/support/SupportPage.tsx', "useSmartBack('/app')"],
-    ['src/pages/dj/DJPublicProfilePage.tsx', "useSmartBack('/')"],
     ['src/pages/legal/CopyrightClaimPage.tsx', "useSmartBack('/app')"],
-    ['src/pages/artist/ArtistPublicProfilePage.tsx', "useSmartBack('/')"],
   ]
   for (const [path, expected] of usages) {
     const page = read(path)
@@ -2345,11 +2346,33 @@ test('a DJ can set a profile photo, and both artist and DJ settings link to a li
 
   // Preview links on both settings pages, opening the real public route in a new tab so
   // in-progress edits aren't lost.
-  assert.match(dj, /to=\{`\/djs\/\$\{profile\.djId\}`\}/)
+  assert.match(dj, /to=\{`\/djs\/\$\{profile\.djId\}\?preview=1`\}/)
   assert.match(dj, /Preview live profile/)
   assert.match(dj, /target="_blank"/)
 
   const artist = read('src/pages/artist/dashboard/ArtistSettingsPage.tsx')
-  assert.match(artist, /to=\{`\/artist\/\$\{artist\.slug\}`\}/)
+  assert.match(artist, /to=\{`\/artist\/\$\{artist\.slug\}\?preview=1`\}/)
   assert.match(artist, /Preview live profile/)
+})
+
+test('pressing back on a self-previewed profile returns to the settings page it was opened from, not the public homepage (user-reported: "when i preview a profile and press the back button i am not taken back to where i was")', () => {
+  // Root cause: "Preview live profile" opens in a new tab (target="_blank") so the edit-in-
+  // progress Settings tab isn't lost — but that means the PREVIEW tab's own history never
+  // included Settings, so useSmartBack's usual "no history" fallback of "/" sent the artist/DJ
+  // to the public homepage instead of back to what they were editing. The preview link now
+  // carries a ?preview=1 marker the public profile page reads to pick a smarter fallback.
+  const djLink = read('src/pages/dj/DJProfilePage.tsx')
+  assert.match(djLink, /to=\{`\/djs\/\$\{profile\.djId\}\?preview=1`\}/)
+  const djPublic = read('src/pages/dj/DJPublicProfilePage.tsx')
+  assert.match(djPublic, /import \{ Link, useParams, useSearchParams \} from 'react-router-dom'/)
+  assert.match(djPublic, /const \[searchParams\] = useSearchParams\(\)/)
+  assert.match(djPublic, /const goBack = useSmartBack\(searchParams\.get\('preview'\) === '1' \? '\/dj\/profile' : '\/'\)/)
+
+  const artistLink = read('src/pages/artist/dashboard/ArtistSettingsPage.tsx')
+  assert.match(artistLink, /to=\{`\/artist\/\$\{artist\.slug\}\?preview=1`\}/)
+  const artistPublic = read('src/pages/artist/ArtistPublicProfilePage.tsx')
+  assert.match(
+    artistPublic,
+    /const goBack = useSmartBack\(searchParams\.get\('preview'\) === '1' \? '\/dashboard\/artist\/settings' : '\/'\)/,
+  )
 })

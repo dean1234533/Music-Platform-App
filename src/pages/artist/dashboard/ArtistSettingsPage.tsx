@@ -197,7 +197,7 @@ export function ArtistSettingsPage() {
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold text-ink-0">Artist settings</h1>
         <Link
-          to={`/artist/${artist.slug}`}
+          to={`/artist/${artist.slug}?preview=1`}
           target="_blank"
           rel="noreferrer"
           className="flex items-center gap-1.5 rounded-full border border-surface-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-ink-1 hover:bg-surface-3"

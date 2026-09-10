@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useSmartBack } from '@/hooks/useSmartBack'
 import { ArrowLeft, BadgeCheck, Disc3, Flag, MapPin } from 'lucide-react'
 import { subscribeDJProfile } from '@/services/djService'
@@ -11,7 +11,11 @@ import type { DJProfile } from '@/types/dj'
 
 export function DJPublicProfilePage() {
   const { djId } = useParams<{ djId: string }>()
-  const goBack = useSmartBack('/')
+  const [searchParams] = useSearchParams()
+  // Opened as a self-preview from DJ settings (target="_blank", so this tab's own history
+  // never included Settings — useSmartBack's usual "no history" fallback of "/" would
+  // otherwise send the DJ to the public homepage instead of back to what they were editing).
+  const goBack = useSmartBack(searchParams.get('preview') === '1' ? '/dj/profile' : '/')
   const { firebaseUser } = useAuth()
   const [profile, setProfile] = useState<DJProfile | null | undefined>(undefined)
   const [loadError, setLoadError] = useState(false)
