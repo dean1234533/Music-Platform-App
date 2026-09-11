@@ -48,7 +48,7 @@ export function OnboardingPage() {
     setStep('saving')
     setError(null)
     try {
-      await completeOnboarding(firebaseUser.uid, [selectedRole])
+      await completeOnboarding(firebaseUser.uid, [selectedRole], profile?.roles.includes('admin') ?? false)
 
       if (selectedRole === 'artist') {
         await createArtistProfile({

@@ -1350,7 +1350,9 @@ test('a regular account can only ever have one role, for life — self-service c
   // there's no path there that would even attempt to request more than one.
   const onboarding = read('src/pages/onboarding/OnboardingPage.tsx')
   assert.match(onboarding, /const \[selectedRole, setSelectedRole\] = useState<UserRole \| null>\(initialRole\)/)
-  assert.match(onboarding, /completeOnboarding\(firebaseUser\.uid, \[selectedRole\]\)/)
+  // completeOnboarding takes a third preserveAdmin argument as of the dedicated test below —
+  // still only ever the one selectedRole being requested, never more than one.
+  assert.match(onboarding, /completeOnboarding\(firebaseUser\.uid, \[selectedRole\], profile\?\.roles\.includes\('admin'\) \?\? false\)/)
 
   // UI: the add-role flow (an already-onboarded account adding artist or dj)
   // shows the block up front instead of only surfacing it as a submit error —
@@ -2665,4 +2667,37 @@ test('copyright claim evidence images are compressed before upload, matching eve
   // legal document for negligible size savings.
   const licence = read('src/services/licenceService.ts')
   assert.doesNotMatch(licence, /compressImage/)
+})
+
+test('an account that already has admin (e.g. bootstrapped directly in Firestore before ever completing onboarding) can actually finish onboarding, instead of every attempt being silently denied (user-reported, after a sign-in lockup traced back to a hand-edited admin account: "yea i think it was the role... when your going through onboarding as there is three types")', () => {
+  // Root cause: completeOnboarding wrote roles: safeRoles (just the one role picked in the
+  // 3-option onboarding UI — fan/artist/dj, never admin) via a plain overwrite. For an account
+  // that already had 'admin' in its roles (onboardingComplete still false), none of
+  // firestore.rules' three update branches permit that write: branch 1 requires the OLD roles
+  // to be empty (false — admin was already there), branch 2 requires the OLD roles to already
+  // be a subset of fan/artist/dj (false — 'admin' isn't), and branch 3 (the admin account
+  // branch) requires the NEW roles to still include 'admin' (false — completeOnboarding never
+  // preserved it). Every branch failing means the whole update is denied outright.
+  const rules = read('firestore.rules')
+  const usersUpdateRule = rules.slice(rules.indexOf('allow update: if isSelf(userId)'), rules.indexOf('allow update: if isSelf(userId)') + 2000)
+  assert.match(
+    usersUpdateRule,
+    /resource\.data\.roles\.hasAny\(\['admin'\]\)\s*\n\s*&& request\.resource\.data\.roles\.hasAny\(\['admin'\]\)/,
+  )
+
+  const userService = read('src/services/userService.ts')
+  assert.match(
+    userService,
+    /export async function completeOnboarding\(uid: string, roles: UserRole\[\], preserveAdmin = false\): Promise<void> \{/,
+  )
+  assert.match(userService, /const safeRoles = roles\.filter\(\(role\): role is UserRole => ONBOARDING_ROLES\.includes\(role\)\)/)
+  // The write now keeps 'admin' in the new roles whenever the account already had it, which is
+  // exactly what satisfies the rules' admin branch above instead of colliding with it.
+  assert.match(userService, /roles: preserveAdmin \? \[\.\.\.safeRoles, 'admin' as UserRole\] : safeRoles,/)
+
+  const onboardingPage = read('src/pages/onboarding/OnboardingPage.tsx')
+  assert.match(
+    onboardingPage,
+    /await completeOnboarding\(firebaseUser\.uid, \[selectedRole\], profile\?\.roles\.includes\('admin'\) \?\? false\)/,
+  )
 })

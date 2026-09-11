@@ -84,10 +84,19 @@ export function subscribeToUserProfile(
   )
 }
 
-export async function completeOnboarding(uid: string, roles: UserRole[]): Promise<void> {
+/**
+ * `preserveAdmin` matters for the rare case of an account that had `admin`
+ * added directly in Firestore (e.g. bootstrapping the very first admin)
+ * before it ever completed onboarding: firestore.rules' users/{userId}
+ * update rule has no branch that permits dropping 'admin' from roles, so a
+ * plain overwrite with just the picked role would be denied outright —
+ * this keeps 'admin' in the write whenever the account already has it,
+ * satisfying that rule's admin branch instead of colliding with it.
+ */
+export async function completeOnboarding(uid: string, roles: UserRole[], preserveAdmin = false): Promise<void> {
   const safeRoles = roles.filter((role): role is UserRole => ONBOARDING_ROLES.includes(role))
   await updateDoc(userRef(uid), {
-    roles: safeRoles,
+    roles: preserveAdmin ? [...safeRoles, 'admin' as UserRole] : safeRoles,
     onboardingComplete: true,
     updatedAt: serverTimestamp(),
   })
