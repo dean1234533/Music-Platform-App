@@ -38,11 +38,38 @@ async function deleteStorageFile(path: string | null | undefined): Promise<void>
 }
 
 /**
+ * Cancels a Stripe subscription if it isn't already canceled. Stripe keeps a
+ * canceled subscription's object around (status: 'canceled') rather than
+ * deleting it, and calling subscriptions.cancel() on one that's already
+ * canceled raises an invalid_request_error, not resource_missing — the only
+ * code the old version of this function tolerated. Without this check, a
+ * retried deletion (the previous attempt got this far before failing later)
+ * would throw here every time and could never actually complete.
+ */
+async function cancelStripeSubscriptionIfActive(stripeSubscriptionId: string): Promise<void> {
+  const stripe = getStripe()
+  try {
+    const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId)
+    if (subscription.status === 'canceled') return
+    await stripe.subscriptions.cancel(stripeSubscriptionId)
+  } catch (error) {
+    if ((error as { code?: string }).code !== 'resource_missing') throw error
+  }
+}
+
+/**
  * Deletes every track owned by the artist, unless it's referenced by a
  * still-active licence agreement — in which case the file must survive for
  * the DJ's existing entitlement (spec §23/§24), so it's unpublished instead
  * of removed: private + taken down, but left in place for getSecureDownloadUrl
  * (which never checks visibility/takenDown, only the agreement itself).
+ *
+ * Deletes each removed track's own artwork file individually (by uuid-scoped
+ * prefix, `artists/{artistId}/artwork/{trackId}.*`) rather than as part of a
+ * blanket `artists/{artistId}/artwork/` folder wipe — a preserved track (kept
+ * for an active licence) shares that same folder with every other track's
+ * artwork, so a folder-level wipe would delete a preserved track's artwork
+ * right alongside the ones actually being removed.
  */
 async function offboardArtistTracks(artistId: string): Promise<void> {
   const tracksSnap = await db.collection('tracks').where('artistId', '==', artistId).get()
@@ -70,6 +97,8 @@ async function offboardArtistTracks(artistId: string): Promise<void> {
       deleteStorageFile(track.originalAudioPath),
       deleteStorageFile(track.previewAudioPath),
       deleteStorageFile(track.streamAudioPath),
+      deleteStorageFile(track.djPreviewAudioPath),
+      deleteStorageFolder(`artists/${artistId}/artwork/${trackDoc.id}`),
     ])
     await trackDoc.ref.delete()
   }
@@ -85,18 +114,38 @@ async function offboardArtistStories(artistId: string): Promise<void> {
 }
 
 /**
+ * Every artistSlugs doc pointing at this artist — the current slug and any
+ * stale ones left behind by a rename (admin/artistSlug.ts keeps those as
+ * redirects). Without this, the vanity URL stays permanently reserved
+ * against a dead artistId and can never be claimed by anyone else, and
+ * getArtistIdForSlug keeps resolving it to an artist that no longer exists.
+ */
+async function offboardArtistSlugs(artistId: string): Promise<void> {
+  await deleteQueryBatched(db.collection('artistSlugs').where('artistId', '==', artistId))
+}
+
+/**
  * The actual deletion work, shared by the self-service callable below and
  * adminDeleteAccount — both must run identical cleanup so an admin-triggered
  * deletion isn't a second, potentially-diverging implementation of something
  * this sensitive. Firebase Auth user, users doc, artist/DJ profiles and
  * their public visibility, uploaded content not covered by an active
- * licence, playlists/crates/follows/likes/notifications/deals. Deliberately
- * leaves licenceRequests, licenceOffers, licenceAgreements, conversations,
- * messages, downloadLogs, transactions, payouts, and copyright/verification
- * records untouched — those are the "minimum contract record" the other
- * party's evidence depends on (spec §24) and are subject to their own
- * retention schedule, not this flow. Idempotent: every step is safe to
- * re-run if a previous attempt partially failed.
+ * licence, playlists/crates/follows/likes/notifications/deals/blocks/
+ * verification requests/support messages/preview-conversion signals/slug
+ * reservations. Deliberately leaves licenceRequests, licenceOffers,
+ * licenceAgreements, licenceAgreementAcceptances, legalAcceptances,
+ * downloadLogs, transactions, payouts, artistBalances, artistPayoutAccounts,
+ * payoutHolds, copyrightClaims, reports, and auditLogs untouched — those are
+ * financial/legal/moderation records (the "minimum contract record" the
+ * other party's evidence depends on, spec §24, plus accounting and abuse
+ * history) and are subject to their own retention schedule, not this flow.
+ * The `conversations`/`messages` collections are dead — nothing in the
+ * current app writes to them — so they're not touched either way.
+ * The underlying Stripe Customer object (past invoices/payment methods) is
+ * likewise left intact for the same accounting reason; only the account's
+ * own active subscriptions are canceled so Stripe stops billing it.
+ * Idempotent: every step is safe to re-run if a previous attempt partially
+ * failed.
  */
 async function performAccountDeletion(uid: string): Promise<void> {
   const statusRef = db.collection('accountDeletions').doc(uid)
@@ -119,23 +168,26 @@ async function performAccountDeletion(uid: string): Promise<void> {
     for (const subRef of [fanSubscriptionRef, artistSubscriptionRef]) {
       const subSnap = await subRef.get()
       const stripeSubscriptionId = subSnap.data()?.stripeSubscriptionId as string | undefined
-      if (stripeSubscriptionId) {
-        try {
-          await getStripe().subscriptions.cancel(stripeSubscriptionId)
-        } catch (error) {
-          if ((error as { code?: string }).code !== 'resource_missing') throw error
-        }
-      }
+      if (stripeSubscriptionId) await cancelStripeSubscriptionIfActive(stripeSubscriptionId)
     }
+    // DJ has no billing product (see PricingPage) — confirmed no subscriptions/{uid}_dj
+    // doc type exists anywhere in this codebase, so fan+artist is the complete set.
 
     if (roles.includes('artist')) {
       await offboardArtistTracks(uid)
       await offboardArtistStories(uid)
+      await offboardArtistSlugs(uid)
       await deleteQueryBatched(db.collection('djDeals').where('artistId', '==', uid))
       await deleteQueryBatched(db.collection('artistPosts').where('artistId', '==', uid))
       await deleteQueryBatched(db.collection('fanOffers').where('artistId', '==', uid))
       await deleteQueryBatched(db.collection('fanOfferClaims').where('artistId', '==', uid))
-      await deleteStorageFolder(`artists/${uid}/artwork/`)
+      // The artist's own photo/cover, deleted explicitly rather than as a blanket
+      // artists/{uid}/artwork/ folder wipe — offboardArtistTracks already deleted each
+      // removed track's own artwork individually, and a folder-level wipe here would also
+      // delete a preserved track's artwork (kept for an active licence agreement), which
+      // shares that same folder.
+      await deleteStorageFile(`artists/${uid}/artwork/profile-photo.webp`)
+      await deleteStorageFile(`artists/${uid}/artwork/cover-image.webp`)
       await db.collection('artistProfiles').doc(uid).delete()
     }
     if (roles.includes('dj')) {
@@ -152,6 +204,17 @@ async function performAccountDeletion(uid: string): Promise<void> {
     await deleteQueryBatched(db.collection('supportRelationships').where('fanId', '==', uid))
     await deleteQueryBatched(db.collection('supportRelationships').where('artistId', '==', uid))
     await deleteQueryBatched(db.collection('notifications').where('userId', '==', uid))
+    // Both sides of a block — the deleted account may have blocked others, or been blocked.
+    await deleteQueryBatched(db.collection('blockedUsers').where('blockerId', '==', uid))
+    await deleteQueryBatched(db.collection('blockedUsers').where('blockedId', '==', uid))
+    // Ephemeral preview->follow/support conversion signal — the deleted account as the fan
+    // who previewed (uid) and, separately, as the artist who was previewed (artistId).
+    await deleteQueryBatched(db.collection('previewSessions').where('uid', '==', uid))
+    await deleteQueryBatched(db.collection('previewSessions').where('artistId', '==', uid))
+    // Plain application data (a verification note, a support contact message) — no
+    // independent legal/moderation significance once the profile they refer to is gone.
+    await deleteQueryBatched(db.collection('verificationRequests').where('userId', '==', uid))
+    await deleteQueryBatched(db.collection('supportMessages').where('userId', '==', uid))
     await db.collection('supportAllocations').doc(uid).delete()
     await fanSubscriptionRef.delete()
     await artistSubscriptionRef.delete()

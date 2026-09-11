@@ -225,6 +225,90 @@ test('account deletion cancels BOTH the fan and artist Stripe subscriptions (use
   }
 })
 
+test('account deletion actually tears down every collection/Storage path an account can own, not just the ones already covered (user-reported: "CRITICAL BUG — ACCOUNT DELETION DOES NOT CLEAN UP THE USER\'S FIREBASE DATA... I have checked Firebase and the account\'s linked data is still present")', () => {
+  // Full inventory pass over every functions/src collection reference found five collections
+  // with a uid-owned field that performAccountDeletion never touched, plus two Storage
+  // correctness bugs and one Stripe retry-safety bug. See the account/deleteAccount.ts doc
+  // comment for the complete classification of every collection (deleted / retained-legal /
+  // dead-unused) — this test locks in the fixes so they can't silently regress.
+  const source = read('functions/src/account/deleteAccount.ts')
+
+  // Gap 1: artistSlugs was never cleaned up — the vanity URL stayed permanently reserved
+  // against a dead artistId forever, and getArtistIdForSlug kept resolving it.
+  assert.match(source, /async function offboardArtistSlugs\(artistId: string\): Promise<void> \{/)
+  assert.match(source, /db\.collection\('artistSlugs'\)\.where\('artistId', '==', artistId\)/)
+  assert.match(source, /await offboardArtistSlugs\(uid\)/)
+
+  // Gap 2: blockedUsers — both directions (the deleted account as blocker, and as the one
+  // blocked by someone else).
+  assert.match(source, /db\.collection\('blockedUsers'\)\.where\('blockerId', '==', uid\)/)
+  assert.match(source, /db\.collection\('blockedUsers'\)\.where\('blockedId', '==', uid\)/)
+
+  // Gap 3: previewSessions — the deleted account as the previewing fan (uid) and, separately,
+  // as the previewed artist (artistId); this is what onFollowCreate/onSupportRelationshipCreate
+  // read to decide a real preview -> follow/support conversion.
+  assert.match(source, /db\.collection\('previewSessions'\)\.where\('uid', '==', uid\)/)
+  assert.match(source, /db\.collection\('previewSessions'\)\.where\('artistId', '==', uid\)/)
+
+  // Gap 4 & 5: verificationRequests and supportMessages — plain application data (a
+  // verification note, a support contact message), no independent legal/moderation
+  // significance once the profile/account they refer to is gone.
+  assert.match(source, /db\.collection\('verificationRequests'\)\.where\('userId', '==', uid\)/)
+  assert.match(source, /db\.collection\('supportMessages'\)\.where\('userId', '==', uid\)/)
+
+  // Storage bug 1: a removed track's djPreviewAudioPath (the separately-uploaded DJ preview
+  // clip) was never deleted, orphaning that file in Storage forever.
+  assert.match(source, /deleteStorageFile\(track\.djPreviewAudioPath\)/)
+
+  // Storage bug 2: a blanket artists/{uid}/artwork/ folder wipe ran unconditionally, which
+  // would delete the artwork of a track PRESERVED for an active DJ licence agreement (that
+  // track shares the same folder) — replaced with per-track artwork deletion (only for tracks
+  // actually being removed) plus two explicit file deletes for the artist's own photo/cover.
+  assert.doesNotMatch(source, /deleteStorageFolder\(`artists\/\$\{uid\}\/artwork\/`\)/)
+  assert.match(source, /deleteStorageFolder\(`artists\/\$\{artistId\}\/artwork\/\$\{trackDoc\.id\}`\)/)
+  assert.match(source, /deleteStorageFile\(`artists\/\$\{uid\}\/artwork\/profile-photo\.webp`\)/)
+  assert.match(source, /deleteStorageFile\(`artists\/\$\{uid\}\/artwork\/cover-image\.webp`\)/)
+
+  // Stripe bug: canceling an already-canceled subscription raises invalid_request_error, not
+  // resource_missing — the only code the old catch tolerated — so retrying a deletion that got
+  // partway through a Stripe cancellation on a prior attempt would throw every time and could
+  // never complete. Now checks the subscription's current status first.
+  assert.match(source, /async function cancelStripeSubscriptionIfActive\(stripeSubscriptionId: string\): Promise<void> \{/)
+  assert.match(source, /const subscription = await stripe\.subscriptions\.retrieve\(stripeSubscriptionId\)/)
+  assert.match(source, /if \(subscription\.status === 'canceled'\) return/)
+  assert.match(source, /await cancelStripeSubscriptionIfActive\(stripeSubscriptionId\)/)
+  // The old unconditional subscriptions.cancel() call sites are gone — replaced by the helper.
+  assert.doesNotMatch(source, /await getStripe\(\)\.subscriptions\.cancel\(stripeSubscriptionId\)/)
+
+  // Confirms the earlier fix's premise still holds: DJ has no billing product (see
+  // PricingPage's "DJ / Free" tier), so fan+artist really is the complete subscription set —
+  // not an assumption, checked against the whole codebase's subscriptions/{uid}_{role} usages.
+  const checkout = read('functions/src/stripe/checkout.ts')
+  assert.doesNotMatch(checkout, /_dj`/)
+
+  // Security: both the self-service and admin paths still derive the account being deleted
+  // from request.auth.uid / an admin-only-supplied userId — never trusting an arbitrary
+  // client-supplied uid on the self-service path.
+  assert.match(source, /const uid = request\.auth\.uid/)
+  assert.doesNotMatch(source.slice(0, source.indexOf('export const adminDeleteAccount')), /request\.data\?\.uid/)
+
+  // Retention decisions this pass confirmed/kept unchanged: licenceRequests, licenceOffers,
+  // licenceAgreements, licenceAgreementAcceptances, legalAcceptances, downloadLogs,
+  // transactions, payouts, artistBalances, artistPayoutAccounts, payoutHolds,
+  // copyrightClaims, reports, and auditLogs are all financial/legal/moderation records with
+  // their own retention schedule, explicitly left untouched by this flow.
+  for (const retained of [
+    'licenceRequests', 'licenceOffers', 'licenceAgreementAcceptances',
+    'legalAcceptances', 'downloadLogs', 'transactions', 'payouts', 'artistBalances',
+    'artistPayoutAccounts', 'payoutHolds', 'copyrightClaims', 'reports', 'auditLogs',
+  ]) {
+    assert.doesNotMatch(source, new RegExp(`collection\\('${retained}'\\)\\.where`))
+  }
+  // licenceAgreements is READ (to find an active agreement a track must be preserved for, and
+  // to decide the final 'retained_limited_data' status) but never queried for deletion.
+  assert.doesNotMatch(source, /deleteQueryBatched\(db\.collection\('licenceAgreements'\)/)
+})
+
 test('playback and track deletion are server-authorised', () => {
   const functions = read('functions/src/tracks.ts')
   assert.match(functions, /getTrackPlaybackUrl/)
