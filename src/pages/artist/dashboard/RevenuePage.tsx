@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Download, Wallet } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Banknote, Clock3, Download, PiggyBank, Wallet } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeArtistBalance, subscribeArtistPayouts, subscribeArtistTransactions, requestPayout } from '@/services/revenueService'
 import { beginConnectOnboarding, openConnectDashboard, subscribeArtistPayoutAccount } from '@/services/connectService'
@@ -86,33 +87,53 @@ export function RevenuePage() {
       <h1 className="text-2xl font-semibold text-ink-0">Revenue</h1>
 
       <div className="grid grid-cols-3 gap-4">
-        <StatCard label="Pending" value={formatCurrency(balance?.pendingMinor ?? 0, currency)} hint="Clears after 7 days" />
-        <StatCard label="Available" value={formatCurrency(balance?.availableMinor ?? 0, currency)} />
-        <StatCard label="Paid out" value={formatCurrency(balance?.paidMinor ?? 0, currency)} />
+        <StatCard icon={<Clock3 className="h-4.5 w-4.5" />} label="Pending" value={formatCurrency(balance?.pendingMinor ?? 0, currency)} hint="Clears after 7 days" accent="neutral" />
+        <StatCard icon={<Wallet className="h-4.5 w-4.5" />} label="Available" value={formatCurrency(balance?.availableMinor ?? 0, currency)} accent="brand" />
+        <StatCard icon={<PiggyBank className="h-4.5 w-4.5" />} label="Paid out" value={formatCurrency(balance?.paidMinor ?? 0, currency)} accent="support" />
       </div>
 
-      <section className="rounded-2xl border border-surface-border bg-surface-1 p-6">
-        <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-ink-3">Payouts</h2>
+      <section className="rounded-2xl border border-surface-border bg-surface-1 p-5 sm:p-6">
+        <p className="eyebrow text-brand-400">Revenue</p>
+        <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-ink-0">Get paid, your way</h2>
+        <p className="mt-1.5 text-sm text-ink-2">Connect Stripe to receive your earnings securely and track your revenue.</p>
+
         {!payoutAccount?.payoutsEnabled ? (
-          <>
-            <p className="mb-3 text-sm text-ink-2">Connect a Stripe account to receive payouts.</p>
-            <Button size="sm" onClick={handleConnect} loading={connecting}>
+          <div className="mt-5 flex flex-col gap-3 rounded-xl border border-surface-border bg-surface-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#635bff] text-base font-bold text-white">S</div>
+              <div>
+                <p className="text-sm font-semibold text-ink-0">Connect Stripe</p>
+                <p className="text-xs text-ink-3">Payouts, payments and earnings all in one place.</p>
+              </div>
+            </div>
+            <Button onClick={handleConnect} loading={connecting} className="w-full sm:w-auto">
               Connect Stripe
             </Button>
-          </>
+          </div>
         ) : (
-          <div>
-            <p className="mb-3 text-sm text-ink-2">Payouts are available once the cleared balance reaches {formatCurrency(MINIMUM_ARTIST_PAYOUT_MINOR, currency)}.</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" onClick={handlePayout} loading={payingOut} disabled={(balance?.availableMinor ?? 0) < MINIMUM_ARTIST_PAYOUT_MINOR}>
-                Request payout
-              </Button>
-              <Button size="sm" variant="secondary" onClick={openConnectDashboard}>
-                Stripe dashboard
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-1 items-center gap-3 rounded-xl border border-surface-border bg-surface-2 p-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-brand-400/20 bg-brand-500/10 text-brand-400">
+                <Banknote className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-ink-3">Available to pay out</p>
+                <p className="text-lg font-semibold text-ink-0">{formatCurrency(balance?.availableMinor ?? 0, currency)}</p>
+              </div>
+              <Button size="sm" onClick={handlePayout} loading={payingOut} disabled={(balance?.availableMinor ?? 0) < MINIMUM_ARTIST_PAYOUT_MINOR} className="shrink-0">
+                Request
               </Button>
             </div>
+            <Button variant="secondary" onClick={openConnectDashboard} className="sm:w-auto">
+              Stripe dashboard
+            </Button>
           </div>
         )}
+        <p className="mt-3 text-xs text-ink-3">
+          {payoutAccount?.payoutsEnabled
+            ? `Payouts are available once your cleared balance reaches ${formatCurrency(MINIMUM_ARTIST_PAYOUT_MINOR, currency)}.`
+            : 'Connect a Stripe account to receive payouts.'}
+        </p>
         {error ? <p className="mt-2 text-sm text-danger-500">{error}</p> : null}
       </section>
 
@@ -197,11 +218,29 @@ export function RevenuePage() {
   )
 }
 
-function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function StatCard({
+  icon,
+  label,
+  value,
+  hint,
+  accent,
+}: {
+  icon: ReactNode
+  label: string
+  value: string
+  hint?: string
+  accent: 'brand' | 'support' | 'neutral'
+}) {
+  const accentClasses = {
+    brand: 'border-brand-400/20 bg-brand-500/10 text-brand-400',
+    support: 'border-support-400/20 bg-support-500/10 text-support-400',
+    neutral: 'border-white/10 bg-white/[0.05] text-ink-1',
+  }
   return (
     <div className="rounded-xl border border-surface-border bg-surface-1 p-4">
-      <p className="text-xs text-ink-2">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-ink-0">{value}</p>
+      <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${accentClasses[accent]}`}>{icon}</div>
+      <p className="mt-3 text-xl font-semibold text-ink-0">{value}</p>
+      <p className="mt-0.5 text-xs text-ink-2">{label}</p>
       {hint ? <p className="mt-0.5 text-xs text-ink-3">{hint}</p> : null}
     </div>
   )

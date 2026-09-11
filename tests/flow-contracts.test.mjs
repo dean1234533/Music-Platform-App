@@ -2818,3 +2818,29 @@ test('the public-profile link card on the Growth page stacks cleanly on mobile i
   )
   assert.match(shareButton, /<Button variant="secondary" size="sm" onClick=\{handleClick\} className=\{className\}>/)
 })
+
+test('the Revenue page\'s Payouts box matches the marketing mockup\'s card style — icon tiles, a Stripe brand square, and real balance data instead of the old plain text/button block (user-reported, with a "Build your community" marketing image attached: "on the revenue page i want the payouts box to look the same as the one in the image")', () => {
+  const page = read('src/pages/artist/dashboard/RevenuePage.tsx')
+  // The "Get paid, your way" header, matching the mockup's copy.
+  assert.match(page, /<p className="eyebrow text-brand-400">Revenue<\/p>/)
+  assert.match(page, /Get paid, your way/)
+  assert.match(page, /Connect Stripe to receive your earnings securely and track your revenue\./)
+
+  // Disconnected state: a Stripe-brand icon tile + title + description + button, matching the
+  // mockup's "Connect Stripe" card, not the old bare paragraph + button.
+  assert.match(page, /bg-\[#635bff\] text-base font-bold text-white">S</)
+  assert.match(page, /Payouts, payments and earnings all in one place\./)
+
+  // Connected state: an icon-badge stat tile for the real available balance (never a fabricated
+  // "next payout in N days" countdown — this app's payouts are on-demand, not scheduled).
+  assert.match(page, /Available to pay out/)
+  assert.doesNotMatch(page, /In \d+ days?/)
+
+  // The top three balance cards now use the same icon-badge StatCard language as the mockup's
+  // stat tiles (and match GrowthPage's established accent-badge pattern), not a plain text card.
+  assert.match(page, /icon: ReactNode/)
+  assert.match(page, /accent: 'brand' \| 'support' \| 'neutral'/)
+  assert.match(page, /<StatCard icon=\{<Clock3 className="h-4\.5 w-4\.5" \/>\} label="Pending"/)
+  assert.match(page, /<StatCard icon=\{<Wallet className="h-4\.5 w-4\.5" \/>\} label="Available"/)
+  assert.match(page, /<StatCard icon=\{<PiggyBank className="h-4\.5 w-4\.5" \/>\} label="Paid out"/)
+})
