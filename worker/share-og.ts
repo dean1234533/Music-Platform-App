@@ -10,6 +10,7 @@
 
 import { BLOG_POSTS } from '../src/content/blog.ts'
 import { DJ_FAQS, ARTIST_FAQS } from '../src/content/faqs.ts'
+import { TOOLS, getToolBySlug } from '../src/content/tools.ts'
 
 export interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> }
@@ -372,6 +373,39 @@ export default {
             bodyHtml: `<ul>${list}</ul>`,
           }),
         )
+      }
+
+      // /tools — the hub index, listing every tool grouped by who it's for.
+      if (parts[0] === 'tools' && parts.length === 1) {
+        const hub = getToolBySlug('')!
+        const realTools = TOOLS.filter((tool) => tool.category !== null)
+        const artistList = realTools.filter((tool) => tool.category === 'artist')
+        const djList = realTools.filter((tool) => tool.category === 'dj')
+        const renderList = (tools: typeof realTools) =>
+          `<ul>${tools.map((tool) => `<li><a href="/tools/${tool.slug}">${escapeHtml(tool.label)}</a> — ${escapeHtml(tool.blurb)}</li>`).join('\n')}</ul>`
+        return contentResponse(
+          renderContentHtml({
+            title: 'Free Music Tools for Artists and DJs',
+            description: 'Free practical tools for independent artists and DJs: plan releases, write an artist bio, and prepare professional licence requests.',
+            url,
+            bodyHtml: `<p>${escapeHtml(hub.description)}</p><h2>For artists</h2>${renderList(artistList)}<h2>For DJs</h2>${renderList(djList)}`,
+          }),
+        )
+      }
+
+      // /tools/:slug — one of the individual generator/reference pages.
+      if (parts[0] === 'tools' && parts.length === 2) {
+        const tool = getToolBySlug(parts[1] ?? '')
+        if (tool && tool.category !== null) {
+          return contentResponse(
+            renderContentHtml({
+              title: `${tool.title} — BackTheVibes`,
+              description: tool.description,
+              url,
+              bodyHtml: `<p>${escapeHtml(tool.description)}</p><p><a href="/tools">See all free tools</a></p>`,
+            }),
+          )
+        }
       }
 
       // /blog/:slug

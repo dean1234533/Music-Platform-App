@@ -2878,9 +2878,12 @@ test('the tools hub has a search + category filter over its eleven tools (user-r
   assert.match(page, /\(\['all', 'artist', 'dj'\] as const\)\.map/)
 
   // Every tool has a real category (not left to infer) and its own blurb, both shown on the
-  // card so the filter chips and the grid content stay honest with each other.
-  assert.match(page, /type ToolCategory = 'artist' \| 'dj'/)
-  const categoryCount = [...page.matchAll(/category: '(artist|dj)'/g)].length
+  // card so the filter chips and the grid content stay honest with each other. Category/blurb
+  // now live in the shared content file (also used by the crawler worker), not inline here.
+  assert.match(page, /import \{ TOOLS, getToolBySlug, type ToolMeta \} from '@\/content\/tools'/)
+  const content = read('src/content/tools.ts')
+  assert.match(content, /category: 'artist' \| 'dj' \| null/)
+  const categoryCount = [...content.matchAll(/category: '(artist|dj)',/g)].length
   assert.strictEqual(categoryCount, 11, 'all 11 tools must have an explicit category for the filter to cover them')
 
   // A query with zero matches shows an honest empty state instead of a blank grid.
@@ -2971,7 +2974,7 @@ test('the social caption generator\'s form fields say what they actually mean, a
   const page = read('src/pages/marketing/ToolsHubPages.tsx')
   assert.match(
     page,
-    /function QuickTool\(\{ eyebrow, title, description, path, fields, makeResult \}: \{ eyebrow: string; title: string; description: string; path: string; fields: \{ label: string; placeholder: string \}\[\]; makeResult: \(values: string\[\]\) => string \}\)/,
+    /function QuickTool\(\{ slug, fields, makeResult \}: \{ slug: string; fields: \{ label: string; placeholder: string \}\[\]; makeResult: \(values: string\[\]\) => string \}\)/,
   )
   assert.match(page, /\{fields\.map\(\(field, index\) => <Field key=\{field\.label\} label=\{field\.label\} placeholder=\{field\.placeholder\}/)
 
@@ -2991,4 +2994,35 @@ test('the social caption generator\'s form fields say what they actually mean, a
     const placeholderCount = [...block.matchAll(/placeholder:/g)].length
     assert.strictEqual(placeholderCount, labelCount, `every field must carry a placeholder — got ${placeholderCount} placeholders for ${labelCount} labels`)
   }
+})
+
+test('crawlers (Googlebot and non-JS-executing bots like GPTBot/ClaudeBot) get real pre-rendered content for /tools and every tool page, matching the pattern already used for /pricing, /for-djs, /for-artists and /blog (user-reported: "why is google concle still picking up the same 14 page when the tool hub is now there")', () => {
+  // Root cause: worker/share-og.ts intercepts crawler requests to inject real HTML (title,
+  // meta description, body text) for every other marketing page, since a bare SPA gives a
+  // non-JS-executing crawler nothing useful. It had no branch at all for /tools or /tools/*, so
+  // those requests fell straight through to the empty SPA shell — weaker signal for Google's
+  // "first wave" crawl, and literally nothing for AI/GEO crawlers that don't render JS.
+  const worker = read('worker/share-og.ts')
+  assert.match(worker, /import \{ TOOLS, getToolBySlug \} from '\.\.\/src\/content\/tools\.ts'/)
+
+  // /tools renders the hub with every tool grouped by category, linking to each one.
+  assert.match(worker, /if \(parts\[0\] === 'tools' && parts\.length === 1\) \{/)
+  assert.match(worker, /const realTools = TOOLS\.filter\(\(tool\) => tool\.category !== null\)/)
+  assert.match(worker, /<a href="\/tools\/\$\{tool\.slug\}">\$\{escapeHtml\(tool\.label\)\}<\/a>/)
+
+  // /tools/:slug renders that specific tool's real title/description — not a generic stub.
+  assert.match(worker, /if \(parts\[0\] === 'tools' && parts\.length === 2\) \{/)
+  assert.match(worker, /const tool = getToolBySlug\(parts\[1\] \?\? ''\)/)
+  assert.match(worker, /title: `\$\{tool\.title\} — BackTheVibes`/)
+
+  // Single source of truth: the client-side hub/tool pages and the worker both read from the
+  // same content/tools.ts file, so a tool's copy can't drift between what a crawler sees and
+  // what a real visitor sees.
+  assert.match(read('src/pages/marketing/ToolsHubPages.tsx'), /import \{ TOOLS, getToolBySlug, type ToolMeta \} from '@\/content\/tools'/)
+  const content = read('src/content/tools.ts')
+  assert.match(content, /export const TOOLS: ToolMeta\[\] = \[/)
+  assert.match(content, /export function getToolBySlug\(slug: string\): ToolMeta \| undefined \{/)
+  // 1 hub entry (slug '') + 11 real tools.
+  const slugCount = [...content.matchAll(/slug: '/g)].length
+  assert.strictEqual(slugCount, 12, `expected 12 TOOLS entries (hub + 11 tools), found ${slugCount}`)
 })
