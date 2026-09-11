@@ -2961,3 +2961,34 @@ test('the tool hub generators produce real output instead of raw fields mashed t
   assert.match(page, /'hip-hop': 'hip hop'/)
   assert.match(page, /const key = GENRE_ALIASES\[sound\.trim\(\)\.toLowerCase\(\)\] \?\? sound\.trim\(\)\.toLowerCase\(\)/)
 })
+
+test('the social caption generator\'s form fields say what they actually mean, and every QuickTool-based field shows an example (user-reported, pasting the page\'s own copy back: "does this make sense to you because it doesnt to me... Artist or track / Release moment / Call to action")', () => {
+  // Root cause: QuickTool (shared by 4 of the 11 tools) only ever rendered a bare label — no
+  // placeholder — while every other tool showed an example. "Release moment" in particular is a
+  // genuinely misleading name: the field is actually a one-line hook/vibe description ("Made for
+  // late nights and loud headphones"), not a date or a point in time, and nothing told the user
+  // that. "Artist or track" was an unresolvable either/or with no indication which was wanted.
+  const page = read('src/pages/marketing/ToolsHubPages.tsx')
+  assert.match(
+    page,
+    /function QuickTool\(\{ eyebrow, title, description, path, fields, makeResult \}: \{ eyebrow: string; title: string; description: string; path: string; fields: \{ label: string; placeholder: string \}\[\]; makeResult: \(values: string\[\]\) => string \}\)/,
+  )
+  assert.match(page, /\{fields\.map\(\(field, index\) => <Field key=\{field\.label\} label=\{field\.label\} placeholder=\{field\.placeholder\}/)
+
+  // The specific confusing fields are gone, replaced with unambiguous labels and real examples.
+  assert.doesNotMatch(page, /'Artist or track'/)
+  assert.doesNotMatch(page, /'Release moment'/)
+  assert.match(page, /\{ label: 'Track \(or artist\) name', placeholder: 'e\.g\. Afterimage' \}/)
+  assert.match(page, /\{ label: 'One line describing the sound or vibe', placeholder: 'e\.g\. Made for late nights and loud headphones' \}/)
+  assert.match(page, /\{ label: 'What you want people to do', placeholder: 'e\.g\. link in bio, save it, share with a friend' \}/)
+
+  // Every field across all 4 QuickTool-based tools now carries a placeholder — not just the
+  // reported one, since the same underlying gap affected the others too.
+  const fieldBlocks = [...page.matchAll(/fields=\{\[([\s\S]*?)\]\}/g)]
+  assert.strictEqual(fieldBlocks.length, 4, 'expected exactly 4 QuickTool-based tools (royalty calculator, playlist pitch, social captions, DJ setlist planner)')
+  for (const [, block] of fieldBlocks) {
+    const labelCount = [...block.matchAll(/label:/g)].length
+    const placeholderCount = [...block.matchAll(/placeholder:/g)].length
+    assert.strictEqual(placeholderCount, labelCount, `every field must carry a placeholder — got ${placeholderCount} placeholders for ${labelCount} labels`)
+  }
+})
