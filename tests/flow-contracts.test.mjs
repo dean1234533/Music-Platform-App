@@ -2711,3 +2711,26 @@ test('the mobile TopBar no longer shows a dead-end profile-photo avatar circle o
   // Fan/artist/dj keep the real avatar (photo or initial letter) in the else branch.
   assert.match(topBar, /\{profile\?\.photoURL \? \(/)
 })
+
+test('the public-profile link card on the Growth page stacks cleanly on mobile instead of the URL/Copy/Share row overflowing (user-reported screenshot: "fix the way that the link looks on mobile")', () => {
+  // Root cause: a single `flex flex-wrap` row put the flex-1 URL block, the Copy button, and
+  // the Share button all in contention for one line — on a real phone width the URL block ate
+  // the row, leaving Copy/Share to wrap awkwardly (or get visually lost) instead of a clean
+  // layout. The URL now gets its own full-width line below sm:, with Copy/Share as a separate
+  // equal-width two-up row beneath it — merging back into the original single row at sm: and up.
+  const page = read('src/pages/artist/dashboard/GrowthPage.tsx')
+  assert.match(
+    page,
+    /<div className="mt-6 flex flex-col gap-3 rounded-2xl border border-white\/10 bg-black\/25 p-3 backdrop-blur-md sm:flex-row sm:items-center sm:pr-4">/,
+  )
+  assert.match(page, /<div className="grid shrink-0 grid-cols-2 gap-2 sm:flex sm:items-center">/)
+  assert.match(page, /className="w-full rounded-full border border-white\/15 bg-white\/\[0\.06\][^"]*sm:w-auto"/)
+  assert.match(page, /className="w-full justify-center sm:w-auto"/)
+
+  const shareButton = read('src/components/common/ShareButton.tsx')
+  assert.match(
+    shareButton,
+    /export function ShareButton\(\{ url, title, text, className \}: \{ url: string; title: string; text: string; className\?: string \}\)/,
+  )
+  assert.match(shareButton, /<Button variant="secondary" size="sm" onClick=\{handleClick\} className=\{className\}>/)
+})

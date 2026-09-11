@@ -56,19 +56,26 @@ export function GrowthPage() {
           Real numbers from your public profile and track links — not estimates.
         </p>
 
-        <div className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-black/25 p-3 pr-4 backdrop-blur-md">
+        <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-white/10 bg-black/25 p-3 backdrop-blur-md sm:flex-row sm:items-center sm:pr-4">
           <div className="min-w-0 flex-1">
             <p className="text-xs text-white/45">Public profile</p>
             <p className="mt-0.5 truncate text-sm font-medium text-white">{profileUrl}</p>
           </div>
-          <button
-            type="button"
-            onClick={() => void handleCopyProfile()}
-            className="shrink-0 rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white/[0.1]"
-          >
-            Copy
-          </button>
-          <ShareButton url={profileUrl} title={artist.name} text={`Check out ${artist.name} on BackTheVibes`} />
+          <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex sm:items-center">
+            <button
+              type="button"
+              onClick={() => void handleCopyProfile()}
+              className="w-full rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white/[0.1] sm:w-auto"
+            >
+              Copy
+            </button>
+            <ShareButton
+              url={profileUrl}
+              title={artist.name}
+              text={`Check out ${artist.name} on BackTheVibes`}
+              className="w-full justify-center sm:w-auto"
+            />
+          </div>
         </div>
       </section>
 

@@ -6,7 +6,7 @@ import { Button } from './Button'
 import { copyToClipboard, emailShareUrl, facebookShareUrl, whatsAppShareUrl, xShareUrl } from '@/utils/shareLinks'
 import { useToast } from '@/contexts/ToastContext'
 
-export function ShareButton({ url, title, text }: { url: string; title: string; text: string }) {
+export function ShareButton({ url, title, text, className }: { url: string; title: string; text: string; className?: string }) {
   const [open, setOpen] = useState(false)
   const { notify } = useToast()
 
@@ -24,7 +24,7 @@ export function ShareButton({ url, title, text }: { url: string; title: string; 
 
   return (
     <>
-      <Button variant="secondary" size="sm" onClick={handleClick}>
+      <Button variant="secondary" size="sm" onClick={handleClick} className={className}>
         <Share2 className="h-4 w-4" />
         Share
       </Button>
