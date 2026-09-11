@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Bell } from 'lucide-react'
+import { Bell, Settings } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useUnreadNotificationCount } from '@/hooks/useUnreadNotificationCount'
 import { BrandMark } from '@/components/common/BrandMark'
@@ -8,6 +8,7 @@ import { DashboardSwitcherCompact } from './DashboardSwitcher'
 export function TopBar() {
   const { profile } = useAuth()
   const { pathname } = useLocation()
+  const isAdmin = pathname.startsWith('/admin')
   const unreadCount = useUnreadNotificationCount()
   const homeTo = pathname.startsWith('/dashboard/artist')
     ? '/dashboard/artist'
@@ -48,15 +49,26 @@ export function TopBar() {
             </span>
           ) : null}
         </Link>
-        <Link to={profileTo} className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-surface-3">
-          {profile?.photoURL ? (
-            <img src={profile.photoURL} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <span className="text-xs font-semibold text-ink-1">
-              {(profile?.displayName ?? '?').charAt(0).toUpperCase()}
-            </span>
-          )}
-        </Link>
+        {isAdmin ? (
+          // No photo/avatar concept for an admin account — there's no public-facing "admin
+          // profile" for a photo to represent, and AdminSettingsPage has no photo upload UI at
+          // all, so the shared avatar circle used here for fan/artist/dj was a dead end
+          // (user-reported: "on the admin page it has a hole for a profile image but why would
+          // i even need this... it does nothing").
+          <Link to={profileTo} className="flex h-8 w-8 items-center justify-center rounded-full p-2 text-ink-2 hover:bg-surface-2" aria-label="Admin settings">
+            <Settings className="h-5 w-5" />
+          </Link>
+        ) : (
+          <Link to={profileTo} className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-surface-3">
+            {profile?.photoURL ? (
+              <img src={profile.photoURL} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-xs font-semibold text-ink-1">
+                {(profile?.displayName ?? '?').charAt(0).toUpperCase()}
+              </span>
+            )}
+          </Link>
+        )}
       </div>
     </header>
   )

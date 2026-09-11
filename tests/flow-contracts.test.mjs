@@ -2701,3 +2701,13 @@ test('an account that already has admin (e.g. bootstrapped directly in Firestore
     /await completeOnboarding\(firebaseUser\.uid, \[selectedRole\], profile\?\.roles\.includes\('admin'\) \?\? false\)/,
   )
 })
+
+test('the mobile TopBar no longer shows a dead-end profile-photo avatar circle on admin pages, since admin has no photo upload anywhere to link to (user-reported: "on the admin page it has a hole for a profile image but why would i even need this... it does nothing")', () => {
+  const topBar = read('src/components/layout/TopBar.tsx')
+  assert.match(topBar, /const isAdmin = pathname\.startsWith\('\/admin'\)/)
+  assert.match(topBar, /\{isAdmin \? \(/)
+  // Admin gets a plain settings icon instead of the photo/initial-letter avatar circle.
+  assert.match(topBar, /aria-label="Admin settings">\s*<Settings className="h-5 w-5" \/>/)
+  // Fan/artist/dj keep the real avatar (photo or initial letter) in the else branch.
+  assert.match(topBar, /\{profile\?\.photoURL \? \(/)
+})
