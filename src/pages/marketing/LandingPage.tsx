@@ -60,6 +60,7 @@ export function LandingPage() {
             <a href="#how-it-works" className="hidden rounded-full px-3 py-2.5 text-sm font-medium text-ink-2 transition hover:text-white md:block">How it works</a>
             <a href="#pricing" className="hidden rounded-full px-3 py-2.5 text-sm font-medium text-ink-2 transition hover:text-white md:block">Pricing</a>
             <Link to="/blog" className="hidden rounded-full px-3 py-2.5 text-sm font-medium text-ink-2 transition hover:text-white md:block">Blog</Link>
+            <Link to="/tools" className="hidden rounded-full px-3 py-2.5 text-sm font-medium text-ink-2 transition hover:text-white md:block">Tools</Link>
             <Link to="/sign-in" className="hidden rounded-full px-4 py-2.5 text-sm font-medium text-ink-1 transition hover:text-white md:block">Sign in</Link>
             <Link to="/sign-up" className="rounded-full bg-brand-500 px-5 py-2.5 text-sm font-semibold text-[#090b06] transition hover:bg-brand-400"><span className="sm:hidden">Join</span><span className="hidden sm:inline">Join BackTheVibes</span></Link>
             <button
@@ -100,6 +101,13 @@ export function LandingPage() {
               className="border-b border-white/[0.06] px-5 py-4 text-sm font-medium text-ink-1 transition hover:text-white"
             >
               Blog
+            </Link>
+            <Link
+              to="/tools"
+              onClick={() => setMenuOpen(false)}
+              className="border-b border-white/[0.06] px-5 py-4 text-sm font-medium text-ink-1 transition hover:text-white"
+            >
+              Tools
             </Link>
             <Link
               to="/sign-in"

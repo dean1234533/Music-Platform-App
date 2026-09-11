@@ -36,6 +36,18 @@ function LegacyRequestRedirect() {
 const PricingPage = lazy(() => import('@/pages/marketing/PricingPage').then((m) => ({ default: m.PricingPage })))
 const ForDjsPage = lazy(() => import('@/pages/marketing/ForDjsPage').then((m) => ({ default: m.ForDjsPage })))
 const ForArtistsPage = lazy(() => import('@/pages/marketing/ForArtistsPage').then((m) => ({ default: m.ForArtistsPage })))
+const ToolsHubPage = lazy(() => import('@/pages/marketing/ToolsHubPages').then((m) => ({ default: m.ToolsHubPage })))
+const ReleasePlannerPage = lazy(() => import('@/pages/marketing/ToolsHubPages').then((m) => ({ default: m.ReleasePlannerPage })))
+const ArtistBioGeneratorPage = lazy(() => import('@/pages/marketing/ToolsHubPages').then((m) => ({ default: m.ArtistBioGeneratorPage })))
+const DjLicenceRequestPage = lazy(() => import('@/pages/marketing/ToolsHubPages').then((m) => ({ default: m.DjLicenceRequestPage })))
+const DjNameGeneratorPage = lazy(() => import('@/pages/marketing/ToolsHubPages').then((m) => ({ default: m.DjNameGeneratorPage })))
+const SongTitleGeneratorPage = lazy(() => import('@/pages/marketing/ToolsHubPages').then((m) => ({ default: m.SongTitleGeneratorPage })))
+const RoyaltyCalculatorPage = lazy(() => import('@/pages/marketing/ToolsHubPages').then((m) => ({ default: m.RoyaltyCalculatorPage })))
+const BpmKeyFinderPage = lazy(() => import('@/pages/marketing/ToolsHubPages').then((m) => ({ default: m.BpmKeyFinderPage })))
+const PlaylistPitchTemplatePage = lazy(() => import('@/pages/marketing/ToolsHubPages').then((m) => ({ default: m.PlaylistPitchTemplatePage })))
+const SocialCaptionGeneratorPage = lazy(() => import('@/pages/marketing/ToolsHubPages').then((m) => ({ default: m.SocialCaptionGeneratorPage })))
+const DjSetlistPlannerPage = lazy(() => import('@/pages/marketing/ToolsHubPages').then((m) => ({ default: m.DjSetlistPlannerPage })))
+const MusicGenreGuidePage = lazy(() => import('@/pages/marketing/ToolsHubPages').then((m) => ({ default: m.MusicGenreGuidePage })))
 const BlogIndexPage = lazy(() => import('@/pages/blog/BlogIndexPage').then((m) => ({ default: m.BlogIndexPage })))
 const BlogPostPage = lazy(() => import('@/pages/blog/BlogPostPage').then((m) => ({ default: m.BlogPostPage })))
 const LegalPage = lazy(() => import('@/pages/marketing/LegalPage').then((m) => ({ default: m.LegalPage })))
@@ -119,6 +131,18 @@ function App() {
             <Route path="/pricing" element={<PricingPage />} />
             <Route path="/for-djs" element={<ForDjsPage />} />
             <Route path="/for-artists" element={<ForArtistsPage />} />
+            <Route path="/tools" element={<ToolsHubPage />} />
+            <Route path="/tools/release-planner" element={<ReleasePlannerPage />} />
+            <Route path="/tools/artist-bio-generator" element={<ArtistBioGeneratorPage />} />
+            <Route path="/tools/dj-licence-request" element={<DjLicenceRequestPage />} />
+            <Route path="/tools/dj-name-generator" element={<DjNameGeneratorPage />} />
+            <Route path="/tools/song-title-generator" element={<SongTitleGeneratorPage />} />
+            <Route path="/tools/royalty-calculator" element={<RoyaltyCalculatorPage />} />
+            <Route path="/tools/bpm-key-finder" element={<BpmKeyFinderPage />} />
+            <Route path="/tools/playlist-pitch-template" element={<PlaylistPitchTemplatePage />} />
+            <Route path="/tools/social-caption-generator" element={<SocialCaptionGeneratorPage />} />
+            <Route path="/tools/dj-setlist-planner" element={<DjSetlistPlannerPage />} />
+            <Route path="/tools/music-genre-guide" element={<MusicGenreGuidePage />} />
             <Route path="/blog" element={<BlogIndexPage />} />
             <Route path="/blog/:slug" element={<BlogPostPage />} />
             <Route path="/terms" element={<LegalPage type="terms" />} />
