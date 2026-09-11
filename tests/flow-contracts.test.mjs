@@ -2868,3 +2868,21 @@ test('every tool hub page has a working back button (user-reported: "add a back 
     assert.match(page, new RegExp(`export function ${name}\\(`))
   }
 })
+
+test('the tools hub has a search + category filter over its eleven tools (user-reported: "also give the tool hub a filter")', () => {
+  const page = read('src/pages/marketing/ToolsHubPages.tsx')
+  // Search matches on label OR blurb text, category filters to 'all' | 'artist' | 'dj'.
+  assert.match(page, /const matchesCategory = category === 'all' \|\| tool\.category === category/)
+  assert.match(page, /const matchesQuery = !q \|\| tool\.label\.toLowerCase\(\)\.includes\(q\) \|\| tool\.blurb\.toLowerCase\(\)\.includes\(q\)/)
+  assert.match(page, /placeholder="Search tools…"/)
+  assert.match(page, /\(\['all', 'artist', 'dj'\] as const\)\.map/)
+
+  // Every tool has a real category (not left to infer) and its own blurb, both shown on the
+  // card so the filter chips and the grid content stay honest with each other.
+  assert.match(page, /type ToolCategory = 'artist' \| 'dj'/)
+  const categoryCount = [...page.matchAll(/category: '(artist|dj)'/g)].length
+  assert.strictEqual(categoryCount, 11, 'all 11 tools must have an explicit category for the filter to cover them')
+
+  // A query with zero matches shows an honest empty state instead of a blank grid.
+  assert.match(page, /No tools match "\{query\}"/)
+})

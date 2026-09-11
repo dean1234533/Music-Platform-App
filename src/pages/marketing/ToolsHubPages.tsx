@@ -1,22 +1,27 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, Copy } from 'lucide-react'
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { ArrowLeft, ArrowRight, Copy, Search } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { clsx } from 'clsx'
 import { BrandMark } from '@/components/common/BrandMark'
 import { useSeo } from '@/lib/seo'
 import { useSmartBack } from '@/hooks/useSmartBack'
 
-const toolLinks = [
-  ['Release planner', '/tools/release-planner'],
-  ['Artist bio generator', '/tools/artist-bio-generator'],
-  ['DJ licence request tool', '/tools/dj-licence-request'],
-  ['DJ name generator', '/tools/dj-name-generator'],
-  ['Song title generator', '/tools/song-title-generator'],
-  ['Royalty calculator', '/tools/royalty-calculator'],
-  ['BPM and key finder', '/tools/bpm-key-finder'],
-  ['Playlist pitch template', '/tools/playlist-pitch-template'],
-  ['Social caption generator', '/tools/social-caption-generator'],
-  ['DJ setlist planner', '/tools/dj-setlist-planner'],
-  ['Music genre guide', '/tools/music-genre-guide'],
+type ToolCategory = 'artist' | 'dj'
+
+const CATEGORY_LABEL: Record<ToolCategory, string> = { artist: 'For artists', dj: 'For DJs' }
+
+const toolLinks: { label: string; href: string; category: ToolCategory; blurb: string }[] = [
+  { label: 'Release planner', href: '/tools/release-planner', category: 'artist', blurb: 'Build a week-by-week timeline for your next single, EP or album.' },
+  { label: 'Artist bio generator', href: '/tools/artist-bio-generator', category: 'artist', blurb: 'Draft a bio for your Spotify profile, press kit or website.' },
+  { label: 'DJ licence request tool', href: '/tools/dj-licence-request', category: 'dj', blurb: 'Send a clear, professional first message to request a track licence.' },
+  { label: 'DJ name generator', href: '/tools/dj-name-generator', category: 'dj', blurb: 'Get stage-name ideas built from your sound, mood and location.' },
+  { label: 'Song title generator', href: '/tools/song-title-generator', category: 'artist', blurb: 'Turn a track idea into a shortlist of title directions.' },
+  { label: 'Royalty calculator', href: '/tools/royalty-calculator', category: 'artist', blurb: 'Estimate what a release could earn from streams.' },
+  { label: 'BPM and key finder', href: '/tools/bpm-key-finder', category: 'dj', blurb: 'Turn a track’s BPM and key into practical mixing notes.' },
+  { label: 'Playlist pitch template', href: '/tools/playlist-pitch-template', category: 'artist', blurb: 'Write a focused pitch for an editor, curator or DJ.' },
+  { label: 'Social caption generator', href: '/tools/social-caption-generator', category: 'artist', blurb: 'Generate launch, behind-the-scenes and thank-you captions.' },
+  { label: 'DJ setlist planner', href: '/tools/dj-setlist-planner', category: 'dj', blurb: 'Map the energy arc of your next set from warm-up to close.' },
+  { label: 'Music genre guide', href: '/tools/music-genre-guide', category: 'artist', blurb: 'Find the language to describe your sound clearly.' },
 ]
 
 function ToolShell({ eyebrow, title, description, path, children }: { eyebrow: string; title: string; description: string; path: string; children: ReactNode }) {
@@ -54,7 +59,68 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
 
 export function ToolsHubPage() {
   useSeo({ title: 'Free Music Tools for Artists and DJs', description: 'Free practical tools for independent artists and DJs: plan releases, write an artist bio, and prepare professional licence requests.', path: '/tools' })
-  return <ToolShell eyebrow="BackTheVibes tools" title="Useful tools for the people moving music forward." description="Free, practical tools for independent artists and DJs. Use them without an account, then save your work in BackTheVibes when you are ready." path="/tools"><div className="grid gap-4 md:grid-cols-3">{toolLinks.map(([label, href], index) => <Link key={href} to={href} className="group rounded-2xl border border-white/[0.08] bg-white/[0.025] p-6 transition hover:-translate-y-1 hover:border-brand-400/40"><span className="text-xs text-brand-400">{String(index + 1).padStart(2, '0')}</span><h2 className="mt-12 text-xl font-medium">{label}</h2><p className="mt-3 text-sm leading-6 text-ink-2">A focused tool built around a real music workflow—not a generic template.</p><span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-ink-1 group-hover:text-brand-400">Open tool <ArrowRight className="h-4 w-4" /></span></Link>)}</div></ToolShell>
+  const [query, setQuery] = useState('')
+  const [category, setCategory] = useState<'all' | ToolCategory>('all')
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return toolLinks.filter((tool) => {
+      const matchesCategory = category === 'all' || tool.category === category
+      const matchesQuery = !q || tool.label.toLowerCase().includes(q) || tool.blurb.toLowerCase().includes(q)
+      return matchesCategory && matchesQuery
+    })
+  }, [query, category])
+
+  return <ToolShell eyebrow="BackTheVibes tools" title="Useful tools for the people moving music forward." description="Free, practical tools for independent artists and DJs. Use them without an account, then save your work in BackTheVibes when you are ready." path="/tools">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="relative w-full sm:max-w-xs">
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" />
+        <input
+          type="text"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search tools…"
+          aria-label="Search tools"
+          className="w-full rounded-full border border-white/10 bg-white/[0.04] py-2.5 pl-10 pr-4 text-sm text-ink-0 outline-none placeholder:text-ink-3 focus:border-brand-400/60"
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        {(['all', 'artist', 'dj'] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => setCategory(option)}
+            className={clsx(
+              'rounded-full border px-4 py-2 text-xs font-semibold transition',
+              category === option ? 'border-brand-400/50 bg-brand-400/15 text-brand-300' : 'border-white/10 bg-white/[0.03] text-ink-2 hover:text-white',
+            )}
+          >
+            {option === 'all' ? 'All tools' : CATEGORY_LABEL[option]}
+          </button>
+        ))}
+      </div>
+    </div>
+
+    {filtered.length === 0 ? (
+      <p className="mt-12 rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm leading-6 text-ink-2">
+        No tools match "{query}". Try a different search or clear the filter.
+      </p>
+    ) : (
+      <div className="mt-8 grid gap-4 md:grid-cols-3">
+        {filtered.map((tool, index) => (
+          <Link key={tool.href} to={tool.href} className="group rounded-2xl border border-white/[0.08] bg-white/[0.025] p-6 transition hover:-translate-y-1 hover:border-brand-400/40">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-brand-400">{String(index + 1).padStart(2, '0')}</span>
+              <span className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-3">{CATEGORY_LABEL[tool.category]}</span>
+            </div>
+            <h2 className="mt-8 text-xl font-medium">{tool.label}</h2>
+            <p className="mt-3 text-sm leading-6 text-ink-2">{tool.blurb}</p>
+            <span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-ink-1 group-hover:text-brand-400">Open tool <ArrowRight className="h-4 w-4" /></span>
+          </Link>
+        ))}
+      </div>
+    )}
+  </ToolShell>
 }
 
 export function ReleasePlannerPage() {
