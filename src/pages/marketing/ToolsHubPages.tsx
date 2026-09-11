@@ -1,8 +1,9 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { ArrowRight, Copy } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Copy } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { BrandMark } from '@/components/common/BrandMark'
 import { useSeo } from '@/lib/seo'
+import { useSmartBack } from '@/hooks/useSmartBack'
 
 const toolLinks = [
   ['Release planner', '/tools/release-planner'],
@@ -20,11 +21,20 @@ const toolLinks = [
 
 function ToolShell({ eyebrow, title, description, path, children }: { eyebrow: string; title: string; description: string; path: string; children: ReactNode }) {
   useSeo({ title, description, path })
+  // The hub page itself (/tools) falls back to the homepage; every individual tool page falls
+  // back to the hub — so a tool opened via a direct/shared link (no in-app history) still goes
+  // somewhere sensible instead of navigate(-1) silently doing nothing.
+  const goBack = useSmartBack(path === '/tools' ? '/' : '/tools')
   return <div className="min-h-svh bg-surface-0 text-ink-0">
     <header className="sticky top-0 z-20 border-b border-white/[0.07] bg-surface-0/80 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-5 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8">
-        <Link to="/"><BrandMark /></Link>
-        <div className="flex items-center gap-4"><Link to="/tools" className="text-sm text-ink-2 hover:text-white">All tools</Link><Link to="/sign-up?role=artist" className="rounded-full bg-brand-500 px-4 py-2 text-xs font-semibold text-surface-0">Join free</Link></div>
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8">
+        <div className="flex min-w-0 items-center gap-4">
+          <Link to="/" className="shrink-0"><BrandMark /></Link>
+          <button type="button" onClick={goBack} className="flex shrink-0 items-center gap-1.5 text-sm text-ink-2 transition hover:text-white">
+            <ArrowLeft className="h-4 w-4" /> Back
+          </button>
+        </div>
+        <div className="flex shrink-0 items-center gap-4">{path !== '/tools' ? <Link to="/tools" className="hidden text-sm text-ink-2 hover:text-white sm:block">All tools</Link> : null}<Link to="/sign-up?role=artist" className="rounded-full bg-brand-500 px-4 py-2 text-xs font-semibold text-surface-0">Join free</Link></div>
       </div>
     </header>
     <main className="mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20">

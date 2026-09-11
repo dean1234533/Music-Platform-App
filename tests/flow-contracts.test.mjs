@@ -2844,3 +2844,27 @@ test('the Revenue page\'s Payouts box matches the marketing mockup\'s card style
   assert.match(page, /<StatCard icon=\{<Wallet className="h-4\.5 w-4\.5" \/>\} label="Available"/)
   assert.match(page, /<StatCard icon=\{<PiggyBank className="h-4\.5 w-4\.5" \/>\} label="Paid out"/)
 })
+
+test('every tool hub page has a working back button (user-reported: "add a back button for the tool hub pages")', () => {
+  const page = read('src/pages/marketing/ToolsHubPages.tsx')
+  assert.match(page, /import \{ useSmartBack \} from '@\/hooks\/useSmartBack'/)
+  // The hub page itself (/tools) falls back to home; every individual tool page falls back to
+  // the hub — so a tool reached via a direct/shared link with no in-app history still goes
+  // somewhere sensible, matching the useSmartBack convention used across the rest of the app.
+  assert.match(page, /const goBack = useSmartBack\(path === '\/tools' \? '\/' : '\/tools'\)/)
+  assert.match(page, /<button type="button" onClick=\{goBack\} className="flex shrink-0 items-center gap-1\.5 text-sm text-ink-2 transition hover:text-white">\s*<ArrowLeft className="h-4 w-4" \/> Back/)
+  // "All tools" is redundant with Back while already on the hub page, so it's hidden there.
+  assert.match(page, /\{path !== '\/tools' \? <Link to="\/tools"/)
+
+  // ToolShell is the single shared header for the hub AND all eleven tool pages, so this one
+  // back button covers every page in the section — confirm every exported page actually routes
+  // through it (each passes its own `path` to ToolShell, which is what drives the fallback).
+  const toolPages = [
+    'ToolsHubPage', 'ReleasePlannerPage', 'ArtistBioGeneratorPage', 'DjLicenceRequestPage',
+    'DjNameGeneratorPage', 'SongTitleGeneratorPage', 'RoyaltyCalculatorPage', 'BpmKeyFinderPage',
+    'PlaylistPitchTemplatePage', 'SocialCaptionGeneratorPage', 'DjSetlistPlannerPage', 'MusicGenreGuidePage',
+  ]
+  for (const name of toolPages) {
+    assert.match(page, new RegExp(`export function ${name}\\(`))
+  }
+})
