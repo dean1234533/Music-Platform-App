@@ -2886,3 +2886,20 @@ test('the tools hub has a search + category filter over its eleven tools (user-r
   // A query with zero matches shows an honest empty state instead of a blank grid.
   assert.match(page, /No tools match "\{query\}"/)
 })
+
+test('the tools hub no longer dumps all 11 cards on screen at once (user-reported: "stop the hub from showing all. on mobile this will just be way to much scrolling")', () => {
+  // Root cause: the filter added just before this made the list narrower once you searched,
+  // but the DEFAULT view (no search, "All tools" selected) still rendered every one of the 11
+  // cards — on a single-column mobile layout that's 11 full-height cards of scroll before
+  // reaching anything else on the page.
+  const page = read('src/pages/marketing/ToolsHubPages.tsx')
+  assert.match(page, /const COLLAPSED_COUNT = 6/)
+  assert.match(page, /const visible = expanded \? filtered : filtered\.slice\(0, COLLAPSED_COUNT\)/)
+  assert.match(page, /const hiddenCount = filtered\.length - visible\.length/)
+  assert.match(page, /\{visible\.map\(\(tool, index\) => \(/)
+  assert.match(page, /Show \{hiddenCount\} more tool\{hiddenCount === 1 \? '' : 's'\}/)
+  // Narrowing the search or category resets back to collapsed — a filter that narrows the list
+  // shouldn't leave it stuck fully expanded from a moment ago.
+  assert.match(page, /setQuery\(event\.target\.value\); setExpanded\(false\)/)
+  assert.match(page, /setCategory\(option\); setExpanded\(false\)/)
+})

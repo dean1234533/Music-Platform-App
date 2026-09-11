@@ -61,6 +61,11 @@ export function ToolsHubPage() {
   useSeo({ title: 'Free Music Tools for Artists and DJs', description: 'Free practical tools for independent artists and DJs: plan releases, write an artist bio, and prepare professional licence requests.', path: '/tools' })
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<'all' | ToolCategory>('all')
+  const [expanded, setExpanded] = useState(false)
+  // Dumping all 11 cards on screen at once is mostly a mobile problem (one column, so it's 11
+  // full-height cards of scroll) — cap the initial view and let a search/category pick or this
+  // button reveal the rest, rather than always showing the whole list up front.
+  const COLLAPSED_COUNT = 6
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -70,6 +75,8 @@ export function ToolsHubPage() {
       return matchesCategory && matchesQuery
     })
   }, [query, category])
+  const visible = expanded ? filtered : filtered.slice(0, COLLAPSED_COUNT)
+  const hiddenCount = filtered.length - visible.length
 
   return <ToolShell eyebrow="BackTheVibes tools" title="Useful tools for the people moving music forward." description="Free, practical tools for independent artists and DJs. Use them without an account, then save your work in BackTheVibes when you are ready." path="/tools">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -78,7 +85,7 @@ export function ToolsHubPage() {
         <input
           type="text"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => { setQuery(event.target.value); setExpanded(false) }}
           placeholder="Search tools…"
           aria-label="Search tools"
           className="w-full rounded-full border border-white/10 bg-white/[0.04] py-2.5 pl-10 pr-4 text-sm text-ink-0 outline-none placeholder:text-ink-3 focus:border-brand-400/60"
@@ -89,7 +96,7 @@ export function ToolsHubPage() {
           <button
             key={option}
             type="button"
-            onClick={() => setCategory(option)}
+            onClick={() => { setCategory(option); setExpanded(false) }}
             className={clsx(
               'rounded-full border px-4 py-2 text-xs font-semibold transition',
               category === option ? 'border-brand-400/50 bg-brand-400/15 text-brand-300' : 'border-white/10 bg-white/[0.03] text-ink-2 hover:text-white',
@@ -106,19 +113,30 @@ export function ToolsHubPage() {
         No tools match "{query}". Try a different search or clear the filter.
       </p>
     ) : (
-      <div className="mt-8 grid gap-4 md:grid-cols-3">
-        {filtered.map((tool, index) => (
-          <Link key={tool.href} to={tool.href} className="group rounded-2xl border border-white/[0.08] bg-white/[0.025] p-6 transition hover:-translate-y-1 hover:border-brand-400/40">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-brand-400">{String(index + 1).padStart(2, '0')}</span>
-              <span className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-3">{CATEGORY_LABEL[tool.category]}</span>
-            </div>
-            <h2 className="mt-8 text-xl font-medium">{tool.label}</h2>
-            <p className="mt-3 text-sm leading-6 text-ink-2">{tool.blurb}</p>
-            <span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-ink-1 group-hover:text-brand-400">Open tool <ArrowRight className="h-4 w-4" /></span>
-          </Link>
-        ))}
-      </div>
+      <>
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          {visible.map((tool, index) => (
+            <Link key={tool.href} to={tool.href} className="group rounded-2xl border border-white/[0.08] bg-white/[0.025] p-6 transition hover:-translate-y-1 hover:border-brand-400/40">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-brand-400">{String(index + 1).padStart(2, '0')}</span>
+                <span className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-3">{CATEGORY_LABEL[tool.category]}</span>
+              </div>
+              <h2 className="mt-8 text-xl font-medium">{tool.label}</h2>
+              <p className="mt-3 text-sm leading-6 text-ink-2">{tool.blurb}</p>
+              <span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-ink-1 group-hover:text-brand-400">Open tool <ArrowRight className="h-4 w-4" /></span>
+            </Link>
+          ))}
+        </div>
+        {hiddenCount > 0 ? (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="mx-auto mt-8 block rounded-full border border-white/10 bg-white/[0.03] px-5 py-2.5 text-sm font-semibold text-ink-1 transition hover:border-brand-400/40 hover:text-white"
+          >
+            Show {hiddenCount} more tool{hiddenCount === 1 ? '' : 's'}
+          </button>
+        ) : null}
+      </>
     )}
   </ToolShell>
 }
