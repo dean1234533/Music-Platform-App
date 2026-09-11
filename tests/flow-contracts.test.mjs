@@ -2903,3 +2903,61 @@ test('the tools hub no longer dumps all 11 cards on screen at once (user-reporte
   assert.match(page, /setQuery\(event\.target\.value\); setExpanded\(false\)/)
   assert.match(page, /setCategory\(option\); setExpanded\(false\)/)
 })
+
+test('the tool hub generators produce real output instead of raw fields mashed together, and none silently lose the user\'s field choices (user-reported: "make sure they all work and they all are of good value because I think they are currently low value as some of the wording is not clear and simple and also what they are genarating is just shit")', () => {
+  const page = read('src/pages/marketing/ToolsHubPages.tsx')
+
+  // Raw lowercase input inserted straight into a title/name read as sloppy — every generator
+  // that surfaces the user's own words now runs them through titleCase first.
+  assert.match(page, /function titleCase\(input: string\): string \{/)
+
+  // Release planner: the format picker used to be cosmetic — every format produced the exact
+  // same 8-week EP timeline regardless of what was selected. Now each format has its own
+  // proportionate timeline.
+  assert.match(page, /const RELEASE_TIMELINES: Record<string, string> = \{/)
+  assert.match(page, /single: '4 weeks before/)
+  assert.match(page, /EP: '8 weeks before/)
+  assert.match(page, /album: '12 weeks before/)
+  assert.match(page, /\$\{RELEASE_TIMELINES\[format\]\}/)
+
+  // Artist bio generator: cut the generic "something real, distinctive and worth returning to"
+  // filler that could describe literally any artist, and generate three actually-different
+  // lengths instead of one paragraph.
+  assert.doesNotMatch(page, /worth returning to/)
+  assert.match(page, /const oneLine = /)
+  assert.match(page, /const shortBio = /)
+  assert.match(page, /const pressBio = /)
+
+  // DJ name generator: the old version was a bare `${mood} ${sound} ${location}` concatenation
+  // with no capitalisation — real name patterns from a curated word bank now back it up.
+  assert.match(page, /const DJ_ADJECTIVES = \[/)
+  assert.match(page, /const DJ_NOUNS = \[/)
+  assert.doesNotMatch(page, /DJ \$\{\[mood \|\| 'Neon'/)
+
+  // Song title generator: same bug (mechanical concatenation, no capitalisation) plus title
+  // patterns that actually read like song titles.
+  assert.match(page, /const titles = \[t, `\$\{m\} \$\{t\}`, `\$\{t\} \(\$\{m\} Mix\)`, g \? `\$\{g\} \$\{t\}` : `Last \$\{t\}`, `The \$\{m\} Hours`, `\$\{t\}, Undone`\]/)
+
+  // BPM and key finder: the old copy said "test tracks one Camelot step above or below" but
+  // never actually computed anything — it just echoed whatever string the user typed. Now it's
+  // a real Camelot wheel lookup with correct harmonic neighbours.
+  assert.match(page, /const CAMELOT_BY_KEY: Record<string, string> = \{/)
+  assert.match(page, /function camelotNeighbours\(code: string\): string\[\] \{/)
+  assert.doesNotMatch(page, /test tracks one Camelot step above or below/)
+
+  // Music genre guide: the old version didn't reference any actual genre knowledge — it just
+  // paraphrased the three fields the user had already typed back at them. Now it's a real
+  // lookup table of common genres with tempo ranges and related styles.
+  assert.match(page, /const GENRE_GUIDE: Record<string, \{ bpm: string; description: string; related: string\[\] \}> = \{/)
+  const genreCount = [...page.matchAll(/bpm: '[^']*', description:/g)].length
+  assert.ok(genreCount >= 15, `genre guide should cover a real spread of genres, found ${genreCount}`)
+  assert.doesNotMatch(page, /Useful tags: \$\{sound/)
+
+  // Real-world search terms ("DnB", "R&B", "hip-hop") wouldn't have matched the dataset's
+  // canonical spelled-out keys at all before this alias map — confirmed empty by direct testing.
+  assert.match(page, /const GENRE_ALIASES: Record<string, string> = \{/)
+  assert.match(page, /dnb: 'drum and bass'/)
+  assert.match(page, /rnb: 'r&b'/)
+  assert.match(page, /'hip-hop': 'hip hop'/)
+  assert.match(page, /const key = GENRE_ALIASES\[sound\.trim\(\)\.toLowerCase\(\)\] \?\? sound\.trim\(\)\.toLowerCase\(\)/)
+})
