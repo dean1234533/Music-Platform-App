@@ -1,19 +1,16 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import { createTrack, newTrackId, uploadTrackAssets } from '@/services/trackService'
+import { createTrack, newTrackId, uploadTrackArtworkAsset } from '@/services/trackService'
 import { getArtistProfile } from '@/services/artistService'
 import { getPlatformSettings } from '@/services/platformSettingsService'
-import { deriveAudioAssets, readAudioMetadata, type AudioMetadata } from '@/services/audioProcessing'
 import { compressImage } from '@/services/imageProcessing'
 import { recordRightsDeclaration } from '@/services/legalService'
 import { subscribeToOwnSubscription, subscribeToPlan } from '@/services/subscriptionService'
-import { useMediaUpload } from '@/hooks/useMediaUpload'
+import { extractYoutubeVideoId, youtubeThumbnailUrl } from '@/utils/youtube'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
-import { UploadProgress } from '@/components/common/UploadProgress'
-import { formatFileSize, MAX_AUDIO_MB, MAX_IMAGE_MB, validateAudioFile, validateImageFile } from '@/utils/uploadLimits'
-import { PREVIEW_DEFAULT_DURATION_SEC, PREVIEW_MAX_DURATION_SEC, PREVIEW_MIN_DURATION_SEC, SUGGESTED_PREVIEW_DURATIONS_SEC } from '@/constants/mediaConfig'
+import { validateImageFile, MAX_IMAGE_MB } from '@/utils/uploadLimits'
 import { ACCESS_SUMMARY, VISIBILITY_OPTIONS } from '@/utils/trackAccess'
 import type { LicenceMode, TrackRightsMetadata, TrackVisibility } from '@/types/track'
 import type { SubscriptionDoc } from '@/types/subscription'
@@ -38,14 +35,13 @@ const OWNERSHIP_OPTIONS = [
 const COMPOSITION_OWNERSHIP_OPTIONS = [...OWNERSHIP_OPTIONS, { value: 'not_sure', label: 'Not sure' }] as const
 
 const RIGHTS_DECLARATION_TEXT =
-  'I confirm that I own, control, or have obtained the necessary rights and permissions to upload, distribute, stream, preview, and offer this recording through this platform.'
+  'I confirm that I have the necessary rights and permissions to promote this link through BackTheVibes, and that I am not knowingly submitting content I do not have permission to share.'
 const RIGHTS_CONSEQUENCES_TEXT =
-  "I understand that uploading music without the necessary rights may result in content removal, account restriction, withheld payouts where legally appropriate, and further action under the platform Terms."
+  'I understand BackTheVibes does not verify copyright ownership or provide legal advice, and that sharing content without the necessary rights may result in removal, account restriction, or further action under the platform Terms.'
 
 export function UploadTrackPage() {
   const { firebaseUser } = useAuth()
   const navigate = useNavigate()
-  const mediaUpload = useMediaUpload()
 
   const [title, setTitle] = useState('')
   const [genre, setGenre] = useState<string>(GENRES[0])
@@ -61,27 +57,18 @@ export function UploadTrackPage() {
   const [producers, setProducers] = useState('')
   const [featuredArtists, setFeaturedArtists] = useState('')
   const [visibility, setVisibility] = useState<TrackVisibility>('followers')
-  const [previewEnabled, setPreviewEnabled] = useState(true)
-  const [previewStartSec, setPreviewStartSec] = useState(0)
-  const [previewDurationSec, setPreviewDurationSec] = useState(PREVIEW_DEFAULT_DURATION_SEC)
   const [djPromotion, setDjPromotion] = useState(false)
-  const [djPreviewStartSec, setDjPreviewStartSec] = useState(0)
-  const [djPreviewDurationSec, setDjPreviewDurationSec] = useState(90)
   const [djLicenceMode, setDjLicenceMode] = useState<LicenceMode>('not_available')
   const [djFixedPrice, setDjFixedPrice] = useState('')
   const [embargoDate, setEmbargoDate] = useState('')
   const [followerReleaseDate, setFollowerReleaseDate] = useState('')
   const [publicReleaseDate, setPublicReleaseDate] = useState('')
-  const [suggestedPreviewDurations, setSuggestedPreviewDurations] = useState<number[]>(SUGGESTED_PREVIEW_DURATIONS_SEC)
 
-  // Platform-configurable defaults (admin-set, not hard-coded) — only applied
-  // once, before the artist has had a chance to touch these fields.
+  // Platform-configurable default visibility (admin-set, not hard-coded) —
+  // only applied once, before the artist has had a chance to touch it.
   useEffect(() => {
     void getPlatformSettings().then((settings) => {
-      if (!settings) return
-      if (settings.defaultTrackVisibility) setVisibility(settings.defaultTrackVisibility)
-      if (settings.defaultPreviewDurationSec) setPreviewDurationSec(settings.defaultPreviewDurationSec)
-      if (settings.allowedPreviewDurationsSec?.length) setSuggestedPreviewDurations(settings.allowedPreviewDurationsSec)
+      if (settings?.defaultTrackVisibility) setVisibility(settings.defaultTrackVisibility)
     })
   }, [])
 
@@ -115,10 +102,11 @@ export function UploadTrackPage() {
     }
   }
 
-  const [masterFile, setMasterFile] = useState<File | null>(null)
-  const [audioMetadata, setAudioMetadata] = useState<AudioMetadata | null>(null)
+  const [youtubeInput, setYoutubeInput] = useState('')
+  const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null)
+  const [youtubeError, setYoutubeError] = useState<string | null>(null)
   const [artworkFile, setArtworkFile] = useState<File | null>(null)
-  const [fileErrors, setFileErrors] = useState<{ master?: string; artwork?: string }>({})
+  const [artworkError, setArtworkError] = useState<string | null>(null)
 
   // Rights & Ownership.
   const [ownsMaster, setOwnsMaster] = useState<TrackRightsMetadata['ownsMasterRecording']>('yes')
@@ -142,28 +130,27 @@ export function UploadTrackPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function masterFileHandler(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null
-    const validationError = file ? validateAudioFile(file) : null
-    setFileErrors((prev) => ({ ...prev, master: validationError ?? undefined }))
-    setMasterFile(validationError ? null : file)
-    setAudioMetadata(null)
-    if (file && !validationError) {
-      try {
-        const metadata = await readAudioMetadata(file)
-        setAudioMetadata(metadata)
-        setDjPreviewDurationSec(Math.min(90, metadata.durationSeconds))
-      } catch (err) {
-        setMasterFile(null)
-        setFileErrors((prev) => ({ ...prev, master: err instanceof Error ? err.message : 'Could not read this audio file.' }))
-      }
+  function handleYoutubeInputChange(value: string) {
+    setYoutubeInput(value)
+    if (!value.trim()) {
+      setYoutubeVideoId(null)
+      setYoutubeError(null)
+      return
     }
+    const videoId = extractYoutubeVideoId(value)
+    if (!videoId) {
+      setYoutubeVideoId(null)
+      setYoutubeError('This does not look like a supported YouTube link (youtube.com/watch, youtu.be, or youtube.com/shorts).')
+      return
+    }
+    setYoutubeVideoId(videoId)
+    setYoutubeError(null)
   }
 
   function artworkFileHandler(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null
     const validationError = file ? validateImageFile(file) : null
-    setFileErrors((prev) => ({ ...prev, artwork: validationError ?? undefined }))
+    setArtworkError(validationError ?? null)
     setArtworkFile(validationError ? null : file)
   }
 
@@ -182,28 +169,11 @@ export function UploadTrackPage() {
     }
     setStoredTrackCount(currentTrackCount)
     if (currentTrackCount >= MAX_STORED_TRACKS_PER_ARTIST) {
-      setError(`Your account can store up to ${MAX_STORED_TRACKS_PER_ARTIST} tracks. Delete an existing track before uploading another.`)
+      setError(`Your account can list up to ${MAX_STORED_TRACKS_PER_ARTIST} tracks. Remove an existing track before adding another.`)
       return
     }
-    if (!masterFile) {
-      setError('A master audio file is required.')
-      return
-    }
-    const metadata = audioMetadata ?? await readAudioMetadata(masterFile)
-    if (!Number.isFinite(previewStartSec) || previewStartSec < 0 || !Number.isFinite(previewDurationSec)
-      || previewDurationSec < PREVIEW_MIN_DURATION_SEC || previewDurationSec > PREVIEW_MAX_DURATION_SEC) {
-      setError(`Preview timing must use a start at or after 0 and a length between ${PREVIEW_MIN_DURATION_SEC} and ${PREVIEW_MAX_DURATION_SEC} seconds.`)
-      return
-    }
-    if (previewEnabled && previewStartSec + previewDurationSec > metadata.durationSeconds) {
-      setError(`The preview must end within the full ${metadata.durationFormatted} track.`)
-      return
-    }
-    if (djPromotion && (!Number.isFinite(djPreviewStartSec) || djPreviewStartSec < 0
-      || !Number.isFinite(djPreviewDurationSec) || djPreviewDurationSec < 5
-      || djPreviewDurationSec > 120
-      || djPreviewStartSec + djPreviewDurationSec > metadata.durationSeconds)) {
-      setError(`The DJ preview must be at least 5 seconds and end within the full ${metadata.durationFormatted} track.`)
+    if (!youtubeVideoId) {
+      setError('A valid YouTube link is required.')
       return
     }
     if (!rightsConfirmed || !understandsConsequences) {
@@ -217,33 +187,15 @@ export function UploadTrackPage() {
 
     setSubmitting(true)
     setError(null)
-    mediaUpload.reset()
     try {
       const trackId = newTrackId()
-
-      mediaUpload.setProcessing(0)
-      const audio = await deriveAudioAssets(masterFile, {
-        previewStartSec,
-        previewDurationSec,
-        djPreviewStartSec: djPromotion ? djPreviewStartSec : undefined,
-        djPreviewDurationSec: djPromotion ? djPreviewDurationSec : undefined,
-        onProgress: (_stage, ratio) => mediaUpload.setProcessing(Math.round(ratio * 100)),
-      })
 
       let processedArtwork = artworkFile
       if (artworkFile) {
         const compressed = await compressImage(artworkFile, 'artwork')
         processedArtwork = compressed.file
       }
-
-      mediaUpload.setProcessed(masterFile.size, audio.streaming.sizeBytes, audio.degraded)
-
-      const assets = await uploadTrackAssets(
-        firebaseUser.uid,
-        trackId,
-        { master: masterFile, streaming: audio.streaming.file, preview: audio.preview.file, djPreview: audio.djPreview?.file ?? null, artwork: processedArtwork },
-        (percent) => mediaUpload.setUploadProgress(percent),
-      )
+      const artworkURL = await uploadTrackArtworkAsset(firebaseUser.uid, trackId, processedArtwork)
 
       await recordRightsDeclaration({ trackId, agreed: true })
 
@@ -267,7 +219,7 @@ export function UploadTrackPage() {
         copyrightNotice: copyrightNotice || null,
       }
 
-      await createTrack(firebaseUser.uid, trackId, assets, {
+      await createTrack(firebaseUser.uid, trackId, artworkURL, {
         title,
         genre,
         subgenre: subgenre || null,
@@ -284,13 +236,7 @@ export function UploadTrackPage() {
           featuredArtists: splitList(featuredArtists),
         },
         visibility,
-        durationSeconds: metadata.durationSeconds,
-        durationFormatted: metadata.durationFormatted,
-        previewEnabled,
-        djPreviewStartSec: djPromotion ? djPreviewStartSec : null,
-        djPreviewDurationSec: djPromotion ? djPreviewDurationSec : null,
-        previewStartSec,
-        previewDurationSec,
+        youtubeVideoId,
         djPromotion,
         djLicenceMode,
         djFixedPrice: djLicenceMode === 'fixed_price' && djFixedPrice ? Math.round(Number(djFixedPrice) * 100) : null,
@@ -300,11 +246,9 @@ export function UploadTrackPage() {
         publicReleaseAt: visibility === 'early_access' && publicReleaseDate ? new Date(publicReleaseDate) : null,
         rightsMetadata,
       })
-      mediaUpload.setDone()
       navigate('/dashboard/artist/music')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed. Please try again.')
-      mediaUpload.setError(err instanceof Error ? err.message : 'Upload failed.')
+      setError(err instanceof Error ? err.message : 'Could not add this track. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -312,10 +256,10 @@ export function UploadTrackPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="text-2xl font-semibold text-ink-0">Upload a track</h1>
+      <h1 className="text-2xl font-semibold text-ink-0">Add a track</h1>
       <p className="mt-1 text-sm text-ink-2">
-        Upload one master file — we'll automatically create an optimised streaming version and a
-        preview clip. The master stays private.
+        Add a link to your official YouTube upload — BackTheVibes plays it through YouTube's own
+        player. We never host, download, or extract audio.
       </p>
 
       {membership !== undefined && !hasActiveMembership ? (
@@ -338,7 +282,7 @@ export function UploadTrackPage() {
         </span>
       </div>
       {storedTrackCount !== null && storedTrackCount >= MAX_STORED_TRACKS_PER_ARTIST ? (
-        <p className="mt-2 text-sm text-ink-2">Delete an existing track from Music before uploading another.</p>
+        <p className="mt-2 text-sm text-ink-2">Remove an existing track from Music before adding another.</p>
       ) : null}
 
       <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-6">
@@ -417,78 +361,39 @@ export function UploadTrackPage() {
         </label>
 
         <div className="rounded-xl border border-surface-border bg-surface-1 p-4">
-          <h2 className="mb-3 text-sm font-semibold text-ink-0">Audio</h2>
+          <h2 className="mb-3 text-sm font-semibold text-ink-0">YouTube link</h2>
           <p className="mb-3 text-xs text-ink-2">
-            MP3, AAC/M4A, or OGG only, up to {MAX_AUDIO_MB}MB — export uncompressed masters
-            (WAV/FLAC/AIFF) as MP3 320kbps first. We'll derive a compressed streaming version and a
-            preview clip from this file automatically.
+            Paste the link to your official YouTube upload of this track. Playback uses the
+            official YouTube player — we never download, extract, proxy, or cache the audio/video.
           </p>
-          <div className="flex flex-col gap-4">
-            <Field label="Master audio (never public)">
-              <input
-                type="file"
-                accept="audio/mpeg,audio/mp4,audio/aac,audio/x-m4a,audio/ogg,audio/opus,audio/webm,.mp3,.m4a,.aac,.ogg,.opus"
-                required
-                onChange={masterFileHandler}
-                className="block w-full text-sm text-ink-2 file:mr-3 file:rounded-lg file:border-0 file:bg-surface-3 file:px-3 file:py-2 file:text-ink-0"
-              />
-              {masterFile && !fileErrors.master ? (
-                <p className="mt-1 text-xs text-ink-3">
-                  {formatFileSize(masterFile.size)}{audioMetadata ? ` · Full track ${audioMetadata.durationFormatted}` : ' · Reading duration…'}
-                </p>
-              ) : null}
-              {fileErrors.master ? <p className="mt-1 text-xs text-danger-500">{fileErrors.master}</p> : null}
-            </Field>
-            <Field label="Cover artwork">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={artworkFileHandler}
-                className="block w-full text-sm text-ink-2 file:mr-3 file:rounded-lg file:border-0 file:bg-surface-3 file:px-3 file:py-2 file:text-ink-0"
-              />
-              <p className="mt-1 text-xs text-ink-3">Up to {MAX_IMAGE_MB}MB — resized and compressed automatically.</p>
-              {fileErrors.artwork ? <p className="mt-1 text-xs text-danger-500">{fileErrors.artwork}</p> : null}
-            </Field>
-            <label className="flex items-center gap-2 text-sm text-ink-1">
-              <input type="checkbox" checked={previewEnabled} onChange={(e) => setPreviewEnabled(e.target.checked)} className="h-4 w-4 accent-brand-500" />
-              Public preview enabled
-            </label>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Preview start (seconds)">
-                <Input disabled={!previewEnabled} type="number" min={0} max={audioMetadata ? Math.max(0, audioMetadata.durationSeconds - previewDurationSec) : undefined} value={previewStartSec} onChange={(e) => setPreviewStartSec(Number(e.target.value))} />
-              </Field>
-              <Field label="Preview duration (seconds)">
-                <Input
-                  type="number"
-                  min={PREVIEW_MIN_DURATION_SEC}
-                  max={PREVIEW_MAX_DURATION_SEC}
-                  disabled={!previewEnabled}
-                  value={previewDurationSec}
-                  onChange={(e) => setPreviewDurationSec(Number(e.target.value))}
-                />
-              </Field>
+          <Field label="YouTube URL">
+            <Input
+              required
+              placeholder="https://www.youtube.com/watch?v=..."
+              value={youtubeInput}
+              onChange={(e) => handleYoutubeInputChange(e.target.value)}
+            />
+            {youtubeError ? <p className="mt-1 text-xs text-danger-500">{youtubeError}</p> : null}
+          </Field>
+          {youtubeVideoId ? (
+            <div className="mt-3 flex items-center gap-3">
+              <img src={youtubeThumbnailUrl(youtubeVideoId)} alt="" className="h-14 w-24 rounded-md object-cover" />
+              <p className="text-xs text-ink-2">Link recognised — video ID <span className="font-mono text-ink-1">{youtubeVideoId}</span></p>
             </div>
-            <div className="flex gap-2" aria-disabled={!previewEnabled}>
-              {suggestedPreviewDurations.map((sec) => (
-                <button
-                  key={sec}
-                  type="button"
-                  disabled={!previewEnabled}
-                  onClick={() => setPreviewDurationSec(sec)}
-                  className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                    previewDurationSec === sec
-                      ? 'border-brand-500 bg-brand-500/10 text-brand-400'
-                      : 'border-surface-border text-ink-2 hover:text-ink-0'
-                  }`}
-                >
-                  {sec}s
-                </button>
-              ))}
-            </div>
-          </div>
+          ) : null}
+          <Field label="Cover artwork">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={artworkFileHandler}
+              className="mt-1 block w-full text-sm text-ink-2 file:mr-3 file:rounded-lg file:border-0 file:bg-surface-3 file:px-3 file:py-2 file:text-ink-0"
+            />
+            <p className="mt-1 text-xs text-ink-3">Up to {MAX_IMAGE_MB}MB — resized and compressed automatically.</p>
+            {artworkError ? <p className="mt-1 text-xs text-danger-500">{artworkError}</p> : null}
+          </Field>
         </div>
 
-        <Field label="Who can hear the full track?">
+        <Field label="Who can see this track's YouTube link?">
           <select
             value={visibility}
             onChange={(e) => setVisibility(e.target.value as TrackVisibility)}
@@ -505,9 +410,9 @@ export function UploadTrackPage() {
               const summary = ACCESS_SUMMARY[visibility] ?? ACCESS_SUMMARY.public
               return (
                 <>
-                  <div><p className="font-semibold text-ink-1">Public</p><p className="mt-0.5">{summary.public(previewDurationSec)}</p></div>
-                  <div><p className="font-semibold text-ink-1">Followers</p><p className="mt-0.5">{summary.followers(previewDurationSec)}</p></div>
-                  <div><p className="font-semibold text-ink-1">Supporters</p><p className="mt-0.5">{summary.supporters(previewDurationSec)}</p></div>
+                  <div><p className="font-semibold text-ink-1">Public</p><p className="mt-0.5">{summary.public}</p></div>
+                  <div><p className="font-semibold text-ink-1">Followers</p><p className="mt-0.5">{summary.followers}</p></div>
+                  <div><p className="font-semibold text-ink-1">Supporters</p><p className="mt-0.5">{summary.supporters}</p></div>
                 </>
               )
             })()}
@@ -517,12 +422,12 @@ export function UploadTrackPage() {
         {visibility === 'early_access' ? (
           <div className="rounded-xl border border-brand-500/30 bg-brand-500/5 p-4">
             <h2 className="mb-3 text-sm font-semibold text-ink-0">Early access schedule</h2>
-            <p className="mb-3 text-xs text-ink-2">Supporters always get the full track immediately. Set when followers (and, optionally, everyone) get it too.</p>
+            <p className="mb-3 text-xs text-ink-2">Supporters always get the link immediately. Set when followers (and, optionally, everyone) get it too.</p>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Followers get full access on">
+              <Field label="Followers get access on">
                 <Input type="date" value={followerReleaseDate} onChange={(e) => setFollowerReleaseDate(e.target.value)} />
               </Field>
-              <Field label="Public gets full access on (optional)">
+              <Field label="Public gets access on (optional)">
                 <Input type="date" value={publicReleaseDate} onChange={(e) => setPublicReleaseDate(e.target.value)} />
               </Field>
             </div>
@@ -530,7 +435,7 @@ export function UploadTrackPage() {
         ) : null}
 
         <div className="rounded-xl border border-dj-500/30 bg-dj-500/5 p-4">
-          <h2 className="mb-3 text-sm font-semibold text-ink-0">DJ access</h2>
+          <h2 className="mb-3 text-sm font-semibold text-ink-0">DJ / business collaboration</h2>
           <label className="mb-3 flex items-center gap-2 text-sm text-ink-1">
             <input
               type="checkbox"
@@ -538,21 +443,10 @@ export function UploadTrackPage() {
               onChange={(e) => setDjPromotion(e.target.checked)}
               className="h-4 w-4 accent-brand-500"
             />
-            Available for DJ promotion — list this track in the DJ discovery feed
+            Open to DJ/business collaboration proposals — list this track in DJ discovery
           </label>
-          {djPromotion ? (
-            <div className="mb-4 grid grid-cols-1 gap-4 rounded-xl border border-dj-500/20 bg-black/10 p-3 sm:grid-cols-2">
-              <Field label="DJ preview start (seconds)">
-                <Input type="number" min={0} value={djPreviewStartSec} onChange={(e) => setDjPreviewStartSec(Number(e.target.value))} />
-              </Field>
-              <Field label="DJ preview length (seconds)">
-                <Input type="number" min={5} max={120} value={djPreviewDurationSec} onChange={(e) => setDjPreviewDurationSec(Number(e.target.value))} />
-              </Field>
-              <p className="text-xs leading-5 text-ink-2 sm:col-span-2">This creates a separate DJ Preview. It never grants the master or download access.</p>
-            </div>
-          ) : null}
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Licence terms">
+            <Field label="Terms">
               <select
                 value={djLicenceMode}
                 onChange={(e) => setDjLicenceMode(e.target.value as LicenceMode)}
@@ -577,8 +471,9 @@ export function UploadTrackPage() {
             </Field>
           </div>
           <p className="mt-3 text-xs text-ink-2">
-            DJs can request access, discuss terms, sign an agreement, pay any licence fee, and download approved tracks.
-            Access to a downloaded file never transfers copyright ownership.
+            A DJ/business can propose a collaboration, negotiate terms, and sign an agreement.
+            Master audio/stems are exchanged directly between the parties outside BackTheVibes —
+            an agreement never transfers copyright and is not legal advice.
           </p>
         </div>
 
@@ -671,7 +566,6 @@ export function UploadTrackPage() {
           </label>
         </div>
 
-        {mediaUpload.state.stage !== 'idle' ? <UploadProgress state={mediaUpload.state} /> : null}
         {error ? <p className="text-sm text-danger-500">{error}</p> : null}
 
         <Button type="submit" loading={submitting} disabled={storedTrackCount === null || storedTrackCount >= MAX_STORED_TRACKS_PER_ARTIST || !hasActiveMembership} className="w-fit">

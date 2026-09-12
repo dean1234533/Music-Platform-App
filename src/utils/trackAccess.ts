@@ -19,75 +19,75 @@ export const VISIBILITY_OPTIONS: { value: TrackVisibility; label: string }[] = [
   { value: 'private', label: 'Private' },
 ]
 
-const previewCopy = (sec: number) => `${sec}-second preview`
-const notAvailable = () => 'Not available'
-const fullTrack = () => 'Full track'
-
-/** What each audience actually gets, shown to the artist before they publish/edit — never fabricated, mirrors the exact server-side ladder in canPreviewTrack/canStreamFullTrack. */
-export const ACCESS_SUMMARY: Record<TrackVisibility, { public: (sec: number) => string; followers: (sec: number) => string; supporters: (sec: number) => string }> = {
-  public: { public: fullTrack, followers: fullTrack, supporters: fullTrack },
-  followers: { public: previewCopy, followers: fullTrack, supporters: fullTrack },
-  supporters: { public: previewCopy, followers: previewCopy, supporters: fullTrack },
-  early_access: { public: previewCopy, followers: () => 'Full track from your scheduled date', supporters: () => 'Full track now' },
-  dj_only: { public: notAvailable, followers: notAvailable, supporters: notAvailable },
-  private: { public: notAvailable, followers: notAvailable, supporters: notAvailable },
+/**
+ * What each audience actually gets, shown to the artist before they
+ * publish/edit — never fabricated, mirrors the exact server-side ladder in
+ * canAccessTrackYoutubeLink. There is no separate "preview" tier any more:
+ * the YouTube link is either visible (full track, on YouTube) or not shown
+ * at all to that audience yet.
+ */
+export const ACCESS_SUMMARY: Record<TrackVisibility, { public: string; followers: string; supporters: string }> = {
+  public: { public: 'Can watch on YouTube', followers: 'Can watch on YouTube', supporters: 'Can watch on YouTube' },
+  followers: { public: 'Link not shown yet', followers: 'Can watch on YouTube', supporters: 'Can watch on YouTube' },
+  supporters: { public: 'Link not shown yet', followers: 'Link not shown yet', supporters: 'Can watch on YouTube' },
+  early_access: { public: 'Link not shown yet', followers: 'Shown from your scheduled date', supporters: 'Can watch now' },
+  dj_only: { public: 'Not shown', followers: 'Not shown', supporters: 'Not shown' },
+  private: { public: 'Not shown', followers: 'Not shown', supporters: 'Not shown' },
 }
 
 export interface TrackAccessInfo {
-  /** Whether this viewer should expect the full track to actually play — a display hint only. getTrackPlaybackUrl is the real, server-side gate regardless of what this says. */
+  /** Whether this viewer should be shown the YouTube link — a display hint only. getTrackYoutubeInfo is the real, server-side gate regardless of what this says. */
   fullAccess: boolean
   playLabel: string
-  /** Shown once the preview ends (or up front, locked) — null when the viewer already has full access. */
+  /** Shown when the link isn't available to this viewer yet — null when the viewer already has access. */
   lockedMessage: string | null
 }
 
 /**
  * Purely descriptive — never used to grant playback. The actual entitlement
- * decision lives entirely in getTrackPlaybackUrl (canPreviewTrack /
- * canStreamFullTrack); this only decides what the UI *says* before that
- * server call resolves, so the player's fallback-to-preview stays correct
- * even if a stale isFollowing/isSupporting snapshot makes this guess wrong.
+ * decision lives entirely in getTrackYoutubeInfo (canAccessTrackYoutubeLink);
+ * this only decides what the UI *says* before that server call resolves.
  */
 export function describeTrackAccess(
   track: TrackDoc,
   viewer: { isOwner: boolean; isAdmin: boolean; isFollowing: boolean; isSupporting: boolean },
 ): TrackAccessInfo {
   if (viewer.isOwner || viewer.isAdmin) {
-    return { fullAccess: true, playLabel: 'Play Full Track', lockedMessage: null }
+    return { fullAccess: true, playLabel: 'Play on YouTube', lockedMessage: null }
   }
   if (track.visibility === 'public') {
-    return { fullAccess: true, playLabel: 'Play Full Track', lockedMessage: null }
+    return { fullAccess: true, playLabel: 'Play on YouTube', lockedMessage: null }
   }
   if (track.visibility === 'followers') {
     return viewer.isFollowing || viewer.isSupporting
-      ? { fullAccess: true, playLabel: 'Play Full Track', lockedMessage: null }
-      : { fullAccess: false, playLabel: track.previewEnabled === false ? 'Preview Unavailable' : 'Play Preview', lockedMessage: "Want to hear the full track? Follow this artist for free." }
+      ? { fullAccess: true, playLabel: 'Play on YouTube', lockedMessage: null }
+      : { fullAccess: false, playLabel: 'Locked', lockedMessage: 'Follow this artist for free to unlock this track.' }
   }
   if (track.visibility === 'supporters') {
     return viewer.isSupporting
-      ? { fullAccess: true, playLabel: 'Play Full Track', lockedMessage: null }
-      : { fullAccess: false, playLabel: track.previewEnabled === false ? 'Preview Unavailable' : 'Play Preview', lockedMessage: 'Support this artist to unlock the full track and exclusive releases.' }
+      ? { fullAccess: true, playLabel: 'Play on YouTube', lockedMessage: null }
+      : { fullAccess: false, playLabel: 'Locked', lockedMessage: 'Support this artist to unlock this track and other exclusive releases.' }
   }
   if (track.visibility === 'early_access') {
-    if (viewer.isSupporting) return { fullAccess: true, playLabel: 'Play Full Track', lockedMessage: null }
+    if (viewer.isSupporting) return { fullAccess: true, playLabel: 'Play on YouTube', lockedMessage: null }
     const now = Date.now()
     if (track.publicReleaseAt && now >= track.publicReleaseAt.toMillis()) {
-      return { fullAccess: true, playLabel: 'Play Full Track', lockedMessage: null }
+      return { fullAccess: true, playLabel: 'Play on YouTube', lockedMessage: null }
     }
     if (viewer.isFollowing && track.followerReleaseAt && now >= track.followerReleaseAt.toMillis()) {
-      return { fullAccess: true, playLabel: 'Play Full Track', lockedMessage: null }
+      return { fullAccess: true, playLabel: 'Play on YouTube', lockedMessage: null }
     }
     const releaseCopy = track.followerReleaseAt
-      ? ` Full track for followers from ${new Date(track.followerReleaseAt.toMillis()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.`
+      ? ` Unlocked for followers from ${new Date(track.followerReleaseAt.toMillis()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.`
       : ''
     return {
       fullAccess: false,
-      playLabel: 'Play Preview',
+      playLabel: 'Locked',
       lockedMessage: viewer.isFollowing
         ? `This is an early access release.${releaseCopy}`
         : `Support this artist to hear this early access release now.${releaseCopy} Otherwise, follow to unlock it when it's released.`,
     }
   }
-  // dj_only / private: preview-only (or no preview at all) for a non-owner, non-admin viewer — no follow/support CTA applies.
-  return { fullAccess: false, playLabel: 'Play Preview', lockedMessage: null }
+  // dj_only / private: locked for a non-owner, non-admin viewer — no follow/support CTA applies.
+  return { fullAccess: false, playLabel: 'Locked', lockedMessage: null }
 }

@@ -74,7 +74,6 @@ async function cancelStripeSubscriptionIfActive(stripeSubscriptionId: string): P
 async function offboardArtistTracks(artistId: string): Promise<void> {
   const tracksSnap = await db.collection('tracks').where('artistId', '==', artistId).get()
   for (const trackDoc of tracksSnap.docs) {
-    const track = trackDoc.data()
     const activeAgreement = await db
       .collection('licenceAgreements')
       .where('trackId', '==', trackDoc.id)
@@ -93,13 +92,8 @@ async function offboardArtistTracks(artistId: string): Promise<void> {
       continue
     }
 
-    await Promise.all([
-      deleteStorageFile(track.originalAudioPath),
-      deleteStorageFile(track.previewAudioPath),
-      deleteStorageFile(track.streamAudioPath),
-      deleteStorageFile(track.djPreviewAudioPath),
-      deleteStorageFolder(`artists/${artistId}/artwork/${trackDoc.id}`),
-    ])
+    await deleteStorageFolder(`artists/${artistId}/artwork/${trackDoc.id}`)
+    await db.collection('trackMedia').doc(trackDoc.id).delete()
     await trackDoc.ref.delete()
   }
 }

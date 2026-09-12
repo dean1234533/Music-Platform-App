@@ -1,7 +1,7 @@
 export { onUserCreate, onUserRolesChange } from './users.js'
 export { createArtistProfile, createDJProfile } from './profiles.js'
 export { onFollowCreate, onFollowDelete } from './follows.js'
-export { recordTrackPlay, getTrackPlaybackUrl, deleteTrack } from './tracks.js'
+export { recordTrackPlay, getTrackYoutubeInfo, createTrack, deleteTrack } from './tracks.js'
 export { recordProfileView, recordTrackView } from './analytics.js'
 export { onNotificationCreatePush } from './notifications/pushTrigger.js'
 export { onFanOfferCreate, onFanOfferDelete } from './fanOffers.js'
@@ -40,9 +40,8 @@ export { onTrackCreate, onTrackDelete } from './tracks/triggers.js'
 export { adminSeedSubscriptionPlans } from './admin/seedPlans.js'
 export { sendBulkDjOutreach } from './messaging/bulkOutreach.js'
 
-// Media compression, sharing, and copyright protection.
+// Sharing and copyright protection.
 export { recordRightsDeclaration, recordLegalAcceptance } from './legal/acceptances.js'
-export { onOriginalUploaded } from './tracks/onOriginalUploaded.js'
 
 // Artist Stories.
 export { createStory, toggleStoryHighlight, getStoryMediaUrl } from './stories/stories.js'

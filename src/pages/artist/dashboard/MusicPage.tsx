@@ -30,9 +30,9 @@ const VISIBILITY_LABEL: Record<TrackDoc['visibility'], string> = {
 export function MusicPage() {
   const { firebaseUser } = useAuth()
   const { notify } = useToast()
-  // Full playback here is authorised the exact same way as anywhere else in
-  // the app: getTrackPlaybackUrl grants the owner (uid === track.artistId)
-  // the real streaming derivative — this button just gives artists a way to
+  // Playback here is authorised the exact same way as anywhere else in the
+  // app: getTrackYoutubeInfo grants the owner (uid === track.artistId)
+  // access unconditionally — this button just gives artists a way to
   // actually reach that, previously missing from their own track list.
   const { playTrack, togglePlay, currentTrack, isPlaying } = usePlayer()
   const [tracks, setTracks] = useState<TrackDoc[] | null>(null)

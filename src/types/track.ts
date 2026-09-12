@@ -41,23 +41,9 @@ export interface TrackDoc {
   description: string
   explicit: boolean
   credits: TrackCredits
-  /** Actual complete song length read from the uploaded audio metadata. */
-  durationSeconds: number
-  durationFormatted: string
-  /** False means no public/follower/supporter preview derivative may be served. */
-  previewEnabled: boolean
-  /** Storage path under /artists/{artistId}/previews/ — safe for public playback */
-  previewAudioPath: string
-  previewDurationSec: number
-  previewStartSec: number
-  /** Optional DJ-specific derivative; never a master and never a download entitlement. */
-  djPreviewAudioPath?: string | null
-  djPreviewDurationSec?: number | null
-  djPreviewStartSec?: number | null
-  /** Storage path under /artists/{artistId}/originals/ — never exposed publicly */
-  originalAudioPath: string
-  /** Storage path under /artists/{artistId}/streaming/ — full-length optimised derivative, visibility-gated like the track itself. */
-  streamAudioPath: string
+  /** Best-effort, read client-side from the YouTube player once it loads — never authoritative, never required. */
+  durationSeconds?: number
+  durationFormatted?: string
   artworkURL: string | null
   visibility: TrackVisibility
   djPromotion: boolean
@@ -75,35 +61,13 @@ export interface TrackDoc {
   followerReleaseAt?: Timestamp | null
   /** Only meaningful when visibility === 'early_access'. When set and passed, the track behaves as fully public — optional, defaults to never. */
   publicReleaseAt?: Timestamp | null
-  /** Preview plays — kept under its original name; every dashboard already labels this "preview"/"sample" plays. */
+  /** Count of times an entitled viewer opened this track's YouTube link/embed. Never a claimed YouTube view count. */
   playCount: number
-  previewStarts?: number
-  previewCompletions?: number
-  /** Full-length stream plays — separate counter, never summed with playCount for a "total plays" figure. */
-  fullPlayCount?: number
-  fullTrackStarts?: number
-  fullTrackCompletions?: number
-  followerFullPlays?: number
-  publicFullPlays?: number
-  /** Narrower breakdown of fullPlayCount: full plays specifically gated by the supporters tier. */
-  supporterPlayCount?: number
-  supporterFullPlays?: number
-  /** Narrower breakdown of playCount: preview plays specifically on a dj_only track. */
-  djPreviewCount?: number
-  djPreviewPlays?: number
   createdAt: Timestamp | null
   updatedAt: Timestamp | null
   rightsConfirmed: boolean
-  /** New uploads are only created after every required derivative is ready. Legacy tracks without this field remain published. */
-  status?: 'processing' | 'published' | 'unpublished' | 'failed'
+  status?: 'published' | 'unpublished'
   takenDown?: boolean
-  /** SHA-256 of the original master, computed server-side by a Storage trigger. Not proof of ownership — duplicate-detection only. */
-  fileHash?: string | null
-  fileSize?: number | null
-  mimeType?: string | null
-  hashCheckedAt?: Timestamp | null
-  /** Flagged (never auto-actioned) when another artist's track shares this file's hash. */
-  possibleDuplicateOfTrackId?: string | null
   /** Free-text ownership/rights context an artist provides — evidence, not proof. */
   rightsMetadata?: TrackRightsMetadata
   /** Capabilities temporarily withheld by an admin during a copyright review — never all-or-nothing like takenDown. */

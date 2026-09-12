@@ -163,19 +163,19 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------------
-    // tracks/{trackId} — visibility-gated read, owner-only write. Supporter/
-    // follower-gated visibility is enforced client-side for now (Storage
-    // rules are the real gate on the audio file itself); playCount and
-    // takenDown are frozen from client writes.
+    // tracks/{trackId} — visibility-gated read, owner-only write. There is
+    // no hosted audio: playback is always the official YouTube embed, keyed
+    // by the validated youtubeVideoId. playCount and takenDown are frozen
+    // from client writes.
     // ---------------------------------------------------------------------
     match /tracks/{trackId} {
-      // Metadata (title/artwork/etc, never audio) is readable for any
+      // Metadata (title/artwork/youtubeVideoId/etc) is readable for any
       // non-private, non-dj_only-to-non-DJs track, even by a signed-out
       // visitor — the public profile shows a locked followers/supporters
-      // track with a Follow/Support CTA rather than hiding it outright. The
-      // real gate is entirely in getTrackPlaybackUrl + storage.rules: this
-      // doc never contains playable audio, only Storage paths that are
-      // owner-only at the Storage layer regardless of who can read this doc.
+      // track with a Follow/Support CTA rather than hiding it outright.
+      // getTrackYoutubeInfo re-checks this same ladder server-side before
+      // ever handing back a video ID, so a future visibility tightening is
+      // enforced even if a client held a stale copy of this doc.
       // The artist-still-holds-the-role gate also applies here — the same
       // stepping-back that hides artistProfiles hides their tracks too, not
       // just the profile page, so a bookmarked/shared track link goes dark
@@ -195,73 +195,22 @@ service cloud.firestore {
         || (isSignedIn() && resource.data.artistId == request.auth.uid)
         || isAdmin();
 
-      allow create: if isSignedIn()
-        && request.resource.data.artistId == request.auth.uid
-        && request.resource.data.originalAudioPath.matches('artists/' + request.auth.uid + '/originals/' + trackId + '.+')
-        && request.resource.data.streamAudioPath.matches('artists/' + request.auth.uid + '/streaming/' + trackId + '.+')
-        && request.resource.data.previewAudioPath.matches('artists/' + request.auth.uid + '/previews/' + trackId + '.+')
-        && (request.resource.data.djPromotion == false || (
-            request.resource.data.djPreviewAudioPath.matches('artists/' + request.auth.uid + '/dj-previews/' + trackId + '.+')
-            && request.resource.data.djPreviewStartSec >= 0
-            && request.resource.data.djPreviewDurationSec >= 5
-            && request.resource.data.djPreviewStartSec + request.resource.data.djPreviewDurationSec <= request.resource.data.durationSeconds))
-        && hasRole('artist')
-        // Keep this finite storage allowance in sync with platformLimits.ts.
-        && exists(/databases/$(database)/documents/artistProfiles/$(request.auth.uid))
-        && get(/databases/$(database)/documents/artistProfiles/$(request.auth.uid)).data.get('trackCount', 0) < 10
-        // Publishing requires an active Artist Membership — dashboard access itself stays open.
-        && exists(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_artist'))
-        && get(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_artist')).data.status in ['active', 'trialing']
-        && request.resource.data.rightsConfirmed == true
-        && request.resource.data.durationSeconds is number
-        && request.resource.data.durationSeconds > 0
-        && request.resource.data.durationFormatted is string
-        && request.resource.data.previewEnabled is bool
-        && request.resource.data.previewStartSec is number
-        && request.resource.data.previewStartSec >= 0
-        && request.resource.data.previewDurationSec is number
-        && request.resource.data.previewDurationSec >= 5
-        && request.resource.data.previewDurationSec <= 90
-        && (request.resource.data.previewEnabled == false
-            || request.resource.data.previewStartSec + request.resource.data.previewDurationSec <= request.resource.data.durationSeconds)
-        && request.resource.data.status == 'published'
-        && request.resource.data.playCount == 0;
+      // The YouTube video ID is never stored on this doc — see trackMedia
+      // below. This doc's read rule intentionally exposes locked-tier
+      // metadata (title/artwork/genre) to any visitor so a public profile
+      // can show a Follow/Support CTA on a locked track; the one thing that
+      // could actually let someone bypass a lock is the video ID, which is
+      // why it lives in a genuinely admin/Function-only document instead.
+      // createTrack (Cloud Function) is the only way to create a track, so
+      // it can atomically write both this doc and trackMedia together.
+      allow create: if false;
 
       allow update: if isSignedIn()
         && resource.data.artistId == request.auth.uid
         && request.resource.data.artistId == resource.data.artistId
-        && request.resource.data.originalAudioPath == resource.data.originalAudioPath
-        && request.resource.data.streamAudioPath == resource.data.streamAudioPath
-        && request.resource.data.previewAudioPath == resource.data.previewAudioPath
-        && request.resource.data.get('djPreviewAudioPath', null) == resource.data.get('djPreviewAudioPath', null)
         && request.resource.data.playCount == resource.data.playCount
-        && request.resource.data.get('fullPlayCount', 0) == resource.data.get('fullPlayCount', 0)
-        && request.resource.data.get('supporterPlayCount', 0) == resource.data.get('supporterPlayCount', 0)
-        && request.resource.data.get('djPreviewCount', 0) == resource.data.get('djPreviewCount', 0)
-        && request.resource.data.get('djPreviewPlays', 0) == resource.data.get('djPreviewPlays', 0)
-        && request.resource.data.get('previewStarts', 0) == resource.data.get('previewStarts', 0)
-        && request.resource.data.get('previewCompletions', 0) == resource.data.get('previewCompletions', 0)
-        && request.resource.data.get('fullTrackStarts', 0) == resource.data.get('fullTrackStarts', 0)
-        && request.resource.data.get('fullTrackCompletions', 0) == resource.data.get('fullTrackCompletions', 0)
-        && request.resource.data.get('followerFullPlays', 0) == resource.data.get('followerFullPlays', 0)
-        && request.resource.data.get('publicFullPlays', 0) == resource.data.get('publicFullPlays', 0)
-        && request.resource.data.get('supporterFullPlays', 0) == resource.data.get('supporterFullPlays', 0)
         && request.resource.data.get('status', 'published') == resource.data.get('status', 'published')
-        && request.resource.data.get('durationSeconds', 0) == resource.data.get('durationSeconds', 0)
-        && request.resource.data.get('durationFormatted', '') == resource.data.get('durationFormatted', '')
-        && request.resource.data.get('previewEnabled', true) is bool
-        && request.resource.data.previewStartSec >= 0
-        && request.resource.data.previewDurationSec >= 5
-        && request.resource.data.previewDurationSec <= 90
-        && (request.resource.data.get('previewEnabled', true) == false
-            || resource.data.get('durationSeconds', 0) == 0
-            || request.resource.data.previewStartSec + request.resource.data.previewDurationSec <= resource.data.durationSeconds)
         && request.resource.data.get('takenDown', false) == resource.data.get('takenDown', false)
-        && request.resource.data.get('fileHash', null) == resource.data.get('fileHash', null)
-        && request.resource.data.get('fileSize', null) == resource.data.get('fileSize', null)
-        && request.resource.data.get('mimeType', null) == resource.data.get('mimeType', null)
-        && request.resource.data.get('hashCheckedAt', null) == resource.data.get('hashCheckedAt', null)
-        && request.resource.data.get('possibleDuplicateOfTrackId', null) == resource.data.get('possibleDuplicateOfTrackId', null)
         && request.resource.data.get('restrictedCapabilities', []) == resource.data.get('restrictedCapabilities', [])
         && request.resource.data.get('legalHold', false) == resource.data.get('legalHold', false)
         && request.resource.data.get('trackSlug', null) == resource.data.get('trackSlug', null)
@@ -270,6 +219,14 @@ service cloud.firestore {
 
       // Server callable performs licence/legal-hold checks and media cleanup.
       allow delete: if false;
+    }
+
+    // trackMedia/{trackId} — the actual YouTube video ID/URL. Never
+    // client-readable or writable at all: getTrackYoutubeInfo (Admin SDK)
+    // is the only path that ever discloses it, and only after re-checking
+    // the same visibility/entitlement ladder as the track doc itself.
+    match /trackMedia/{trackId} {
+      allow read, write: if false;
     }
 
     match /trackSlugs/{registryId} {

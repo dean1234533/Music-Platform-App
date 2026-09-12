@@ -23,12 +23,14 @@ test('artist annual pricing and role CTAs preserve their intent', () => {
   assert.doesNotMatch(pricing, /Artist Pro(?:\+|\b)|DJ Pro(?:\+|\b)|upgrade artist|upgrade DJ/i)
 })
 
-test('track storage allowance is shown before upload and enforced by Firestore', () => {
+test('track storage allowance is shown before upload and enforced server-side', () => {
   const upload = read('src/pages/artist/dashboard/UploadTrackPage.tsx')
-  const rules = read('firestore.rules')
+  // Track creation is a Cloud Function (createTrack) now, not a direct
+  // client Firestore write, so the trackCount ceiling is enforced there.
+  const tracksFn = read('functions/src/tracks.ts')
   assert.match(upload, /MAX_STORED_TRACKS_PER_ARTIST/)
   assert.match(upload, /Stored track allowance/)
-  assert.match(rules, /trackCount[\s\S]*?< 10/)
+  assert.match(tracksFn, /trackCount[\s\S]*?>= 10/)
 })
 
 test('launch supporter pricing stays low-friction and legacy tiers are retired', () => {
@@ -256,9 +258,11 @@ test('account deletion actually tears down every collection/Storage path an acco
   assert.match(source, /db\.collection\('verificationRequests'\)\.where\('userId', '==', uid\)/)
   assert.match(source, /db\.collection\('supportMessages'\)\.where\('userId', '==', uid\)/)
 
-  // Storage bug 1: a removed track's djPreviewAudioPath (the separately-uploaded DJ preview
-  // clip) was never deleted, orphaning that file in Storage forever.
-  assert.match(source, /deleteStorageFile\(track\.djPreviewAudioPath\)/)
+  // Storage bug 1 (pre-YouTube-migration): a removed track's djPreviewAudioPath (the
+  // separately-uploaded DJ preview clip) was never deleted, orphaning that file in Storage
+  // forever. Tracks are YouTube links now — the only per-track cleanup left is the artwork
+  // folder and the never-client-readable trackMedia doc holding the video ID.
+  assert.match(source, /db\.collection\('trackMedia'\)\.doc\(trackDoc\.id\)\.delete\(\)/)
 
   // Storage bug 2: a blanket artists/{uid}/artwork/ folder wipe ran unconditionally, which
   // would delete the artwork of a track PRESERVED for an active DJ licence agreement (that
@@ -311,16 +315,21 @@ test('account deletion actually tears down every collection/Storage path an acco
 
 test('playback and track deletion are server-authorised', () => {
   const functions = read('functions/src/tracks.ts')
-  assert.match(functions, /getTrackPlaybackUrl/)
+  // Playback is the official YouTube embed now — getTrackYoutubeInfo re-checks the same
+  // visibility/entitlement ladder before ever disclosing a track's video ID.
+  assert.match(functions, /getTrackYoutubeInfo/)
+  assert.match(functions, /createTrack/)
   assert.match(functions, /deleteTrack/)
   assert.match(functions, /takenDown/)
   assert.match(functions, /restrictedCapabilities/)
   assert.match(functions, /active licence/)
-  const storage = read('storage.rules')
-  assert.match(storage, /match \/artists\/\{artistId\}\/previews\/\{fileName\}[\s\S]*?allow read: if isOwner\(artistId\)/)
+  const firestoreRules = read('firestore.rules')
+  // The actual video ID never lives on the publicly-readable tracks/{trackId} doc (which
+  // exposes locked-tier metadata to any visitor) — it lives in a doc no client can read at all.
+  assert.match(firestoreRules, /match \/trackMedia\/\{trackId\}[\s\S]*?allow read, write: if false/)
 })
 
-test('copyright-restricted tracks are gated out of new DJ requests, contracts, payments, and downloads', () => {
+test('copyright-restricted tracks are gated out of new DJ requests and contracts; master downloads are gone entirely', () => {
   const requests = read('functions/src/licensing/requests.ts')
   const offers = read('functions/src/licensing/offers.ts')
   const payment = read('functions/src/stripe/licencePayment.ts')
@@ -328,12 +337,14 @@ test('copyright-restricted tracks are gated out of new DJ requests, contracts, p
   assert.match(requests, /dj_licensing/)
   assert.match(offers, /dj_licensing/)
   assert.match(payment, /dj_licensing/)
-  assert.match(downloads, /dj_licensing/)
   assert.match(requests, /not available for new DJ requests/)
   assert.match(offers, /no new contract can be generated/)
   assert.match(payment, /payment is temporarily unavailable/)
-  assert.match(downloads, /downloads are temporarily unavailable/)
-  // A restricted/removed track's existing signed history is never deleted by this gating.
+  // BackTheVibes no longer stores or serves master audio at all (see the YouTube-based track
+  // migration) — downloadLicensedTrack always responds 410 regardless of copyright status,
+  // rather than conditionally gating a file transfer that no longer exists.
+  assert.match(downloads, /status\(410\)/)
+  assert.match(downloads, /no longer stores or distributes master audio/)
   assert.doesNotMatch(downloads, /\.delete\(\)/)
 })
 
@@ -539,28 +550,21 @@ test('My Agreements opens on the first tab that actually has something in it, no
   assert.doesNotMatch(page, /useState\(0\)/)
 })
 
-test('downloading the licensed track forces an actual download with zero page navigation (user-reported, confirmed live: responseDisposition alone was not honoured)', () => {
-  // A Storage-signed URL's responseDisposition hint is not reliably honoured by the browser —
-  // confirmed live: the browser still opened its native audio player. This project's GCP
-  // identity also lacks IAM permission to configure the bucket's CORS policy, which a
-  // client-side fetch()-of-the-signed-URL workaround would have needed. The reliable fix
-  // streams the file through this function's own response, whose headers it sets directly, and
-  // whose CORS is this function's own to control — not GCS's.
+test('master audio is never stored or streamed by BackTheVibes — the old signed-download endpoint is permanently disabled instead of gating a file transfer that no longer exists', () => {
+  // BackTheVibes previously streamed a licensed master through this function's own HTTP
+  // response (Content-Disposition set directly, since a Storage-signed URL's
+  // responseDisposition hint wasn't reliably honoured). The YouTube-based track migration
+  // removes hosted master audio entirely (see section 22 of the migration spec: master audio
+  // must stay outside BackTheVibes) — this endpoint now always explains that instead of
+  // attempting a transfer, but its URL/auth surface is kept so old links fail clearly.
   const downloads = read('functions/src/licensing/downloads.ts')
   assert.match(downloads, /export const downloadLicensedTrack = onRequest/)
-  assert.match(downloads, /res\.set\('Content-Disposition', `attachment; filename="\$\{safeTitle\}\.\$\{extension\}"`\)/)
-  assert.match(downloads, /file\.createReadStream\(\)/)
-  assert.match(downloads, /verifyIdToken/)
-  // Forcing application/octet-stream made the browser fall back to a generic document
-  // association on download instead of recognising it as audio — the real stored contentType
-  // (set at upload time from the original file's own MIME type) must be used instead.
-  assert.doesNotMatch(downloads, /'application\/octet-stream'/)
-  assert.match(downloads, /res\.set\('Content-Type', contentType\)/)
-  assert.match(downloads, /file\.getMetadata\(\)/)
+  assert.match(downloads, /res\.status\(410\)\.json/)
+  assert.match(downloads, /no longer stores or distributes master audio/)
+  assert.doesNotMatch(downloads, /createReadStream/)
+  assert.doesNotMatch(downloads, /verifyIdToken/)
   const service = read('src/services/licenceService.ts')
   assert.match(service, /export async function downloadLicensedTrack/)
-  assert.match(service, /link\.download = filename/)
-  assert.doesNotMatch(service, /export const getSecureDownloadUrl/)
   const contract = read('src/pages/agreements/ContractPage.tsx')
   assert.match(contract, /await downloadLicensedTrack\(agreement!\.agreementId, actingRole\)/)
 })
@@ -705,7 +709,7 @@ test('the persistent player can be fully dismissed', () => {
   const player = read('src/contexts/PlayerContext.tsx')
   const bar = read('src/components/player/PlayerBar.tsx')
   assert.match(player, /closePlayer: \(\) => void/)
-  assert.match(player, /audio\.removeAttribute\('src'\)/)
+  assert.match(player, /playerRef\.current\?\.destroy\(\)/)
   assert.match(player, /setCurrentTrack\(null\)/)
   assert.match(bar, /aria-label="Close player"/)
   assert.match(bar, /onClick=\{closePlayer\}/)
@@ -811,7 +815,7 @@ test('a taken-down or streaming-restricted track shows a clear unavailable state
   assert.match(trackPage, /if \(track\.takenDown\) \{/)
   assert.match(trackPage, /This track is no longer available/)
   assert.match(trackPage, /const streamingRestricted = track\.restrictedCapabilities\?\.includes\('streaming'\) \?\? false/)
-  assert.match(trackPage, /disabled=\{streamingRestricted \|\| previewUnavailable\}/)
+  assert.match(trackPage, /disabled=\{streamingRestricted\}/)
   assert.match(trackPage, /Streaming is temporarily restricted while this track is under review\./)
 
   // The "Open for DJ promotion" badge and DJ request flow must agree with
@@ -980,61 +984,52 @@ test('signed-in users can send a support message, an admin gets notified and can
   assert.match(read('functions/src/index.ts'), /export \{ submitSupportMessage, resolveSupportMessage \} from '\.\/support\.js'/)
 })
 
-test('music access ladder: everyone can hear the preview regardless of a track\'s full-stream tier, but the full stream stays strictly gated (user-reported: the player never actually streamed the full track to entitled listeners)', () => {
+test('music access ladder: playback is the official YouTube embed for everyone, but the video ID stays strictly gated (YouTube-based track migration: there is no more separate preview tier — a track is either revealed or locked)', () => {
   const fn = read('functions/src/tracks.ts')
 
-  // Preview access is permissive — a followers/supporters-tier track's
-  // preview must not be gated the same way its full stream is, or the
-  // preview -> follow -> unlock funnel never gets off the ground.
-  assert.match(fn, /async function canPreviewTrack\(uid: string \| null, track: FirebaseFirestore\.DocumentData\): Promise<boolean> \{/)
-  assert.match(fn, /return true\n\}/)
+  // The one entitlement check gates whether the video ID is ever disclosed
+  // at all — there is no more permissive "preview" layer, since a YouTube
+  // embed either plays the whole thing or it doesn't play at all.
+  assert.match(fn, /async function canAccessTrackYoutubeLink\(uid: string \| null, track: FirebaseFirestore\.DocumentData\): Promise<boolean> \{/)
 
-  // Full-stream access keeps the strict ladder, plus a real fix: a
-  // supportRelationships doc alone isn't proof of a *currently active*
-  // subscription (it isn't cleaned up the instant Stripe cancels one).
-  assert.match(fn, /async function canStreamFullTrack\(uid: string \| null, track: FirebaseFirestore\.DocumentData\): Promise<boolean> \{/)
+  // A real fix carried over from the old audio ladder: a supportRelationships
+  // doc alone isn't proof of a *currently active* subscription (it isn't
+  // cleaned up the instant Stripe cancels one).
+  assert.match(fn, /async function isActiveSupporter\(uid: string, artistId: string\): Promise<boolean> \{/)
   assert.match(fn, /db\.collection\('subscriptions'\)\.doc\(`\$\{uid\}_fan`\)\.get\(\)/)
   assert.match(fn, /return status === 'active' \|\| status === 'trialing'/)
 
-  // getTrackPlaybackUrl must route to the matching check per kind — using
-  // the same strict check for both would silently re-break the split above.
-  assert.match(fn, /kind === 'dj_preview'[\s\S]*?await canPlayDjPreview\(uid, track\)[\s\S]*?await canStreamFullTrack\(uid, track\)/)
+  // getTrackYoutubeInfo is the one place the video ID is ever handed back,
+  // and only after that same entitlement check passes — the actual ID lives
+  // in trackMedia/{trackId}, never on the publicly-readable track doc.
+  assert.match(fn, /export const getTrackYoutubeInfo = onCall\(async \(request\) => \{/)
+  assert.match(fn, /if \(!\(await canAccessTrackYoutubeLink\(uid, track\)\)\) \{/)
+  assert.match(fn, /const mediaSnap = await db\.collection\('trackMedia'\)\.doc\(trackId\)\.get\(\)/)
 
-  // Analytics stay honest: preview and full-stream plays are separate
-  // counters, further broken down by DJ-preview and supporter-tier plays —
-  // never summed into one inflated "plays" figure.
+  // Analytics stay honest: one counter for "this entitled viewer opened the
+  // YouTube link" — never a claimed YouTube view count, never client-writable.
   assert.match(fn, /export const recordTrackPlay = onCall/)
-  assert.match(fn, /update\.playCount = FieldValue\.increment\(1\)/)
-  assert.match(fn, /update\.fullPlayCount = FieldValue\.increment\(1\)/)
-  assert.match(fn, /update\.djPreviewCount = FieldValue\.increment\(1\)/)
-  assert.match(fn, /update\.supporterPlayCount = FieldValue\.increment\(1\)/)
+  assert.match(fn, /await ref\.update\(\{ playCount: FieldValue\.increment\(1\) \}\)/)
 
-  // The player must actually request the full stream first and only fall
-  // back to the preview when the server itself says no — never decide
-  // client-side who is "probably" entitled.
+  // The player must actually ask the server before ever loading a video —
+  // never decide client-side who is "probably" entitled.
   const player = read('src/contexts/PlayerContext.tsx')
-  assert.match(player, /url = await getStreamPlaybackURL\(track\)/)
-  assert.match(player, /streamError instanceof FirebaseError && streamError\.code === 'functions\/permission-denied'/)
-  assert.match(player, /url = await getPreviewPlaybackURL\(track\)/)
-  assert.match(player, /void recordTrackPlay\(track\.trackId, kind\)/)
+  assert.match(player, /const \{ youtubeVideoId \} = await getTrackYoutubeInfo\(track\)/)
+  assert.match(player, /void recordTrackPlay\(track\.trackId\)/)
 
-  // Firestore rules: track metadata (never audio) is visible for a locked
-  // followers/supporters/early_access track too, so the public profile can
-  // show it locked-with-a-CTA instead of hiding it outright — the real
-  // gate stays entirely in getTrackPlaybackUrl + storage.rules.
+  // Firestore rules: track metadata (never the video ID) is visible for a
+  // locked followers/supporters/early_access track too, so the public
+  // profile can show it locked-with-a-CTA instead of hiding it outright —
+  // the real gate is entirely in getTrackYoutubeInfo + trackMedia's rules.
   const rules = read('firestore.rules')
   assert.match(rules, /resource\.data\.visibility == 'followers'\n {8}\|\| resource\.data\.visibility == 'supporters'/)
-  assert.match(rules, /request\.resource\.data\.get\('fullPlayCount', 0\) == resource\.data\.get\('fullPlayCount', 0\)/)
-  assert.match(rules, /request\.resource\.data\.get\('supporterPlayCount', 0\) == resource\.data\.get\('supporterPlayCount', 0\)/)
-  assert.match(rules, /request\.resource\.data\.get\('djPreviewCount', 0\) == resource\.data\.get\('djPreviewCount', 0\)/)
+  assert.match(rules, /match \/trackMedia\/\{trackId\} \{\s*allow read, write: if false;/)
 
-  // Storage stays the real backstop regardless of the Firestore doc-read
-  // relaxation above — previews/streaming/originals are all owner-only,
-  // full stop, no visibility-based branch to accidentally get wrong.
+  // No hosted audio paths exist any more — the only remaining Storage
+  // surface for a track is its owner-writable, publicly-readable artwork.
   const storage = read('storage.rules')
-  assert.match(storage, /match \/artists\/\{artistId\}\/previews\/\{fileName\} \{\s*\/\/[\s\S]*?allow read: if isOwner\(artistId\);/)
-  assert.match(storage, /match \/artists\/\{artistId\}\/streaming\/\{fileName\} \{[\s\S]*?allow read: if isOwner\(artistId\);/)
-  assert.match(storage, /match \/artists\/\{artistId\}\/originals\/\{fileName\} \{[\s\S]*?allow read: if isOwner\(artistId\);/)
+  assert.doesNotMatch(storage, /artists\/\{artistId\}\/(originals|streaming|previews|dj-previews)\//)
+  assert.match(storage, /match \/artists\/\{artistId\}\/artwork\/\{fileName\} \{/)
 })
 
 test('the public artist profile shows locked followers/supporters/early-access tracks with a lock + CTA instead of hiding them, and the track page shows accurate play-button/access copy per viewer', () => {
@@ -1063,13 +1058,13 @@ test('the public artist profile shows locked followers/supporters/early-access t
   assert.match(profile, /locked=\{/)
 })
 
-test('early access tracks: supporters get the full track immediately, followers/public unlock automatically on a server-timestamp date, not the caller\'s clock (spec scenario: third test track)', () => {
+test('early access tracks: supporters get access immediately, followers/public unlock automatically on a server-timestamp date, not the caller\'s clock (spec scenario: third test track)', () => {
   const fn = read('functions/src/tracks.ts')
-  // Public release date is checked before the signed-in guard, so it also
+  // Public release date is checked in the signed-out branch, so it also
   // applies to an anonymous visitor once it passes — not just accounts.
-  assert.match(fn, /if \(track\.visibility === 'early_access'\) \{\s*\/\/ The public-release date/)
+  assert.match(fn, /if \(!uid\) \{\s*\/\/ early_access can still be open to signed-out visitors/)
   assert.match(fn, /const publicAt = \(track\.publicReleaseAt as FirebaseFirestore\.Timestamp \| null \| undefined\)\?\.toMillis\(\)/)
-  assert.match(fn, /if \(publicAt !== undefined && Date\.now\(\) >= publicAt\) return true/)
+  assert.match(fn, /return publicAt !== undefined && Date\.now\(\) >= publicAt/)
   // Supporters unlock unconditionally; followers need both the relationship and the date.
   assert.match(fn, /if \(await isActiveSupporter\(uid, track\.artistId\)\) return true/)
   assert.match(fn, /const followerAt = \(track\.followerReleaseAt as FirebaseFirestore\.Timestamp \| null \| undefined\)\?\.toMillis\(\)/)
@@ -1080,7 +1075,7 @@ test('early access tracks: supporters get the full track immediately, followers/
 
   const upload = read('src/pages/artist/dashboard/UploadTrackPage.tsx')
   assert.match(upload, /visibility === 'early_access' \? \(/)
-  assert.match(upload, /Field label="Followers get full access on"/)
+  assert.match(upload, /Field label="Followers get access on"/)
   assert.match(upload, /followerReleaseAt: visibility === 'early_access' && followerReleaseDate \? new Date\(followerReleaseDate\) : null/)
   // The artist sees exactly what each audience gets before publishing — never a fabricated/generic summary.
   assert.match(upload, /import \{ ACCESS_SUMMARY, VISIBILITY_OPTIONS \} from '@\/utils\/trackAccess'/)
@@ -1109,26 +1104,23 @@ test('artists can edit a track\'s fan-facing access settings after upload, kept 
   assert.match(musicPage, /<TrackAccessSettingsModal track=\{accessSettingsTrack\}/)
 })
 
-test('the default preview length and default track visibility for new uploads are admin-configurable, not hard-coded (spec: "make this configurable")', () => {
+test('the default track visibility for new uploads is admin-configurable, not hard-coded (spec: "make this configurable")', () => {
   const settingsFn = read('functions/src/admin/settings.ts')
-  assert.match(settingsFn, /defaultTrackVisibility,\s*\n\s*defaultPreviewDurationSec,/)
   assert.match(settingsFn, /update\.defaultTrackVisibility = defaultTrackVisibility/)
-  assert.match(settingsFn, /update\.defaultPreviewDurationSec = defaultPreviewDurationSec/)
 
   const adminPage = read('src/pages/admin/AdminSettingsPage.tsx')
   assert.match(adminPage, /handleSaveTrackDefaults/)
   assert.match(adminPage, /Default visibility for new uploads/)
-  assert.match(adminPage, /Default preview duration \(seconds\)/)
 
+  // Tracks are YouTube links now, so there is no preview length left to
+  // default — only the visibility default still applies at upload time.
   const upload = read('src/pages/artist/dashboard/UploadTrackPage.tsx')
-  assert.match(upload, /if \(settings\.defaultTrackVisibility\) setVisibility\(settings\.defaultTrackVisibility\)/)
-  assert.match(upload, /if \(settings\.defaultPreviewDurationSec\) setPreviewDurationSec\(settings\.defaultPreviewDurationSec\)/)
-  assert.match(upload, /if \(settings\.allowedPreviewDurationsSec\?\.length\) setSuggestedPreviewDurations\(settings\.allowedPreviewDurationsSec\)/)
+  assert.match(upload, /if \(settings\?\.defaultTrackVisibility\) setVisibility\(settings\.defaultTrackVisibility\)/)
 })
 
 test('follow/support conversions are counted from a real per-fan preview signal, not fabricated or assumed from every follow/support', () => {
   const tracksFn = read('functions/src/tracks.ts')
-  assert.match(tracksFn, /if \(\(kind === 'preview' \|\| kind === 'dj_preview'\) && uid && uid !== track\.artistId\) \{/)
+  assert.match(tracksFn, /if \(uid && uid !== track\.artistId\) \{/)
   assert.match(tracksFn, /db\.collection\('previewSessions'\)\.doc\(`\$\{uid\}_\$\{track\.artistId\}`\)\.set\(/)
 
   const followsFn = read('functions/src/follows.ts')
@@ -1158,26 +1150,23 @@ test('music access ALLOW/DENY matrix — every row of the spec, traced to the co
   // 1. Public user reads public track metadata -> ALLOW.
   assert.match(rules, /resource\.data\.visibility == 'public'/)
 
-  // 2. Public user (signed out, uid === null) accesses the preview -> ALLOW.
-  //    canPreviewTrack's base case (public/followers/supporters/early_access)
-  //    falls through to an unconditional `return true`. A signed-out caller's
-  //    roles resolve to [] (no Firestore lookup), so `roles.includes('dj')`
-  //    correctly denies dj_only without a separate uid check.
-  assert.match(tracksFn, /async function canPreviewTrack\(uid: string \| null, track: FirebaseFirestore\.DocumentData\): Promise<boolean> \{/)
-  assert.match(tracksFn, /const roles = uid \? await getRoles\(uid\) : \[\]/)
-  assert.match(tracksFn, /if \(track\.visibility === 'dj_only'\) return roles\.includes\('dj'\)/)
+  // 2. Public user (signed out, uid === null) accesses a public track's
+  //    YouTube link -> ALLOW. A signed-out caller's roles resolve to []
+  //    (no Firestore lookup), so `roles.includes('dj')` correctly denies
+  //    dj_only without a separate uid check.
+  assert.match(tracksFn, /async function canAccessTrackYoutubeLink\(uid: string \| null, track: FirebaseFirestore\.DocumentData\): Promise<boolean> \{/)
+  assert.match(tracksFn, /if \(track\.visibility === 'dj_only'\) return !!uid && roles\.includes\('dj'\)/)
 
-  // 3. Public user (no uid) accesses a followers-tier full stream -> DENY.
-  //    canStreamFullTrack hits `if (!uid) return false` before any tier check
-  //    can grant access (the public-visibility and early_access-public-date
-  //    checks are the only paths before that guard, and neither applies here).
+  // 3. Public user (no uid) accesses a followers-tier track's link -> DENY.
+  //    canAccessTrackYoutubeLink hits `if (!uid) { ... return false }` before
+  //    any followers/supporters branch can grant access.
   assert.match(tracksFn, /if \(track\.visibility === 'public'\) return true/)
-  assert.match(tracksFn, /if \(!uid\) return false/)
+  assert.match(tracksFn, /if \(!uid\) \{/)
 
-  // 4. A real follower accesses that eligible full stream -> ALLOW (a genuine follows/{uid_artistId} doc exists).
+  // 4. A real follower accesses that eligible track -> ALLOW (a genuine follows/{uid_artistId} doc exists).
   assert.match(tracksFn, /if \(track\.visibility === 'followers'\) \{\s*const follow = await db\.collection\('follows'\)\.doc\(`\$\{uid\}_\$\{track\.artistId\}`\)\.get\(\)\s*return follow\.exists \|\| isActiveSupporter/)
 
-  // 5. That same follower (no supportRelationships doc) accesses a supporters-only full stream -> DENY.
+  // 5. That same follower (no supportRelationships doc) accesses a supporters-only track -> DENY.
   //    isActiveSupporter returns false immediately when the relationship doc doesn't exist.
   assert.match(tracksFn, /async function isActiveSupporter\(uid: string, artistId: string\): Promise<boolean> \{/)
   assert.match(tracksFn, /if \(!relSnap\.exists\) return false/)
@@ -1187,59 +1176,77 @@ test('music access ALLOW/DENY matrix — every row of the spec, traced to the co
 
   // 7. "Other user's fake follow state" -> DENY. There is no channel for a
   //    client to assert isFollowing/isSupporting to the server at all — the
-  //    callable only ever accepts trackId/kind, and every entitlement check
-  //    is a live Firestore doc read the caller cannot influence.
-  assert.match(tracksFn, /const \{ trackId, kind \} = request\.data/)
+  //    callable only ever accepts trackId, and every entitlement check is a
+  //    live Firestore doc read the caller cannot influence.
+  assert.match(tracksFn, /const trackId = request\.data\?\.trackId as string \| undefined/)
   assert.doesNotMatch(tracksFn, /request\.data\?\.isFollowing|request\.data\?\.isSupporting/)
 
-  // 8/9/10. Public, follower, and supporter all DENY on the master —
-  // originals/ is owner-only at Storage regardless of visibility tier or
-  // relationship, and neither canPreviewTrack nor canStreamFullTrack (nor
-  // anything else fan-facing) ever touches originalAudioPath.
-  assert.match(storage, /match \/artists\/\{artistId\}\/originals\/\{fileName\} \{\s*allow read: if isOwner\(artistId\);/)
-  // getTrackPlaybackUrl only ever signs previewAudioPath or streamAudioPath — never originalAudioPath.
-  assert.match(tracksFn, /const path = kind === 'preview' \? track\.previewAudioPath : kind === 'dj_preview' \? track\.djPreviewAudioPath : track\.streamAudioPath/)
+  // 8/9/10. Public, follower, and supporter all get exactly the video ID
+  // and nothing more — there is no master audio anywhere in this app any
+  // more (the YouTube-based track migration removed hosted audio entirely).
+  assert.doesNotMatch(storage, /artists\/\{artistId\}\/originals\//)
+  assert.match(tracksFn, /return \{ youtubeVideoId, youtubeUrl: `https:\/\/www\.youtube\.com\/watch\?v=\$\{youtubeVideoId\}` \}/)
 
-  // 11. A DJ with no signed licence agreement for this track -> DENY —
-  // downloadLicensedTrack requires an active, non-revoked, non-legal-held
-  // agreement, not just the dj role.
-  assert.match(downloads, /if \(agreement\.status !== 'active'\)/)
-  assert.match(downloads, /if \(agreement\.legalHold\)/)
-  assert.match(downloads, /if \(agreement\.downloadRevoked\)/)
-
-  // 12. An approved DJ with a valid agreement -> ALLOW, through the signed,
-  // short-lived download URL flow (never a permanent Storage URL).
-  assert.match(downloads, /resolveLicencePartyRole\(agreement, djId,/)
+  // 11/12. Master/stem exchange for an agreed DJ deal happens outside
+  // BackTheVibes entirely — downloadLicensedTrack always explains that
+  // rather than gating a file transfer that no longer exists, for a DJ with
+  // or without a valid agreement alike.
+  assert.match(downloads, /res\.status\(410\)\.json/)
+  assert.match(downloads, /no longer stores or distributes master audio/)
 })
 
-test('music derivatives fail closed and use real audio metadata', () => {
-  const processing = read('src/services/audioProcessing.ts')
-  const upload = read('src/pages/artist/dashboard/UploadTrackPage.tsx')
+test('YouTube link validation: valid URL formats resolve to the canonical 11-character video ID, invalid/unsupported ones are rejected, and there is no audio extraction/proxying/caching anywhere in the app', () => {
+  const utilSource = read('src/utils/youtube.ts')
+  assert.match(utilSource, /export function extractYoutubeVideoId/)
+  assert.match(utilSource, /export function isValidYoutubeVideoId/)
+  assert.match(utilSource, /export function canonicalYoutubeUrl/)
+  assert.match(utilSource, /export function youtubeEmbedUrl/)
+  assert.match(utilSource, /youtube-nocookie\.com/)
+  // autoplay is never set on the embed — the user must deliberately start playback.
+  assert.doesNotMatch(utilSource, /autoplay['"]?\s*[:=]\s*['"]?1/)
+
+  // The URL patterns are anchored full-string matches against a strict
+  // 11-character video ID class, and every branch returns null on no match
+  // — so an unsupported host, a malformed/short ID, or markup injected
+  // through the input (e.g. an <iframe> tag) can never resolve to an ID.
+  assert.match(utilSource, /^const VIDEO_ID_PATTERN = \/\^\[A-Za-z0-9_-\]\{11\}\$\/$/m)
+  assert.ok(utilSource.includes('youtube\\.com\\/watch\\?'), 'accepts youtube.com/watch URLs')
+  assert.ok(utilSource.includes('youtu\\.be\\/'), 'accepts youtu.be URLs')
+  assert.ok(utilSource.includes('youtube(?:-nocookie)?\\.com\\/embed\\/'), 'accepts youtube(-nocookie).com/embed URLs')
+  assert.ok(utilSource.includes('youtube\\.com\\/shorts\\/'), 'accepts youtube.com/shorts URLs')
+  assert.match(utilSource, /if \(match\?\.\[1\] && VIDEO_ID_PATTERN\.test\(match\[1\]\)\) return match\[1\]/)
+  assert.match(utilSource, /^\s*return null$/m)
+
+  // No audio hosting/processing/extraction anywhere in the codebase any more.
+  assert.doesNotMatch(read('functions/src/index.ts'), /onOriginalUploaded/)
+  assert.doesNotMatch(read('package.json'), /@ffmpeg/)
   const trackType = read('src/types/track.ts')
-  assert.match(processing, /export async function readAudioMetadata/)
-  assert.match(processing, /throw new Error\('Audio processing failed\. Nothing was published and the full track was not used as a preview\.'\)/)
-  assert.doesNotMatch(processing, /preview: \{ file: master/)
-  assert.match(upload, /previewStartSec \+ previewDurationSec > metadata\.durationSeconds/)
-  assert.match(upload, /durationSeconds: metadata\.durationSeconds/)
-  assert.match(trackType, /durationSeconds: number/)
-  assert.match(trackType, /durationFormatted: string/)
+  assert.doesNotMatch(trackType, /originalAudioPath|streamAudioPath|previewAudioPath/)
+
+  // The reusable player component only ever renders the official embed — no fetch of media bytes.
+  const player = read('src/components/player/YouTubePlayer.tsx')
+  assert.match(player, /youtube-nocookie\.com/)
+  assert.doesNotMatch(player, /fetch\(/)
 })
 
-test('DJ role never grants a full stream and the licensed master path is exact', () => {
+test('DJ role never grants access to a dj_only track\'s YouTube link without the dj role, and BackTheVibes never streams/serves a master file at all', () => {
   const tracksFn = read('functions/src/tracks.ts')
   const downloads = read('functions/src/licensing/downloads.ts')
-  assert.match(tracksFn, /if \(track\.visibility === 'dj_only'\) return false/)
-  assert.match(downloads, /expectedOriginalPrefix = `artists\/\$\{track\.artistId\}\/originals\/\$\{agreement\.trackId\}\.`/)
-  assert.match(downloads, /track\.originalAudioPath\.startsWith\(expectedOriginalPrefix\)/)
+  assert.match(tracksFn, /if \(track\.visibility === 'dj_only'\) return !!uid && roles\.includes\('dj'\)/)
+  // No master file path is ever referenced any more — the endpoint always explains that instead.
+  assert.doesNotMatch(downloads, /originalAudioPath/)
+  assert.match(downloads, /res\.status\(410\)\.json/)
 })
 
-test('the persistent player starts trimmed previews at zero, reports completions, and revalidates access', () => {
+test('the persistent player loads the track through the official YouTube embed, reports plays, and locked tracks show a Follow/Support CTA', () => {
   const player = read('src/contexts/PlayerContext.tsx')
   const bar = read('src/components/player/PlayerBar.tsx')
-  assert.match(player, /audio\.currentTime = 0/)
-  assert.match(player, /recordTrackPlay\(current\.trackId, completedKind, 'completion'\)/)
-  assert.match(player, /window\.setInterval\(\(\) => void revalidate\(\), 60_000\)/)
-  assert.match(bar, /Want to hear the full/)
+  // No autoplay: the player only calls playVideo() from onReady, which only ever fires after
+  // the user has already deliberately pressed play in our own UI (playTrack/togglePlay).
+  assert.match(player, /event\.target\.playVideo\(\)/)
+  assert.match(player, /void recordTrackPlay\(track\.trackId\)\.catch/)
+  assert.match(player, /stepQueueRef\.current\(1\)/)
+  assert.match(bar, /Follow \$\{artist\.name\} for free to unlock this track\./)
   assert.match(bar, /FollowButton/)
   assert.match(bar, /SupportButton/)
 })
@@ -1338,8 +1345,8 @@ test('only an admin account can change its own roles after signup (add or remove
   const functions = read('functions/src/tracks.ts')
   assert.match(functions, /async function artistRoleActive\(artistId: string\): Promise<boolean> \{/)
   // Every entitlement check must gate on the artist's live role, and must do so AFTER its own admin-bypass check,
-  // so an admin never loses the ability to preview/play/stream while investigating an account that has gone dark.
-  for (const fn of ['canPreviewTrack', 'canPlayDjPreview', 'canStreamFullTrack']) {
+  // so an admin never loses the ability to see/play a track's YouTube link while investigating an account that has gone dark.
+  for (const fn of ['canAccessTrackYoutubeLink']) {
     const start = functions.indexOf(`async function ${fn}(`)
     const end = functions.indexOf('\n}', start)
     const body = functions.slice(start, end)
@@ -1627,41 +1634,35 @@ test('the "message" report target is gone with the chat system that created it �
 
 test('BUG 1 — an artist can actually reach playback of their own uploaded track: server-side owner entitlement already existed, but nothing in the UI called it from the artist\'s own Music page (user-reported)', () => {
   const tracksFn = read('functions/src/tracks.ts')
-  // 1/2. Owner bypass is per-DOCUMENT (uid === THIS track's artistId), not a role check — an
+  // Owner bypass is per-DOCUMENT (uid === THIS track's artistId), not a role check — an
   // artist can never reach this branch for a track whose artistId is someone else's uid, so
-  // one artist's own-track access can never extend to another artist's private/full track.
-  for (const fn of ['canPreviewTrack', 'canPlayDjPreview', 'canStreamFullTrack']) {
-    const start = tracksFn.indexOf(`async function ${fn}(`)
-    const end = tracksFn.indexOf('\n}', start)
-    const body = tracksFn.slice(start, end)
-    assert.match(body, /if \(uid === track\.artistId\) return true/, `${fn} must grant the owner full access`)
-  }
+  // one artist's own-track access can never extend to another artist's private track.
+  const start = tracksFn.indexOf('async function canAccessTrackYoutubeLink(')
+  const end = tracksFn.indexOf('\n}', start)
+  const body = tracksFn.slice(start, end)
+  assert.match(body, /if \(uid === track\.artistId\) return true/, 'canAccessTrackYoutubeLink must grant the owner access')
   // Owner bypass is checked before the takenDown/restrictedCapabilities short-circuit only in
   // the sense that it's unreachable if that already returned false — moderation holds still
   // apply to the owner too, which is correct: a takedown pulls the track from everyone.
   assert.match(tracksFn, /if \(track\.takenDown === true \|\| \(track\.restrictedCapabilities \?\? \[\]\)\.includes\('streaming'\)\) return false\s*\n\s*if \(uid === track\.artistId\) return true/)
 
-  // getTrackPlaybackUrl derives uid exclusively from request.auth.uid — there is no
+  // getTrackYoutubeInfo derives uid exclusively from request.auth.uid — there is no
   // trackId/uid/artistId field read from request.data that could let a client claim ownership.
   assert.match(tracksFn, /const uid = request\.auth\?\.uid \?\? null/)
   assert.doesNotMatch(tracksFn, /request\.data\?\.(uid|artistId|ownerId)\b/)
 
-  // The master is structurally unreachable through this function regardless of entitlement —
-  // 'kind' only ever resolves to previews/dj-previews/streaming directories, never originals.
-  assert.match(tracksFn, /type PlaybackKind = 'preview' \| 'dj_preview' \| 'stream'/)
-  assert.match(
-    tracksFn,
-    /const directory = kind === 'preview' \? 'previews' : kind === 'dj_preview' \? 'dj-previews' : 'streaming'/,
-  )
-  const getUrlStart = tracksFn.indexOf('export const getTrackPlaybackUrl = onCall')
-  const getUrlEnd = tracksFn.indexOf('\n})', getUrlStart)
-  assert.doesNotMatch(tracksFn.slice(getUrlStart, getUrlEnd), /originals/, 'getTrackPlaybackUrl must never resolve to the originals/ directory')
+  // The video ID is only ever readable via trackMedia, a doc no client can read directly at
+  // all — getTrackYoutubeInfo is structurally the only way to reach it, owner included.
+  const getInfoStart = tracksFn.indexOf('export const getTrackYoutubeInfo = onCall')
+  const getInfoEnd = tracksFn.indexOf('\n})', getInfoStart)
+  assert.match(tracksFn.slice(getInfoStart, getInfoEnd), /db\.collection\('trackMedia'\)\.doc\(trackId\)\.get\(\)/)
 
   // DJ licensed downloads are a completely separate, untouched system (agreement/payment
-  // gated, not track-visibility gated) — owner playback here can't reach it either way.
+  // gated, not track-visibility gated) — owner playback here can't reach it either way, and
+  // it no longer serves any file regardless.
   const downloads = read('functions/src/licensing/downloads.ts')
   assert.match(downloads, /export const downloadLicensedTrack = onRequest/)
-  assert.doesNotMatch(downloads, /getTrackPlaybackUrl/)
+  assert.doesNotMatch(downloads, /getTrackYoutubeInfo/)
 
   // The actual, verified root cause: the artist's own track-management page never called
   // usePlayer()/playTrack() at all — there was no way to trigger playback from there, even
@@ -1672,60 +1673,25 @@ test('BUG 1 — an artist can actually reach playback of their own uploaded trac
   assert.match(musicPage, /onClick=\{\(\) => \(currentTrack\?\.trackId === track\.trackId \? togglePlay\(\) : playTrack\(track, tracks\)\)\}/)
 })
 
-test('BUG 2 — public preview media is a physically separate, actually-clipped file, never the full stream with a client-side stop timer (user-reported: a 30s-configured preview played the full 4-minute track)', () => {
-  // Preview generation already exists and already physically clips the audio via ffmpeg's
-  // -ss/-t flags at upload time — it does not send the full file and rely on the UI to stop it.
-  const processing = read('src/services/audioProcessing.ts')
-  assert.match(processing, /'-ss', String\(opts\.previewStartSec\),/)
-  assert.match(processing, /'-i', inputName,/)
-  assert.match(processing, /'-t', String\(opts\.previewDurationSec\),/)
-  // Streaming derivative is a separate ffmpeg pass with no -ss/-t trim at all — full length.
-  const streamingExecStart = processing.indexOf("await ffmpeg.exec(['-i', inputName, '-b:a'")
-  assert.ok(streamingExecStart !== -1, 'the streaming derivative must be produced by its own untrimmed ffmpeg pass')
+test('BUG 2 (superseded by the YouTube migration) — there is no server-side audio clipping/trimming pipeline any more, since a YouTube embed has no separate "preview" derivative to generate or keep in sync', () => {
+  // The old bug this test protected against (a client-side stop timer on the full file, easy
+  // to bypass and prone to drift) can't recur because there is no preview file to derive, trim,
+  // or resynchronise in the first place — playback is always the one official YouTube embed.
+  assert.doesNotMatch(read('src/types/track.ts'), /previewAudioPath|previewStartSec|previewDurationSec/)
+  assert.doesNotMatch(read('src/services/trackService.ts'), /regenerateTrackPreview|uploadTrackAssets/)
+  assert.doesNotMatch(read('functions/src/tracks.ts'), /previewAudioPath|streamAudioPath/)
+  // No ffmpeg dependency remains — it existed solely to produce these derivatives.
+  assert.doesNotMatch(read('package.json'), /ffmpeg/)
 
-  // Regenerating the preview after the artist edits timing re-clips from the real master —
-  // never reuses/extends the old preview file — and overwrites the exact same Storage path,
-  // uploaded BEFORE the new Firestore timing fields are written, so nothing can ever read a
-  // "new" previewDurationSec paired with an old, unclipped, or mismatched preview file.
-  assert.match(processing, /export async function derivePreviewAsset\(/)
-  const trackService = read('src/services/trackService.ts')
-  assert.match(trackService, /export async function regenerateTrackPreview\(/)
-  assert.match(trackService, /uploadBytesResumable\(ref\(storage, track\.previewAudioPath\), derivative\.file\)/)
-  const modal = read('src/components/track/TrackAccessSettingsModal.tsx')
-  const regenIndex = modal.indexOf('await regenerateTrackPreview(track, previewStartSec, previewDurationSec)')
-  const updateIndex = modal.indexOf('await updateTrackAccessSettings(track.trackId,')
-  assert.ok(regenIndex !== -1 && updateIndex !== -1 && regenIndex < updateIndex, 'the preview file must be rebuilt before the new timing is saved to Firestore')
-
-  // Upload writes preview/streaming/original to three distinct Storage paths — never the same object.
-  assert.match(trackService, /const originalPath = `artists\/\$\{artistId\}\/originals\/\$\{trackId\}\.\$\{extOf\(files\.master\)\}`/)
-  assert.match(trackService, /const streamingPath = `artists\/\$\{artistId\}\/streaming\/\$\{trackId\}\.\$\{extOf\(files\.streaming\)\}`/)
-  assert.match(trackService, /const previewPath = `artists\/\$\{artistId\}\/previews\/\$\{trackId\}\.\$\{extOf\(files\.preview\)\}`/)
-
-  // getTrackPlaybackUrl never reads previewStartSec/previewDurationSec from the request at
-  // playback time at all — a client has no channel to influence which bytes it gets back,
-  // only which of the three pre-generated, pre-clipped files (by kind) it's entitled to.
+  // getTrackYoutubeInfo never reads any client-supplied timing/derivative hint — a client has
+  // no channel to influence which video plays, only whether it's entitled to see the ID at all.
   const tracksFn = read('functions/src/tracks.ts')
   assert.doesNotMatch(tracksFn, /request\.data\?\.previewStartSec|request\.data\?\.previewDurationSec/)
-  assert.match(tracksFn, /const \{ trackId, kind \} = request\.data/)
+  assert.match(tracksFn, /const trackId = request\.data\?\.trackId as string \| undefined/)
 
-  // Firestore rules independently validate previewStartSec/previewDurationSec at write time —
-  // bounded, typed, and cross-checked against the track's own real duration, both on create
-  // and on later edit, rejecting NaN/Infinity/negative/excessive/out-of-range values either way.
-  const rules = read('firestore.rules')
-  assert.match(rules, /request\.resource\.data\.previewStartSec is number\s*\n\s*&& request\.resource\.data\.previewStartSec >= 0\s*\n\s*&& request\.resource\.data\.previewDurationSec is number\s*\n\s*&& request\.resource\.data\.previewDurationSec >= 5\s*\n\s*&& request\.resource\.data\.previewDurationSec <= 90/)
-  assert.match(rules, /request\.resource\.data\.previewStartSec \+ request\.resource\.data\.previewDurationSec <= request\.resource\.data\.durationSeconds\)/)
-  // Same bounds re-enforced on update, not just create.
-  assert.match(rules, /request\.resource\.data\.previewStartSec >= 0\s*\n\s*&& request\.resource\.data\.previewDurationSec >= 5\s*\n\s*&& request\.resource\.data\.previewDurationSec <= 90/)
-
-  // The full ladder: only an entitled listener (owner/admin/public-tier/eligible
-  // follower/active supporter/released early-access) ever gets kind:'stream'; everyone else's
-  // client-side fallback (PlayerContext) requests kind:'preview' instead — the server decides
-  // which, the client never does.
-  const player = read('src/contexts/PlayerContext.tsx')
-  assert.match(player, /let url: string\s*\n\s*try \{\s*\n\s*url = await getStreamPlaybackURL\(track\)/)
-  assert.match(player, /const denied = streamError instanceof FirebaseError && streamError\.code === 'functions\/permission-denied'/)
-  assert.match(player, /kind = 'preview'\s*\n\s*url = await getPreviewPlaybackURL\(track\)/)
-
+  // The full ladder still applies to whether the link is revealed at all: only an entitled
+  // viewer (owner/admin/public-tier/eligible follower/active supporter/released early-access)
+  // ever gets the real video ID back from getTrackYoutubeInfo.
   assert.match(tracksFn, /if \(track\.visibility === 'followers'\) \{\s*const follow = await db\.collection\('follows'\)\.doc\(`\$\{uid\}_\$\{track\.artistId\}`\)\.get\(\)\s*return follow\.exists \|\| isActiveSupporter\(uid, track\.artistId\)/)
   assert.match(tracksFn, /if \(track\.visibility === 'supporters'\) \{\s*return isActiveSupporter\(uid, track\.artistId\)/)
   assert.match(tracksFn, /if \(!relSnap\.exists\) return false/)
@@ -1753,13 +1719,14 @@ test('BUG 3 — every track card (including on the artist profile) actually togg
   // Resume-from-position, track-change, natural-end, and error-reset are all handled once,
   // centrally, in the single shared player — never duplicated per page/component.
   const player = read('src/contexts/PlayerContext.tsx')
-  assert.match(player, /const togglePlay = useCallback\(\(\) => \{\s*const audio = audioRef\.current\s*if \(!audio \|\| !currentTrack\) return\s*if \(isPlaying\) \{\s*audio\.pause\(\)\s*setIsPlaying\(false\)\s*\} else if \(audio\.ended\) \{/)
-  assert.match(player, /setIsPlaying\(false\)\s*setPlaybackKind\(null\)\s*const message = error instanceof FirebaseError/)
-  assert.match(player, /if \(completedKind === 'preview' \|\| completedKind === 'dj_preview'\) \{\s*setIsPlaying\(false\)\s*setPreviewEnded\(true\)/)
-  // Only one HTMLAudioElement for the whole app — a new track's src assignment inherently
-  // stops whatever the previous one was playing; there is no second, competing audio element.
-  assert.match(player, /const audio = new Audio\(\)/)
-  assert.doesNotMatch(player, /new Audio\(\)[\s\S]*new Audio\(\)/)
+  assert.match(player, /const togglePlay = useCallback\(\(\) => \{\s*const player = playerRef\.current\s*if \(!player \|\| !currentTrack\) return\s*if \(isPlaying\) \{\s*player\.pauseVideo\(\)/)
+  assert.match(player, /const message = error instanceof FirebaseError && error\.code === 'functions\/permission-denied'/)
+  // Only one YT.Player instance for the whole app at a time — destroyPlayer() tears down the
+  // previous instance before loadAndPlay ever creates a new one, so there is no second,
+  // competing player left running in the background.
+  assert.match(player, /const destroyPlayer = useCallback\(\(\) => \{/)
+  assert.match(player, /playerRef\.current\?\.destroy\(\)/)
+  assert.match(player, /destroyPlayer\(\)\s*\n\s*\n\s*await new Promise<void>\(\(resolve, reject\) => \{\s*\n\s*playerRef\.current = new YT\.Player\(/)
 
   // The global player bar already correctly exposes pause/resume and a full-stop (close) control.
   const bar = read('src/components/player/PlayerBar.tsx')

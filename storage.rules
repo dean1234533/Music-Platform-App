@@ -11,10 +11,8 @@ service firebase.storage {
       return isSignedIn() && request.auth.uid == artistId;
     }
 
-    // 40MB is a generous ceiling for a compressed track (a 320kbps MP3 at
-    // 40MB runs ~17 minutes) while keeping storage/egress costs predictable
-    // on a free-tier-conscious setup. Raw WAV/FLAC uploads are rejected
-    // outright below rather than accepted and left to bloat storage.
+    // Story audio clips are the only remaining audio uploads — tracks
+    // themselves are YouTube links, never hosted audio.
     function underAudioUploadLimit() {
       return request.resource.size < 40 * 1024 * 1024;
     }
@@ -52,53 +50,11 @@ service firebase.storage {
       allow write: if isOwner(artistId) && underImageUploadLimit() && isImage();
     }
 
-    // Preview clips are private at Storage. getTrackPlaybackUrl validates
-    // live Firestore visibility and moderation state, then returns a
-    // short-lived signed URL for entitled playback.
-    match /artists/{artistId}/previews/{fileName} {
-      // Playback is issued through getTrackPlaybackUrl after checking the
-      // current Firestore entitlement/takedown state.
-      allow read: if isOwner(artistId);
-      allow write: if isOwner(artistId) && underAudioUploadLimit() && isCompressedAudio();
-    }
-
-    // Separate DJ-focused preview derivative. DJ entitlement is checked by
-    // getTrackPlaybackUrl; Storage itself remains owner-only.
-    match /artists/{artistId}/dj-previews/{fileName} {
-      allow read: if isOwner(artistId);
-      allow write: if isOwner(artistId) && underAudioUploadLimit() && isCompressedAudio();
-    }
-
-    // Full-length optimised streaming version — visibility-gated exactly
-    // like the track doc itself (public/followers/supporters), not just
-    // publicly readable like previews.
-    match /artists/{artistId}/streaming/{fileName} {
-      allow read: if isOwner(artistId);
-      allow write: if isOwner(artistId) && underAudioUploadLimit() && isCompressedAudio();
-    }
-
-    // Full-quality originals — NEVER publicly readable. Only the owning
-    // artist can read/write directly; DJ downloads are served exclusively
-    // through a Cloud Function issuing short-lived signed URLs (Phase 4),
-    // never through a client-readable Storage rule. Still must be a
-    // compressed format — WAV/FLAC uploads are rejected here too, since
-    // "original" means the master the artist licenses, not an unbounded
-    // raw-file dumping ground.
-    match /artists/{artistId}/originals/{fileName} {
-      allow read: if isOwner(artistId);
-      allow write: if isOwner(artistId) && underAudioUploadLimit() && isCompressedAudio();
-    }
-
-    // Supporter-only content — owner can always read/write; a supporter's
-    // read access is enforced once Phase 2 support entitlements exist in
-    // Firestore (checked here via a cross-service firestore.get on the
-    // supportRelationships collection).
-    match /artists/{artistId}/supporter-content/{fileName} {
-      // Relationship existence alone is not proof of an active paid
-      // subscription. Entitled delivery must go through a server check.
-      allow read: if isOwner(artistId);
-      allow write: if isOwner(artistId) && underAudioUploadLimit() && isCompressedAudio();
-    }
+    // No hosted track audio: tracks are YouTube links, never uploaded
+    // files. There is deliberately no /originals/, /streaming/, /previews/,
+    // or /dj-previews/ path — a track's only playable asset lives on
+    // YouTube, and master/stem exchange for an agreed deal happens outside
+    // the platform (see functions/src/licensing/downloads.ts).
 
     function isStoryMedia() {
       return isImage() || isVideo() || isCompressedAudio();

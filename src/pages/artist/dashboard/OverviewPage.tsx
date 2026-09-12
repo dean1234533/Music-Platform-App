@@ -26,7 +26,7 @@ export function OverviewPage() {
 
   if (!artist) return <LoadingState />
 
-  const totalPreviewPlays = tracks.reduce((sum, track) => sum + track.playCount, 0)
+  const totalYoutubeOpens = tracks.reduce((sum, track) => sum + track.playCount, 0)
   const topTracks = [...tracks].sort((a, b) => b.playCount - a.playCount).slice(0, 5)
   const maxPlays = Math.max(...topTracks.map((track) => track.playCount), 1)
   const supporterShare = artist.followerCount > 0
@@ -81,7 +81,7 @@ export function OverviewPage() {
         <StatCard icon={<Users className="h-5 w-5" />} label="Followers" value={formatCount(artist.followerCount)} accent="brand" />
         <StatCard icon={<Heart className="h-5 w-5" />} label="Supporters" value={formatCount(artist.supporterCount)} accent="support" />
         <StatCard icon={<Disc3 className="h-5 w-5" />} label="Live catalogue" value={formatCount(tracks.length)} accent="neutral" />
-        <StatCard icon={<Headphones className="h-5 w-5" />} label="Preview plays" value={formatCount(totalPreviewPlays)} accent="dj" />
+        <StatCard icon={<Headphones className="h-5 w-5" />} label="YouTube opens" value={formatCount(totalYoutubeOpens)} accent="dj" />
       </section>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(280px,.85fr)]">

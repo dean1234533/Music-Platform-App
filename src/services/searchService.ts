@@ -69,7 +69,7 @@ export async function searchPlatform(rawTerm: string): Promise<SearchResults> {
 
   const tracksById = new Map<string, TrackDoc>()
   const addIfDiscoverable = (id: string, track: TrackDoc) => {
-    if (track.takenDown === true || track.status === 'unpublished' || track.status === 'processing' || track.status === 'failed') return
+    if (track.takenDown === true || track.status === 'unpublished') return
     if (track.restrictedCapabilities?.includes('discovery')) return
     tracksById.set(id, track)
   }

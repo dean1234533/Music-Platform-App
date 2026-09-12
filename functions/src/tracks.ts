@@ -1,12 +1,10 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
-import { FieldValue } from 'firebase-admin/firestore'
+import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { db } from './admin.js'
 import { requireActiveUser } from './roles.js'
 import { enforceRateLimit } from './rateLimit.js'
 import { getStorage } from 'firebase-admin/storage'
-
-type PlaybackKind = 'preview' | 'dj_preview' | 'stream'
-type PlaybackEvent = 'start' | 'completion'
+import { isValidYoutubeVideoId } from './youtube.js'
 
 function isPublished(track: FirebaseFirestore.DocumentData): boolean {
   // Compatibility: tracks created before the status field existed were
@@ -24,45 +22,7 @@ async function artistRoleActive(artistId: string): Promise<boolean> {
   return (await getRoles(artistId)).includes('artist')
 }
 
-/**
- * Whether this listener may hear the configured preview clip. Deliberately
- * permissive — the acquisition funnel (preview -> follow -> full track) only
- * works if a follower/supporter-tier track's preview stays open to everyone,
- * not just entitled listeners. A public visitor previewing a supporters-only
- * track and a follower previewing that same track get the identical preview;
- * only the full-stream check below actually gates anything by relationship.
- */
-async function canPreviewTrack(uid: string | null, track: FirebaseFirestore.DocumentData): Promise<boolean> {
-  if (track.takenDown === true || (track.restrictedCapabilities ?? []).includes('streaming')) return false
-  if (uid === track.artistId) return true
-  const roles = uid ? await getRoles(uid) : []
-  if (roles.includes('admin')) return true
-  if (!isPublished(track) || track.previewEnabled === false) return false
-  if (!(await artistRoleActive(track.artistId))) return false
-  if (track.visibility === 'private') return false
-  if (track.visibility === 'dj_only') return roles.includes('dj')
-  return true
-}
-
-async function canPlayDjPreview(uid: string | null, track: FirebaseFirestore.DocumentData): Promise<boolean> {
-  if (!uid || track.takenDown === true || !isPublished(track)) return false
-  if ((track.restrictedCapabilities ?? []).includes('streaming') || (track.restrictedCapabilities ?? []).includes('dj_licensing')) return false
-  if (uid === track.artistId) return true
-  const roles = await getRoles(uid)
-  if (roles.includes('admin')) return true
-  if (!(await artistRoleActive(track.artistId))) return false
-  return roles.includes('dj') && track.djPromotion === true && typeof track.djPreviewAudioPath === 'string'
-}
-
-/**
- * Whether this listener may hear the full-length stream — the strict
- * entitlement ladder (public / followers / supporters / dj_only / private).
- * Supporter access additionally requires the fan's own subscription to
- * currently be active: supportRelationships isn't cleaned up the instant a
- * subscription lapses (it only changes on the next allocation write), so
- * relationship-existence alone isn't proof of a live paid relationship.
- */
-/** A supportRelationships doc alone isn't proof of a *currently active* subscription — see canStreamFullTrack's doc comment. */
+/** A supportRelationships doc alone isn't proof of a *currently active* subscription. */
 async function isActiveSupporter(uid: string, artistId: string): Promise<boolean> {
   const [relSnap, subSnap] = await Promise.all([
     db.collection('supportRelationships').doc(`${uid}_${artistId}`).get(),
@@ -73,7 +33,14 @@ async function isActiveSupporter(uid: string, artistId: string): Promise<boolean
   return status === 'active' || status === 'trialing'
 }
 
-async function canStreamFullTrack(uid: string | null, track: FirebaseFirestore.DocumentData): Promise<boolean> {
+/**
+ * Whether this viewer may be shown this track's YouTube link at all — the
+ * same public/followers/supporters/dj_only/private ladder that used to gate
+ * full-stream audio now gates whether we ever hand back the video ID. Once
+ * revealed, YouTube itself controls actual playback (this only controls
+ * whether BackTheVibes discloses the link).
+ */
+async function canAccessTrackYoutubeLink(uid: string | null, track: FirebaseFirestore.DocumentData): Promise<boolean> {
   if (track.takenDown === true || (track.restrictedCapabilities ?? []).includes('streaming')) return false
   if (uid === track.artistId) return true
 
@@ -85,17 +52,16 @@ async function canStreamFullTrack(uid: string | null, track: FirebaseFirestore.D
   if (!isPublished(track)) return false
   if (!(await artistRoleActive(track.artistId))) return false
   if (track.visibility === 'public') return true
-  if (track.visibility === 'early_access') {
-    // The public-release date (if any) is checked before the auth guard
-    // below — once it passes, an early_access track behaves like a public
-    // one for anyone, signed in or not. Everything else here needs a uid.
-    const publicAt = (track.publicReleaseAt as FirebaseFirestore.Timestamp | null | undefined)?.toMillis()
-    if (publicAt !== undefined && Date.now() >= publicAt) return true
+  if (track.visibility === 'dj_only') return !!uid && roles.includes('dj')
+  if (track.visibility === 'private') return false
+  if (!uid) {
+    // early_access can still be open to signed-out visitors once its public date passes.
+    if (track.visibility === 'early_access') {
+      const publicAt = (track.publicReleaseAt as FirebaseFirestore.Timestamp | null | undefined)?.toMillis()
+      return publicAt !== undefined && Date.now() >= publicAt
+    }
+    return false
   }
-  if (!uid) return false
-  // DJ role alone never grants a full stream or the master. DJs receive the
-  // DJ/public preview here and the original only through an active licence.
-  if (track.visibility === 'dj_only') return false
   if (track.visibility === 'followers') {
     const follow = await db.collection('follows').doc(`${uid}_${track.artistId}`).get()
     return follow.exists || isActiveSupporter(uid, track.artistId)
@@ -104,11 +70,9 @@ async function canStreamFullTrack(uid: string | null, track: FirebaseFirestore.D
     return isActiveSupporter(uid, track.artistId)
   }
   if (track.visibility === 'early_access') {
-    // Supporters unlock immediately (spec's own worked example never varies
-    // this — "Supporters: full track now" is the point of the tier).
-    // Followers unlock on their own configured server-timestamp date, so
-    // nothing here ever trusts the caller's clock.
     if (await isActiveSupporter(uid, track.artistId)) return true
+    const publicAt = (track.publicReleaseAt as FirebaseFirestore.Timestamp | null | undefined)?.toMillis()
+    if (publicAt !== undefined && Date.now() >= publicAt) return true
     const followerAt = (track.followerReleaseAt as FirebaseFirestore.Timestamp | null | undefined)?.toMillis()
     if (followerAt !== undefined && Date.now() >= followerAt) {
       return (await db.collection('follows').doc(`${uid}_${track.artistId}`).get()).exists
@@ -119,38 +83,124 @@ async function canStreamFullTrack(uid: string | null, track: FirebaseFirestore.D
 }
 
 /**
- * Returns a short-lived URL only after checking current track visibility and
- * moderation state. This avoids permanent Firebase download tokens keeping a
- * preview playable after a takedown or entitlement change.
+ * Returns the validated YouTube video ID only after checking current track
+ * visibility and moderation state — this is the one place the app ever
+ * discloses a track's YouTube link to a viewer who isn't its owner/admin.
+ * The video ID itself lives in trackMedia/{trackId}, a doc that is never
+ * client-readable — see firestore.rules for why it can't simply live on the
+ * public tracks/{trackId} doc.
  */
-export const getTrackPlaybackUrl = onCall(async (request) => {
-  const { trackId, kind } = request.data ?? {} as { trackId?: string; kind?: PlaybackKind }
-  if (!trackId || (kind !== 'preview' && kind !== 'dj_preview' && kind !== 'stream')) {
-    throw new HttpsError('invalid-argument', 'trackId and a valid playback kind are required.')
-  }
+export const getTrackYoutubeInfo = onCall(async (request) => {
+  const trackId = request.data?.trackId as string | undefined
+  if (!trackId) throw new HttpsError('invalid-argument', 'trackId is required.')
   const snap = await db.collection('tracks').doc(trackId).get()
   if (!snap.exists) throw new HttpsError('not-found', 'Track does not exist.')
   const track = snap.data()!
   const uid = request.auth?.uid ?? null
-  const allowed = kind === 'preview'
-    ? await canPreviewTrack(uid, track)
-    : kind === 'dj_preview'
-      ? await canPlayDjPreview(uid, track)
-      : await canStreamFullTrack(uid, track)
-  if (!allowed) {
-    throw new HttpsError('permission-denied', 'You do not have access to this audio.')
+  if (!(await canAccessTrackYoutubeLink(uid, track))) {
+    throw new HttpsError('permission-denied', 'You do not have access to this track.')
   }
-  const path = kind === 'preview' ? track.previewAudioPath : kind === 'dj_preview' ? track.djPreviewAudioPath : track.streamAudioPath
-  const directory = kind === 'preview' ? 'previews' : kind === 'dj_preview' ? 'dj-previews' : 'streaming'
-  const expectedPrefix = `artists/${track.artistId}/${directory}/${trackId}.`
-  if (typeof path !== 'string' || !path.startsWith(expectedPrefix)) {
-    throw new HttpsError('failed-precondition', 'The track audio path is invalid.')
+  const mediaSnap = await db.collection('trackMedia').doc(trackId).get()
+  const youtubeVideoId = mediaSnap.data()?.youtubeVideoId
+  if (typeof youtubeVideoId !== 'string' || !isValidYoutubeVideoId(youtubeVideoId)) {
+    throw new HttpsError('failed-precondition', 'This track has no valid YouTube link.')
   }
-  const [url] = await getStorage().bucket().file(path).getSignedUrl({
-    action: 'read',
-    expires: Date.now() + 10 * 60 * 1000,
+  return { youtubeVideoId, youtubeUrl: `https://www.youtube.com/watch?v=${youtubeVideoId}` }
+})
+
+/**
+ * The only way a track is ever created. Runs every check firestore.rules
+ * used to run on a direct client write, plus the one thing rules can't do:
+ * atomically writing the public tracks/{trackId} doc and the
+ * never-client-readable trackMedia/{trackId} doc (the actual video ID)
+ * together, so a track never briefly exists without its media record.
+ */
+export const createTrack = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  await requireActiveUser(request.auth.uid)
+  const uid = request.auth.uid
+  const data = request.data ?? {}
+
+  const trackId = data.trackId as string | undefined
+  const youtubeVideoId = data.youtubeVideoId as string | undefined
+  const title = data.title as string | undefined
+  const genre = data.genre as string | undefined
+  if (!trackId || typeof trackId !== 'string') throw new HttpsError('invalid-argument', 'trackId is required.')
+  if (!youtubeVideoId || !isValidYoutubeVideoId(youtubeVideoId)) {
+    throw new HttpsError('invalid-argument', 'A valid YouTube video ID is required.')
+  }
+  if (!title || typeof title !== 'string' || !title.trim()) throw new HttpsError('invalid-argument', 'A title is required.')
+  if (!genre || typeof genre !== 'string') throw new HttpsError('invalid-argument', 'A genre is required.')
+  if (data.rightsConfirmed !== true) throw new HttpsError('invalid-argument', 'Rights confirmation is required.')
+
+  const existing = await db.collection('tracks').doc(trackId).get()
+  if (existing.exists) throw new HttpsError('already-exists', 'This track already exists.')
+
+  if (!(await getRoles(uid)).includes('artist')) throw new HttpsError('permission-denied', 'An artist role is required.')
+
+  const artistProfileSnap = await db.collection('artistProfiles').doc(uid).get()
+  if (!artistProfileSnap.exists) throw new HttpsError('failed-precondition', 'An artist profile is required.')
+  if ((artistProfileSnap.data()?.trackCount ?? 0) >= 10) {
+    throw new HttpsError('failed-precondition', 'Your account can list up to 10 tracks. Remove an existing track before adding another.')
+  }
+
+  const membershipSnap = await db.collection('subscriptions').doc(`${uid}_artist`).get()
+  const membershipStatus = membershipSnap.data()?.status
+  if (membershipStatus !== 'active' && membershipStatus !== 'trialing') {
+    throw new HttpsError('failed-precondition', 'An active Artist Membership is required to publish tracks.')
+  }
+
+  const visibility = typeof data.visibility === 'string' ? data.visibility : 'followers'
+  const now = FieldValue.serverTimestamp()
+  const toTimestamp = (value: unknown): Timestamp | null => {
+    if (typeof value !== 'string' || !value) return null
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime()) ? null : Timestamp.fromDate(parsed)
+  }
+  const batch = db.batch()
+  batch.set(db.collection('tracks').doc(trackId), {
+    trackId,
+    artistId: uid,
+    title: title.trim(),
+    titleLower: title.trim().toLowerCase(),
+    ...(typeof data.trackSlug === 'string' && data.trackSlug ? { trackSlug: data.trackSlug } : {}),
+    albumId: data.albumId ?? null,
+    genre,
+    subgenre: data.subgenre ?? null,
+    bpm: data.bpm ?? null,
+    mood: data.mood ?? null,
+    key: data.key ?? null,
+    location: data.location ?? null,
+    releaseDate: now,
+    description: typeof data.description === 'string' ? data.description : '',
+    explicit: data.explicit === true,
+    credits: {
+      songwriters: Array.isArray(data.credits?.songwriters) ? data.credits.songwriters : [],
+      producers: Array.isArray(data.credits?.producers) ? data.credits.producers : [],
+      featuredArtists: Array.isArray(data.credits?.featuredArtists) ? data.credits.featuredArtists : [],
+    },
+    artworkURL: typeof data.artworkURL === 'string' ? data.artworkURL : null,
+    visibility,
+    djPromotion: data.djPromotion === true,
+    djLicenceMode: typeof data.djLicenceMode === 'string' ? data.djLicenceMode : 'not_available',
+    djFixedPrice: typeof data.djFixedPrice === 'number' ? data.djFixedPrice : null,
+    djPromoTier: 'all',
+    embargoUntil: toTimestamp(data.embargoUntil),
+    followerReleaseAt: visibility === 'early_access' ? toTimestamp(data.followerReleaseAt) : null,
+    publicReleaseAt: visibility === 'early_access' ? toTimestamp(data.publicReleaseAt) : null,
+    playCount: 0,
+    createdAt: now,
+    updatedAt: now,
+    rightsConfirmed: true,
+    status: 'published',
+    rightsMetadata: data.rightsMetadata ?? null,
   })
-  return { url }
+  batch.set(db.collection('trackMedia').doc(trackId), {
+    youtubeVideoId,
+    youtubeUrl: `https://www.youtube.com/watch?v=${youtubeVideoId}`,
+  })
+  await batch.commit()
+  return { ok: true, trackId }
 })
 
 async function deleteQuery(query: FirebaseFirestore.Query): Promise<void> {
@@ -178,21 +228,8 @@ export const deleteTrack = onCall(async (request) => {
     throw new HttpsError('failed-precondition', 'This track has an active licence. Unpublish it instead so the signed entitlement remains available.')
   }
 
-  // Prefix-delete rather than deleting the exact stored path — the stored
-  // originalAudioPath/previewAudioPath/streamAudioPath fields only need to
-  // have been right at upload time to have played correctly since; if any
-  // ever drifted from the real Storage path (a legacy doc, a stale field),
-  // an exact bucket.file(path).delete() silently no-ops via ignoreNotFound
-  // instead of actually removing the file. The trackId segment of the path
-  // is always reliable since it's the Firestore doc id itself.
-  const bucket = getStorage().bucket()
-  await Promise.all([
-    bucket.deleteFiles({ prefix: `artists/${track.artistId}/originals/${trackId}.` }),
-    bucket.deleteFiles({ prefix: `artists/${track.artistId}/streaming/${trackId}.` }),
-    bucket.deleteFiles({ prefix: `artists/${track.artistId}/previews/${trackId}.` }),
-    bucket.deleteFiles({ prefix: `artists/${track.artistId}/dj-previews/${trackId}.` }),
-    bucket.deleteFiles({ prefix: `artists/${track.artistId}/artwork/${trackId}.` }),
-  ])
+  // Only artwork is ever stored on our side now — no hosted audio to clean up.
+  await getStorage().bucket().deleteFiles({ prefix: `artists/${track.artistId}/artwork/${trackId}.` })
 
   const [playlists, crates] = await Promise.all([
     db.collection('playlists').where('trackIds', 'array-contains', trackId).get(),
@@ -209,32 +246,21 @@ export const deleteTrack = onCall(async (request) => {
     deleteQuery(db.collection('trackLikes').where('trackId', '==', trackId)),
     deleteQuery(db.collection('djDeals').where('trackId', '==', trackId)),
   ])
+  await db.collection('trackMedia').doc(trackId).delete()
   await ref.delete()
   return { ok: true }
 })
 
 /**
- * Play counts live only on the server so a listener can't inflate their own
- * favourite tracks by hammering an updateDoc from the client — Firestore
- * rules also reject any client write that changes these fields directly.
- * Deliberately callable while signed out (public previews are meant to be
- * playable by anonymous visitors), so the abuse control here is a coarse
- * per-track rate limit rather than a per-user one.
- *
- * playCount == preview plays (kept under its original name — every existing
- * track already has real data in it and every dashboard already labels it
- * "preview"/"sample" plays). fullPlayCount is the new full-stream counter;
- * supporterPlayCount/djPreviewCount are narrower breakdowns of those two,
- * not separate totals — never summed together for a "total plays" figure.
+ * Counts a real YouTube-link open only after the same entitlement check as
+ * getTrackYoutubeInfo passes — this is an analytics counter
+ * (section 46: "YouTube clicks"), never a claimed YouTube view count, and
+ * never client-writable (firestore.rules freezes playCount).
  */
 export const recordTrackPlay = onCall(async (request) => {
   const trackId = request.data?.trackId as string | undefined
-  const kind = request.data?.kind as PlaybackKind | undefined
-  const event = (request.data?.event ?? 'start') as PlaybackEvent
-  if (!trackId || (kind !== 'preview' && kind !== 'dj_preview' && kind !== 'stream') || (event !== 'start' && event !== 'completion')) {
-    throw new HttpsError('invalid-argument', 'trackId, playback kind, and event are required.')
-  }
-  await enforceRateLimit(`recordTrackPlay_${trackId}_${event}`, 120, 60)
+  if (!trackId) throw new HttpsError('invalid-argument', 'trackId is required.')
+  await enforceRateLimit(`recordTrackPlay_${trackId}`, 120, 60)
 
   const ref = db.collection('tracks').doc(trackId)
   const snap = await ref.get()
@@ -243,42 +269,16 @@ export const recordTrackPlay = onCall(async (request) => {
   }
   const track = snap.data()!
   const uid = request.auth?.uid ?? null
-  const allowed = kind === 'preview'
-    ? await canPreviewTrack(uid, track)
-    : kind === 'dj_preview'
-      ? await canPlayDjPreview(uid, track)
-      : await canStreamFullTrack(uid, track)
-  if (!allowed) throw new HttpsError('permission-denied', 'This playback event is not authorised.')
-
-  const update: Record<string, unknown> = {}
-  if ((kind === 'preview' || kind === 'dj_preview') && event === 'start') {
-    update.playCount = FieldValue.increment(1)
-    update.previewStarts = FieldValue.increment(1)
-    if (kind === 'dj_preview' || track.visibility === 'dj_only') {
-      update.djPreviewCount = FieldValue.increment(1)
-      update.djPreviewPlays = FieldValue.increment(1)
-    }
-  } else if (kind === 'preview' || kind === 'dj_preview') {
-    update.previewCompletions = FieldValue.increment(1)
-  } else if (event === 'start') {
-    update.fullPlayCount = FieldValue.increment(1)
-    update.fullTrackStarts = FieldValue.increment(1)
-    if (track.visibility === 'supporters') {
-      update.supporterPlayCount = FieldValue.increment(1)
-      update.supporterFullPlays = FieldValue.increment(1)
-    }
-    else if (track.visibility === 'followers') update.followerFullPlays = FieldValue.increment(1)
-    else if (track.visibility === 'public') update.publicFullPlays = FieldValue.increment(1)
-  } else {
-    update.fullTrackCompletions = FieldValue.increment(1)
+  if (!(await canAccessTrackYoutubeLink(uid, track))) {
+    throw new HttpsError('permission-denied', 'This playback event is not authorised.')
   }
-  await ref.update(update)
 
-  // A real, server-recorded "this fan previewed this artist recently" signal
-  // — the only thing onFollowCreate/onSupportRelationshipCreate trust to
-  // count a genuine preview -> follow/support conversion, rather than
-  // assuming every follow/support came from a preview.
-  if ((kind === 'preview' || kind === 'dj_preview') && uid && uid !== track.artistId) {
+  await ref.update({ playCount: FieldValue.increment(1) })
+
+  // A real, server-recorded "this fan opened this artist's track recently"
+  // signal — the only thing onFollowCreate/onSupportRelationshipCreate
+  // trust to count a genuine listen -> follow/support conversion.
+  if (uid && uid !== track.artistId) {
     await db.collection('previewSessions').doc(`${uid}_${track.artistId}`).set({
       uid,
       artistId: track.artistId,

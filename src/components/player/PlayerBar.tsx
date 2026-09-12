@@ -9,7 +9,7 @@ import { SupportButton } from '@/components/music/SupportButton'
 import { TrackActions } from '@/components/music/TrackActions'
 
 export function PlayerBar() {
-  const { currentTrack, isPlaying, isLoading, progressSec, durationSec, volume, playbackKind, previewEnded, togglePlay, seek, next, previous, closePlayer, setVolume } =
+  const { currentTrack, isPlaying, isLoading, progressSec, durationSec, volume, accessGranted, attachContainer, togglePlay, seek, next, previous, closePlayer, setVolume } =
     usePlayer()
   const artist = useArtistSummary(currentTrack?.artistId ?? null)
   const { firebaseUser } = useAuth()
@@ -22,7 +22,7 @@ export function PlayerBar() {
         <input
           type="range"
           min={0}
-          max={durationSec || currentTrack.previewDurationSec || 30}
+          max={durationSec || 30}
           value={progressSec}
           onChange={(e) => seek(Number(e.target.value))}
           className="h-1 w-full cursor-pointer accent-brand-500"
@@ -30,10 +30,9 @@ export function PlayerBar() {
       </div>
       <div className="flex items-center gap-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <div className="h-11 w-11 shrink-0 overflow-hidden rounded-[10px] bg-surface-2 ring-1 ring-white/10">
-            {currentTrack.artworkURL ? (
-              <img src={currentTrack.artworkURL} alt="" className="h-full w-full object-cover" />
-            ) : null}
+          {/* Official YouTube player mount — this is the actual playback surface, not decoration. Never hidden behind a custom UI. */}
+          <div className="relative h-11 w-20 shrink-0 overflow-hidden rounded-[10px] bg-black ring-1 ring-white/10 sm:h-14 sm:w-24">
+            <div ref={attachContainer} className="h-full w-full" />
           </div>
           <div className="min-w-0">
             <Link to={`/track/${currentTrack.trackId}`} className="block truncate text-sm font-medium text-ink-0 hover:underline">
@@ -82,13 +81,13 @@ export function PlayerBar() {
           <input
             type="range"
             min={0}
-            max={durationSec || currentTrack.previewDurationSec || 30}
+            max={durationSec || 30}
             value={progressSec}
             onChange={(e) => seek(Number(e.target.value))}
             className="h-1 w-full cursor-pointer accent-brand-500"
           />
           <span className="w-10 shrink-0 text-xs tabular-nums text-ink-3">
-            {formatDuration(durationSec || currentTrack.previewDurationSec)}
+            {formatDuration(durationSec)}
           </span>
         </div>
 
@@ -97,8 +96,8 @@ export function PlayerBar() {
           <input
             type="range"
             min={0}
-            max={1}
-            step={0.01}
+            max={100}
+            step={1}
             value={volume}
             onChange={(e) => setVolume(Number(e.target.value))}
             className="h-1 w-20 accent-brand-500"
@@ -119,17 +118,12 @@ export function PlayerBar() {
           <X className="h-5 w-5" />
         </button>
       </div>
-      {previewEnded && playbackKind === 'dj_preview' ? (
-        <div className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-dj-400/20 bg-dj-500/[0.07] px-3 py-2.5">
-          <p className="text-xs text-ink-1">DJ Preview ended. Complete the artist's licence flow to download the full-quality track.</p>
-          <Link to={`/track/${currentTrack.trackId}`} className="shrink-0 text-xs font-semibold text-dj-400 hover:underline">View DJ terms</Link>
-        </div>
-      ) : previewEnded && artist && ['followers', 'supporters', 'early_access'].includes(currentTrack.visibility) ? (
+      {!isLoading && !accessGranted && artist && ['followers', 'supporters', 'early_access'].includes(currentTrack.visibility) ? (
         <div className="mt-2 flex flex-col gap-2 rounded-xl border border-brand-400/20 bg-brand-500/[0.07] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs leading-5 text-ink-1">
             {currentTrack.visibility === 'followers'
-              ? `Want to hear the full ${currentTrack.durationFormatted || 'track'}? Follow ${artist.name} for free.`
-              : `Unlock the full ${currentTrack.durationFormatted || 'track'} by supporting ${artist.name}.`}
+              ? `Follow ${artist.name} for free to unlock this track.`
+              : `Unlock this track by supporting ${artist.name}.`}
           </p>
           <div className="shrink-0">
             {currentTrack.visibility === 'followers'
@@ -137,9 +131,9 @@ export function PlayerBar() {
               : <SupportButton artistId={artist.artistId} size="sm" />}
           </div>
         </div>
-      ) : playbackKind === 'preview' || playbackKind === 'dj_preview' ? (
-        <p className="mt-1 text-center text-[11px] text-ink-3">{playbackKind === 'dj_preview' ? 'DJ Preview' : 'Preview'}</p>
-      ) : null}
+      ) : (
+        <p className="mt-1 text-center text-[11px] text-ink-3">Played via YouTube</p>
+      )}
     </div>
   )
 }

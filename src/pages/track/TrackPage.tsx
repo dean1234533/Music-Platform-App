@@ -35,7 +35,7 @@ export function TrackPage() {
   const navigate = useNavigate()
   const [resolvedTrackId, setResolvedTrackId] = useState<string | null | undefined>(undefined)
   const [track, setTrack] = useState<TrackDoc | null | undefined>(undefined)
-  const { playTrack, currentTrack, isPlaying, playbackKind, togglePlay } = usePlayer()
+  const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer()
   const artist = useArtistSummary(track?.artistId ?? null)
   const { firebaseUser, hasRole, profile } = useAuth()
   const goBack = useSmartBack(homeFallbackPath(profile))
@@ -143,7 +143,6 @@ export function TrackPage() {
     isFollowing,
     isSupporting,
   })
-  const previewUnavailable = !access.fullAccess && track.previewEnabled === false
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8 overflow-x-hidden px-4 pb-10 pt-[max(2.5rem,env(safe-area-inset-top))]">
@@ -170,12 +169,12 @@ export function TrackPage() {
           {streamingRestricted ? <p className="text-xs font-medium text-danger-500">Streaming is temporarily restricted while this track is under review.</p> : null}
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => !streamingRestricted && !previewUnavailable && (isCurrent ? togglePlay() : playTrack(track))}
-              disabled={streamingRestricted || previewUnavailable}
+              onClick={() => !streamingRestricted && (isCurrent ? togglePlay() : playTrack(track))}
+              disabled={streamingRestricted}
               className="flex items-center gap-2 rounded-full bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-ink-3"
             >
               {isCurrent && isPlaying ? <Pause className="h-4 w-4" fill="currentColor" /> : <Play className="h-4 w-4 translate-x-0.5" fill="currentColor" />}
-              {isCurrent && isPlaying ? 'Playing' : isCurrent && playbackKind ? (playbackKind === 'stream' ? 'Play Full Track' : playbackKind === 'dj_preview' ? 'Play DJ Preview' : 'Play Preview') : access.playLabel}
+              {isCurrent && isPlaying ? 'Playing' : access.playLabel}
             </button>
             {artist ? <FollowButton artistId={artist.artistId} /> : null}
             {artist ? <SupportButton artistId={artist.artistId} size="sm" /> : null}
@@ -220,9 +219,10 @@ export function TrackPage() {
         <Meta label="Genre" value={track.genre} />
         {track.bpm ? <Meta label="BPM" value={String(track.bpm)} /> : null}
         {track.mood ? <Meta label="Mood" value={track.mood} /> : null}
-        <Meta label="Full track" value={track.durationFormatted || (track.durationSeconds ? formatDuration(track.durationSeconds) : 'Duration unavailable')} />
-        <Meta label="Preview" value={track.previewEnabled === false ? 'Unavailable' : formatDuration(track.previewDurationSec)} />
-        <Meta label="Your access" value={access.fullAccess ? 'Full Track' : track.previewEnabled === false ? 'Locked' : 'Preview'} />
+        {track.durationFormatted || track.durationSeconds ? (
+          <Meta label="Duration" value={track.durationFormatted || formatDuration(track.durationSeconds!)} />
+        ) : null}
+        <Meta label="Your access" value={access.fullAccess ? 'Unlocked' : 'Locked'} />
       </div>
 
       {(track.credits.songwriters.length > 0 || track.credits.producers.length > 0 || track.credits.featuredArtists.length > 0) && (
