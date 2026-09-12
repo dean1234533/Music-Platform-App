@@ -5,8 +5,9 @@ import test from 'node:test'
 const rules = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8')
 
 test('a regular user can only set roles once at initial signup — no self-service add or remove afterward; only an admin account can change its own roles later', () => {
-  // Non-admin, first-ever write (roles still []): may set any subset of fan/artist/dj, once.
-  assert.match(rules, /resource\.data\.roles\.size\(\) == 0 && request\.resource\.data\.roles\.hasOnly\(\['fan', 'artist', 'dj'\]\)/)
+  // Non-admin, first-ever write (roles still []): may set exactly one of fan/artist/dj, once —
+  // a regular account keeps that single role for life (one role per account, not "a subset of").
+  assert.match(rules, /resource\.data\.roles\.size\(\) == 0 && request\.resource\.data\.roles\.size\(\) == 1 && request\.resource\.data\.roles\.hasOnly\(\['fan', 'artist', 'dj'\]\)/)
   // Non-admin, already onboarded: roles field is frozen exactly as-is on this path.
   assert.match(rules, /resource\.data\.roles\.hasOnly\(\['fan', 'artist', 'dj'\]\) && request\.resource\.data\.roles == resource\.data\.roles/)
   // The admin branch: 'admin' must be present both before and after the write,
