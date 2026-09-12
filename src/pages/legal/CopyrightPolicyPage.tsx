@@ -4,8 +4,8 @@ import { BrandMark } from '@/components/common/BrandMark'
 
 const sections: [string, string][] = [
   [
-    'Rights declaration at upload',
-    'Every artist must confirm they own or control the rights needed to upload, distribute, stream, and preview a track before it can be published, and must disclose samples, cover/interpolation status, featured artists, producers, songwriters, and any label or publisher involvement. This declaration is recorded, but it is evidence of a claim to rights — not proof of ownership, and not a guarantee against a later dispute.',
+    'Rights declaration when adding a track',
+    'BackTheVibes does not host audio — a track is a link to the artist\'s own official YouTube upload, played through the official YouTube player. Every artist must still confirm they have the rights and permissions needed to promote that linked content through BackTheVibes before it can be published, and must disclose samples, cover/interpolation status, featured artists, producers, songwriters, and any label or publisher involvement. This declaration is recorded, but it is evidence of a claim to rights — not proof of ownership, not a guarantee against a later dispute, and not a substitute for YouTube\'s own copyright process on the underlying video.',
   ],
   [
     'Filing a claim',
@@ -20,8 +20,8 @@ const sections: [string, string][] = [
     'Rather than only an all-or-nothing removal, a track under review may have specific capabilities restricted — such as DJ licensing, discovery placement, or full-length streaming — while the claim is investigated.',
   ],
   [
-    'Removal and payout holds',
-    'If a claim is upheld, the track is taken down and the artist\'s payouts are placed on hold pending resolution. Holds are cleared automatically if a track is later restored.',
+    'Removal and payment holds',
+    'If a claim is upheld, the track\'s link is taken down and new fan support or collaboration/licence payments to the artist are placed on hold pending resolution — this never affects money the artist has already been paid directly by Stripe. Holds are cleared automatically if a track is later restored.',
   ],
   [
     'Counter-notices',
@@ -32,8 +32,8 @@ const sections: [string, string][] = [
     'Accounts with a pattern of upheld copyright claims against them are subject to further account-level action, including suspension.',
   ],
   [
-    'DJ downloads',
-    'Access to a track through DJ licensing does not transfer any copyright ownership. A licence, where one exists, only grants the specific permitted uses agreed between the artist and DJ.',
+    'DJ/business collaboration',
+    'A collaboration or licensing agreement, where one exists, only grants the specific permitted uses agreed between the artist and the DJ/business — it does not transfer any copyright ownership. BackTheVibes does not host, store, or transfer master recordings or stems; any exchange of those files happens directly between the parties outside the platform.',
   ],
 ]
 

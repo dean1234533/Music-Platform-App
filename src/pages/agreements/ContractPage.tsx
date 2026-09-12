@@ -270,9 +270,17 @@ export function ContractPage() {
           Except where a permission above is explicitly marked "Yes", the DJ receives no ownership, resale,
           redistribution, remix, synchronisation, publishing, or master-recording rights of any kind. The artist
           (and/or their label, publisher, or rights-holder) remains the sole owner of the underlying recording and
-          composition throughout and after this licence. This record is a platform-managed statement of agreement
-          between the parties, not a substitute for independent legal advice — REQUIRES QUALIFIED MUSIC/IP LEGAL
-          REVIEW BEFORE PRODUCTION.
+          composition throughout and after this licence. Payment of any fee shown on this agreement does not, by
+          itself, grant any right not explicitly listed above.
+        </p>
+        <p className="mt-3 text-xs leading-5 text-ink-3">
+          <strong className="text-ink-2">Not legal advice.</strong> BackTheVibes provides workflow and
+          recordkeeping tools for this agreement — it is not a party to it, does not provide legal advice, and does
+          not guarantee that these terms are legally sufficient or enforceable in your jurisdiction. Master
+          recordings, stems, and other production files are exchanged directly between the parties outside
+          BackTheVibes. Both parties are encouraged to seek independent legal advice, and may use an external
+          e-signature or legal service to formalise a binding agreement — use "Download PDF" below to export these
+          terms for that purpose. REQUIRES QUALIFIED MUSIC/IP LEGAL REVIEW BEFORE PRODUCTION.
         </p>
 
         <div className="mt-6 border-t border-surface-border pt-4 no-print">

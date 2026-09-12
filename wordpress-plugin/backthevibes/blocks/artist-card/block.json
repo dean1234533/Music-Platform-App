@@ -1,0 +1,19 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "backthevibes/artist-card",
+	"title": "BackTheVibes Artist Card",
+	"category": "widgets",
+	"icon": "album",
+	"description": "Your BackTheVibes artist profile, with Follow/Support buttons.",
+	"keywords": [ "backthevibes", "artist", "music" ],
+	"textdomain": "backthevibes",
+	"attributes": {
+		"artist": { "type": "string", "default": "" },
+		"showBio": { "type": "boolean", "default": true },
+		"showButtons": { "type": "boolean", "default": true }
+	},
+	"supports": { "html": false, "align": [ "wide" ] },
+	"editorScript": "backthevibes-blocks-editor",
+	"render": "file:./render.php"
+}

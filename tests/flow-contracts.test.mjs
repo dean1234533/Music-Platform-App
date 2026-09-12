@@ -479,10 +479,12 @@ test('the offer-history query is self-restricting so Firestore does not reject i
   assert.ok(offerIndexes.some((i) => i.fields.some((f) => f.fieldPath === 'artistId')), 'missing requestId+artistId+version index')
 })
 
-test('the contract page states the DJ receives only the listed rights, not ownership', () => {
+test('the contract page states the DJ receives only the listed rights, not ownership, and that BackTheVibes is not a party providing legal advice', () => {
   const contract = read('src/pages/agreements/ContractPage.tsx')
   assert.match(contract, /no ownership, resale,\s*\n\s*redistribution, remix, synchronisation, publishing, or master-recording rights/)
-  assert.match(contract, /REQUIRES QUALIFIED MUSIC\/IP LEGAL\s*\n\s*REVIEW BEFORE PRODUCTION/)
+  assert.match(contract, /Payment of any fee shown on this agreement does not, by\s*\n\s*itself, grant any right not explicitly listed above\./)
+  assert.match(contract, /BackTheVibes provides workflow and\s*\n\s*recordkeeping tools for this agreement — it is not a party to it, does not provide legal advice, and does\s*\n\s*not guarantee/)
+  assert.match(contract, /REQUIRES QUALIFIED MUSIC\/IP LEGAL REVIEW BEFORE PRODUCTION/)
 })
 
 test('a drawn signature upload never calls getDownloadURL on a read-denied Storage path', () => {

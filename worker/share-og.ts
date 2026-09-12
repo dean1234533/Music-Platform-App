@@ -270,8 +270,117 @@ async function buildTrackCard(projectId: string, slug: string, trackParam: strin
   return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })
 }
 
+// --- Public read-only JSON API (used by the WordPress plugin) ---------------
+
+const API_CORS_HEADERS = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET, OPTIONS',
+  'cache-control': 'public, max-age=300',
+}
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json; charset=utf-8', ...API_CORS_HEADERS },
+  })
+}
+
+/**
+ * A small, public, read-only JSON view of exactly what's already visible on
+ * an artist's public BackTheVibes profile page — nothing private, no
+ * authentication, no write path. This is the only endpoint the WordPress
+ * plugin (or any other external embed) ever calls; it never touches
+ * Firebase Auth, Stripe, or any Admin SDK credential, and only ever reads
+ * `public`-visibility tracks (the same ones a signed-out visitor can already
+ * see on backthevibes.com).
+ */
+async function buildPublicArtistApi(projectId: string, slug: string): Promise<Response> {
+  const artistId = await resolveArtistId(projectId, slug)
+  if (!artistId) return jsonResponse({ error: 'Artist not found.' }, 404)
+  const artist = await fetchFirestoreDoc(projectId, `artistProfiles/${artistId}`)
+  if (!artist || artist.roleActive === false) return jsonResponse({ error: 'Artist not found.' }, 404)
+
+  const runQueryUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`
+  const trackDocs: Record<string, unknown>[] = []
+  try {
+    const res = await fetch(runQueryUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: 'tracks' }],
+          where: {
+            compositeFilter: {
+              op: 'AND',
+              filters: [
+                { fieldFilter: { field: { fieldPath: 'artistId' }, op: 'EQUAL', value: { stringValue: artistId } } },
+                { fieldFilter: { field: { fieldPath: 'visibility' }, op: 'EQUAL', value: { stringValue: 'public' } } },
+              ],
+            },
+          },
+          orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
+          limit: 12,
+        },
+      }),
+    })
+    if (res.ok) {
+      const rows = (await res.json()) as { document?: { fields?: Record<string, FirestoreValue> } }[]
+      for (const row of rows) {
+        if (row.document?.fields) trackDocs.push(unwrapFirestoreDoc(row.document.fields))
+      }
+    }
+  } catch {
+    // A failed track query still returns the artist profile below — never fail the whole response.
+  }
+
+  const tracks = await Promise.all(
+    trackDocs
+      .filter((t) => t.takenDown !== true && !(t.restrictedCapabilities as string[] | undefined)?.includes('discovery'))
+      .map(async (t) => {
+        const trackId = t.trackId as string
+        const media = await fetchFirestoreDoc(projectId, `trackMedia/${trackId}`)
+        return {
+          trackId,
+          title: t.title as string,
+          artworkURL: (t.artworkURL as string | null) ?? null,
+          youtubeUrl: (media?.youtubeUrl as string | undefined) ?? null,
+          url: `https://backthevibes.com/artist/${slug}/track/${(t.trackSlug as string | undefined) ?? trackId}`,
+        }
+      }),
+  )
+
+  return jsonResponse({
+    slug,
+    name: artist.name as string,
+    bio: (artist.bio as string | null) ?? null,
+    imageUrl: (artist.photoURL as string | null) ?? null,
+    coverUrl: (artist.coverURL as string | null) ?? null,
+    genres: (artist.genres as string[] | undefined) ?? [],
+    location: (artist.location as string | null) ?? null,
+    socialLinks: (artist.socialLinks as Record<string, string> | undefined) ?? {},
+    followerCount: typeof artist.followerCount === 'number' ? artist.followerCount : 0,
+    profileUrl: `https://backthevibes.com/artist/${slug}`,
+    followUrl: `https://backthevibes.com/artist/${slug}?action=follow`,
+    supportUrl: `https://backthevibes.com/artist/${slug}?action=support`,
+    tracks: tracks.filter((t) => t.youtubeUrl),
+  })
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const requestUrlForApi = new URL(request.url)
+    if (requestUrlForApi.pathname.startsWith('/api/public/artist/')) {
+      if (request.method === 'OPTIONS') return new Response(null, { headers: API_CORS_HEADERS })
+      if (request.method !== 'GET') return jsonResponse({ error: 'Method not allowed.' }, 405)
+      const slug = requestUrlForApi.pathname.slice('/api/public/artist/'.length).split('/')[0]
+      if (!slug) return jsonResponse({ error: 'Artist slug is required.' }, 400)
+      try {
+        return await buildPublicArtistApi(env.FIREBASE_PROJECT_ID, decodeURIComponent(slug))
+      } catch {
+        return jsonResponse({ error: 'Could not load this artist right now.' }, 502)
+      }
+    }
+
     const userAgent = request.headers.get('user-agent')
     if (!isCrawler(userAgent)) return env.ASSETS.fetch(request)
 
@@ -290,7 +399,7 @@ export default {
               'Support the artists you actually listen to. Discover independent music, support artists directly, and give DJs a better way to find what comes next.',
             url,
             bodyHtml:
-              '<p>BackTheVibes connects independent musicians, listeners, and DJs directly. Fans discover and support artists with direct monthly memberships. DJs license tracks directly from the artist who made them, with a real e-signed agreement. Artists publish music and keep control of their own licensing terms.</p><ul><li><a href="/for-artists">For artists</a></li><li><a href="/for-djs">For DJs</a></li><li><a href="/pricing">Pricing</a></li><li><a href="/blog">Blog</a></li></ul>',
+              '<p>BackTheVibes connects independent musicians, listeners, and DJs/businesses directly. Music plays through the official YouTube player. Fans discover artists and support them with a one-off payment straight to the artist. DJs and businesses propose collaborations and licence tracks directly from the artist who made them, with a real e-signed agreement. Artists publish their music and keep control of their own terms.</p><ul><li><a href="/for-artists">For artists</a></li><li><a href="/for-djs">For DJs</a></li><li><a href="/pricing">Pricing</a></li><li><a href="/blog">Blog</a></li></ul>',
             jsonLd: {
               '@context': 'https://schema.org',
               '@type': 'Organization',
@@ -307,10 +416,10 @@ export default {
           renderContentHtml({
             title: 'Pricing — BackTheVibes',
             description:
-              'Listeners and DJs join free. Artists publish for £29.99/year (14 days free) — no revenue percentage. Fans keep 80% of support going straight to artists; DJs pay only for the licences they agree to.',
+              'Listeners and DJs join free. Artists publish for £29.99/year (14 days free) — no revenue percentage. Supporting an artist is a one-off payment straight to them via Stripe, minus a 20% BackTheVibes platform fee. DJs/businesses pay only for the licences they agree to.',
             url,
             bodyHtml:
-              '<p>Listening, following artists, and building a library is free. An optional Supporter membership from £4.99/month lets a fan direct monthly support to artists they follow — artists receive 80% of net supporter revenue directed to them.</p><p>Joining as a DJ is free. DJs pay only for the licences they agree to, on terms the artist sets per track.</p><p>Artists publish for a flat £29.99/year — 14 days free, not a percentage of earnings — and keep 85% of net DJ licensing revenue.</p>',
+              '<p>Listening, following artists, and building a library is free. Supporting an artist is a one-off payment you choose, paid directly to the artist via Stripe — BackTheVibes takes a 20% platform fee, the artist receives the rest. There is no subscription to support an artist.</p><p>Joining as a DJ or business is free. You pay only for the licences you agree to, on terms the artist sets per track — paid directly to the artist, minus a 10% BackTheVibes platform fee.</p><p>Artists publish for a flat £29.99/year — 14 days free, not a percentage of earnings.</p>',
           }),
         )
       }
@@ -343,9 +452,9 @@ export default {
           renderContentHtml({
             title: 'Get Paid Directly by Fans and DJs — No Label Needed — BackTheVibes',
             description:
-              'Publish your music, keep 80–85% of what fans and DJs pay you directly, and set your own terms for DJ licensing. 14-day free trial, then £29.99/year, no revenue percentage.',
+              'Publish your music, get paid directly by Stripe for fan support and DJ/business licensing, and set your own terms. 14-day free trial, then £29.99/year, no revenue percentage.',
             url,
-            bodyHtml: `<p>No label, no percentage of every stream. Try it free for 14 days, then a flat £29.99 a year — keep 80% of direct fan support and 85% of DJ licensing revenue, on terms you set.</p>${renderFaqs(ARTIST_FAQS)}`,
+            bodyHtml: `<p>No label, no percentage of every stream. Try it free for 14 days, then a flat £29.99 a year. Fan support and DJ/business licence payments are paid directly to your own Stripe account the moment they're made — keep 80% of fan support and 90% of DJ/business licensing revenue, on terms you set.</p>${renderFaqs(ARTIST_FAQS)}`,
             jsonLd: {
               '@context': 'https://schema.org',
               '@type': 'FAQPage',
