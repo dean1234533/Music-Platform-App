@@ -128,7 +128,7 @@ async function offboardArtistSlugs(artistId: string): Promise<void> {
  * verification requests/support messages/preview-conversion signals/slug
  * reservations. Deliberately leaves licenceRequests, licenceOffers,
  * licenceAgreements, licenceAgreementAcceptances, legalAcceptances,
- * downloadLogs, transactions, payouts, artistBalances, artistPayoutAccounts,
+ * downloadLogs, transactions, artistPayoutAccounts,
  * payoutHolds, copyrightClaims, reports, and auditLogs untouched — those are
  * financial/legal/moderation records (the "minimum contract record" the
  * other party's evidence depends on, spec §24, plus accounting and abuse
@@ -209,7 +209,6 @@ async function performAccountDeletion(uid: string): Promise<void> {
     // independent legal/moderation significance once the profile they refer to is gone.
     await deleteQueryBatched(db.collection('verificationRequests').where('userId', '==', uid))
     await deleteQueryBatched(db.collection('supportMessages').where('userId', '==', uid))
-    await db.collection('supportAllocations').doc(uid).delete()
     await fanSubscriptionRef.delete()
     await artistSubscriptionRef.delete()
 

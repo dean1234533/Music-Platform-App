@@ -5,6 +5,13 @@ import { getStripe, stripeSecretKey } from './client.js'
 import { getPlatformSettings } from '../platformSettings.js'
 import { resolveLicencePartyRole } from '../licensing/party.js'
 
+/**
+ * DJ/business licence fees are paid directly to the artist's connected
+ * Stripe account via a destination charge (same mechanism as one-off fan
+ * support) — BackTheVibes only ever receives its configured djServiceFeePercent
+ * application fee. There is no internal artist balance for this money to sit in.
+ */
+
 export const createLicencePaymentSession = onCall({ secrets: [stripeSecretKey] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   await requireActiveUser(request.auth.uid)
@@ -38,6 +45,13 @@ export const createLicencePaymentSession = onCall({ secrets: [stripeSecretKey] }
   }
   const trackTitle = track?.title ?? 'Track licence'
 
+  const payoutAccountSnap = await db.collection('artistPayoutAccounts').doc(agreement.artistId).get()
+  const payoutAccount = payoutAccountSnap.data()
+  const stripeAccountId = payoutAccount?.stripeAccountId as string | undefined
+  if (!stripeAccountId || !payoutAccount?.chargesEnabled) {
+    throw new HttpsError('failed-precondition', 'The artist has not finished connecting Stripe yet.')
+  }
+
   let session
   try {
     const settings = await getPlatformSettings()
@@ -63,6 +77,10 @@ export const createLicencePaymentSession = onCall({ secrets: [stripeSecretKey] }
           quantity: 1,
         },
       ],
+      payment_intent_data: {
+        application_fee_amount: platformFeeMinor,
+        transfer_data: { destination: stripeAccountId },
+      },
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: { agreementId, kind: 'licence_payment' },

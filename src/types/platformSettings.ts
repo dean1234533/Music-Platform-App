@@ -24,16 +24,13 @@ export interface SubscriptionPlan {
 }
 
 export interface PlatformSettings {
+  /** BackTheVibes' cut of every one-off fan support payment — see functions/src/support/checkout.ts. */
   platformFeePercent: number
+  /** The artist's complementary share of a support payment (100 - platformFeePercent). Paid directly via Stripe Connect. */
   artistAllocationPercent: number
   djServiceFeePercent: number
-  minimumPayoutMinor: number
-  allowedPreviewDurationsSec: number[]
-  maxUploadSizeMB: number
-  supportedAudioTypes: string[]
-  /** Falls back to PREVIEW_DEFAULT_DURATION_SEC/'followers' until an admin configures these. */
+  /** Falls back to 'followers' until an admin configures this. */
   defaultTrackVisibility?: TrackVisibility
-  defaultPreviewDurationSec?: number
 }
 
 export interface DataRetentionSettings {
@@ -56,12 +53,11 @@ export interface DataRetentionSettings {
  */
 export const DEFAULT_PLATFORM_FEES: Pick<
   PlatformSettings,
-  'platformFeePercent' | 'artistAllocationPercent' | 'djServiceFeePercent' | 'minimumPayoutMinor'
+  'platformFeePercent' | 'artistAllocationPercent' | 'djServiceFeePercent'
 > = {
-  platformFeePercent: 15,
-  artistAllocationPercent: 85,
+  platformFeePercent: 20,
+  artistAllocationPercent: 80,
   djServiceFeePercent: 10,
-  minimumPayoutMinor: 2000,
 }
 
 export const DEFAULT_DATA_RETENTION: DataRetentionSettings = {

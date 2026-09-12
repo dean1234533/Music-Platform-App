@@ -22,15 +22,16 @@ async function artistRoleActive(artistId: string): Promise<boolean> {
   return (await getRoles(artistId)).includes('artist')
 }
 
-/** A supportRelationships doc alone isn't proof of a *currently active* subscription. */
+/**
+ * "Supporter" now means: has ever made a one-off support payment to this
+ * artist. There is no more recurring fan subscription to check — a
+ * supportRelationships doc is only ever created by a real, server-recorded
+ * Stripe payment (see functions/src/stripe/webhook.ts's
+ * handleSupportCheckoutCompleted), never by the client.
+ */
 async function isActiveSupporter(uid: string, artistId: string): Promise<boolean> {
-  const [relSnap, subSnap] = await Promise.all([
-    db.collection('supportRelationships').doc(`${uid}_${artistId}`).get(),
-    db.collection('subscriptions').doc(`${uid}_fan`).get(),
-  ])
-  if (!relSnap.exists) return false
-  const status = subSnap.data()?.status
-  return status === 'active' || status === 'trialing'
+  const relSnap = await db.collection('supportRelationships').doc(`${uid}_${artistId}`).get()
+  return relSnap.exists
 }
 
 /**

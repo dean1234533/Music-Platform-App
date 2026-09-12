@@ -33,25 +33,46 @@ test('track storage allowance is shown before upload and enforced server-side', 
   assert.match(tracksFn, /trackCount[\s\S]*?>= 10/)
 })
 
-test('launch supporter pricing stays low-friction and legacy tiers are retired', () => {
+test('fans never pay a subscription any more — supporting an artist is a one-off payment, and legacy paid-fan-tier plans are retired', () => {
   const seedPlans = read('functions/src/admin/seedPlans.ts')
-  assert.match(seedPlans, /fan_supporter[\s\S]*?priceMinor: 499/)
-  assert.match(seedPlans, /fan_super_supporter/)
+  assert.doesNotMatch(seedPlans, /planId: 'fan_supporter'/)
+  assert.match(seedPlans, /LEGACY_PLAN_IDS = \['fan_supporter', 'fan_super_supporter'/)
+  assert.match(seedPlans, /planId: 'fan_free'[\s\S]*?priceMinor: 0/)
   assert.doesNotMatch(read('src/pages/marketing/PricingPage.tsx'), /artificial limits/i)
+
+  const checkout = read('functions/src/stripe/checkout.ts')
+  assert.match(checkout, /if \(role !== 'artist'\) throw new HttpsError\('invalid-argument', 'Unsupported subscription role\.'\)/)
 })
 
-test('revenue shares use net payment revenue and expose the launch percentages', () => {
+test('one-off fan support and DJ/business licence payments are Stripe Connect destination charges paid directly to the artist, with the platform fee enforced server-side', () => {
+  const checkoutFn = read('functions/src/support/checkout.ts')
+  assert.match(checkoutFn, /export const createSupportCheckoutSession = onCall/)
+  assert.match(checkoutFn, /const platformFeeMinor = Math\.round\(amountMinor \* \(settings\.platformFeePercent \/ 100\)\)/)
+  assert.match(checkoutFn, /application_fee_amount: platformFeeMinor/)
+  assert.match(checkoutFn, /transfer_data: \{ destination: stripeAccountId \}/)
+  // The artist must have finished Stripe Connect onboarding before they can be paid at all.
+  assert.match(checkoutFn, /!payoutAccount\?\.chargesEnabled/)
+  // A copyright-review hold blocks new payments to that artist.
+  assert.match(checkoutFn, /payoutHolds/)
+
+  const licencePayment = read('functions/src/stripe/licencePayment.ts')
+  assert.match(licencePayment, /application_fee_amount: platformFeeMinor/)
+  assert.match(licencePayment, /transfer_data: \{ destination: stripeAccountId \}/)
+
   const webhook = read('functions/src/stripe/webhook.ts')
-  const pricing = read('src/pages/marketing/PricingPage.tsx')
-  assert.match(webhook, /net_after_tax_and_processing/)
-  assert.match(webhook, /paymentDetailsForInvoice/)
-  assert.match(webhook, /billingSettlements/)
-  assert.match(webhook, /stripePaymentIntentIds/)
-  assert.match(webhook, /newlyRefundedCustomerMinor/)
-  assert.match(read('functions/src/payouts/promoteBalances.ts'), /netMinor - \(data\.refundedMinor \?\? 0\)/)
-  assert.match(pricing, /80% of net membership revenue/)
-  assert.match(pricing, /takes 15% of net transaction revenue/)
-  assert.match(pricing, /available balance reaches £25/)
+  assert.match(webhook, /async function handleSupportCheckoutCompleted/)
+  assert.match(webhook, /type: 'artist_support'/)
+  // Idempotent on the checkout session id — Stripe delivers webhooks at least once.
+  assert.match(webhook, /const txId = `support_\$\{session\.id\}`/)
+  assert.match(webhook, /const existing = await tx\.get\(txRef\)\s*\n\s*if \(existing\.exists\) return/)
+  // No internal balance is ever credited — the destination charge already paid the artist.
+  assert.doesNotMatch(webhook, /artistBalances/)
+
+  const settings = read('functions/src/platformSettings.ts')
+  assert.doesNotMatch(settings, /minimumPayoutMinor/)
+
+  // There is no manual payout/balance-promotion machinery left at all.
+  assert.doesNotMatch(read('functions/src/index.ts'), /requestPayout|promotePendingBalances/)
 })
 
 test('email signup cannot continue before verification', () => {
@@ -222,7 +243,7 @@ test('account deletion cancels BOTH the fan and artist Stripe subscriptions (use
   assert.match(source, /db\.collection\('subscriptions'\)\.doc\(`\$\{uid\}_artist`\)/)
   assert.match(source, /fanSubscriptionRef\.delete\(\)/)
   assert.match(source, /artistSubscriptionRef\.delete\(\)/)
-  for (const collection of ['subscriptions', 'supportAllocations', 'supportRelationships', 'fanOffers', 'fanOfferClaims', 'artistPosts']) {
+  for (const collection of ['subscriptions', 'supportRelationships', 'fanOffers', 'fanOfferClaims', 'artistPosts']) {
     assert.match(source, new RegExp(collection))
   }
 })
@@ -732,11 +753,12 @@ test('Follow/Support CTAs preserve intent through the full auth funnel (returnTo
   assert.match(onboarding, /if \(isSafeReturnPath\(returnToParam\)\)/)
   assert.match(onboarding, /navigate\(returnToParam\)/)
 
+  // SupportButton now opens the amount-picker modal directly (a one-off Stripe Connect
+  // payment to the specific artist) rather than routing through a subscription page —
+  // it still preserves intent through the auth funnel by returning to the current page.
   const support = read('src/components/music/SupportButton.tsx')
-  assert.match(support, /const subscriptionPath = artistId \? `\/app\/subscription\?artist=\$\{encodeURIComponent\(artistId\)\}` : '\/app\/subscription'/)
-  // Regression guard: an earlier draft navigated to /sign-in with router state
-  // pointing back at /sign-in itself, which would have been a redirect loop.
-  assert.doesNotMatch(support, /pathname: '\/sign-in'/)
+  assert.match(support, /navigate\(`\/sign-in\?returnTo=\$\{encodeURIComponent\(window\.location\.pathname\)\}`\)/)
+  assert.match(support, /setShowModal\(true\)/)
 })
 
 test('new artist profiles cannot claim reserved/impersonation-prone URLs like /artist/admin or /artist/support', () => {
@@ -992,12 +1014,12 @@ test('music access ladder: playback is the official YouTube embed for everyone, 
   // embed either plays the whole thing or it doesn't play at all.
   assert.match(fn, /async function canAccessTrackYoutubeLink\(uid: string \| null, track: FirebaseFirestore\.DocumentData\): Promise<boolean> \{/)
 
-  // A real fix carried over from the old audio ladder: a supportRelationships
-  // doc alone isn't proof of a *currently active* subscription (it isn't
-  // cleaned up the instant Stripe cancels one).
+  // "Supporter" means: has ever made a one-off Stripe Connect support
+  // payment to this artist — a supportRelationships doc alone is now
+  // sufficient proof, since it's only ever created by a real, server-
+  // recorded payment (there is no more subscription to also check).
   assert.match(fn, /async function isActiveSupporter\(uid: string, artistId: string\): Promise<boolean> \{/)
-  assert.match(fn, /db\.collection\('subscriptions'\)\.doc\(`\$\{uid\}_fan`\)\.get\(\)/)
-  assert.match(fn, /return status === 'active' \|\| status === 'trialing'/)
+  assert.match(fn, /return relSnap\.exists/)
 
   // getTrackYoutubeInfo is the one place the video ID is ever handed back,
   // and only after that same entitlement check passes — the actual ID lives
@@ -1169,10 +1191,12 @@ test('music access ALLOW/DENY matrix — every row of the spec, traced to the co
   // 5. That same follower (no supportRelationships doc) accesses a supporters-only track -> DENY.
   //    isActiveSupporter returns false immediately when the relationship doc doesn't exist.
   assert.match(tracksFn, /async function isActiveSupporter\(uid: string, artistId: string\): Promise<boolean> \{/)
-  assert.match(tracksFn, /if \(!relSnap\.exists\) return false/)
+  assert.match(tracksFn, /return relSnap\.exists/)
 
-  // 6. A supporter with an active/trialing subscription accesses that supporters-only track -> ALLOW.
-  assert.match(tracksFn, /return status === 'active' \|\| status === 'trialing'/)
+  // 6. A fan who genuinely paid to support this artist accesses that supporters-only track -> ALLOW.
+  //    (There is no separate "active subscription" check any more — a supportRelationships
+  //    doc's mere existence is already proof of a real, server-recorded payment.)
+  assert.match(tracksFn, /if \(track\.visibility === 'supporters'\) \{\s*return isActiveSupporter\(uid, track\.artistId\)/)
 
   // 7. "Other user's fake follow state" -> DENY. There is no channel for a
   //    client to assert isFollowing/isSupporting to the server at all — the
@@ -1694,8 +1718,7 @@ test('BUG 2 (superseded by the YouTube migration) — there is no server-side au
   // ever gets the real video ID back from getTrackYoutubeInfo.
   assert.match(tracksFn, /if \(track\.visibility === 'followers'\) \{\s*const follow = await db\.collection\('follows'\)\.doc\(`\$\{uid\}_\$\{track\.artistId\}`\)\.get\(\)\s*return follow\.exists \|\| isActiveSupporter\(uid, track\.artistId\)/)
   assert.match(tracksFn, /if \(track\.visibility === 'supporters'\) \{\s*return isActiveSupporter\(uid, track\.artistId\)/)
-  assert.match(tracksFn, /if \(!relSnap\.exists\) return false/)
-  assert.match(tracksFn, /return status === 'active' \|\| status === 'trialing'/)
+  assert.match(tracksFn, /return relSnap\.exists/)
 })
 
 test('BUG 3 — every track card (including on the artist profile) actually toggles play/pause instead of always restarting the track from a fresh playTrack call (user-reported: could not stop/pause playback from the profile)', () => {
@@ -2361,7 +2384,7 @@ test('platform revenue-split settings auto-configure with placeholder defaults i
   // but a doc that exists with partial/invalid data still fails loudly (never silently mixes
   // saved and default values for a value someone was actively trying to configure).
   const fn = read('functions/src/platformSettings.ts')
-  assert.match(fn, /export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = \{\s*\n\s*platformFeePercent: 15,\s*\n\s*artistAllocationPercent: 85,\s*\n\s*djServiceFeePercent: 10,\s*\n\s*minimumPayoutMinor: 2000,/)
+  assert.match(fn, /export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = \{\s*\n\s*platformFeePercent: 20,\s*\n\s*artistAllocationPercent: 80,\s*\n\s*djServiceFeePercent: 10,/)
   assert.match(fn, /if \(!snap\.exists\) return DEFAULT_PLATFORM_SETTINGS/)
   assert.doesNotMatch(fn, /must be configured before payments can be processed/)
   // Still validates a doc that exists but is malformed.
@@ -2400,41 +2423,29 @@ test('StoryViewer preloads the next story\'s actual media bytes, not just its UR
   assert.match(page, /\}, \[group, groupIndex, storyIndex, mediaUrls\]\)/)
 })
 
-test('a free-plan fan cannot claim artist-defined perk offers, enforced server-side not just by the client (user-reported: "isnt fans that are on the free plan not ment to be able to get offers")', () => {
-  // Root cause: artistDefinedPerks ("Perks chosen by the artist" — the entire Fan Offers
-  // feature) is seeded as a paid-tier-only feature (fan_free's features map is {}, only
-  // fan_supporter has artistDefinedPerks: true — functions/src/admin/seedPlans.ts) and
-  // advertised as such on the Pricing/Subscription pages, but nothing anywhere actually
-  // checked it: claimFanOffer is a direct client Firestore write, and the existing
-  // fanOfferClaims create rule only checked the per-artist audience (everyone/followers/
-  // supporters-of-that-artist), never the fan's own plan. A free-plan fan following/
-  // supporting the right artist could claim any offer regardless of their own subscription.
+test('fan offer claims are gated by a real server-side check, not a client-trusted flag — and every fan can claim now that there is no more paid fan tier to gate behind', () => {
+  // Fans never pay a subscription any more (see the one-off Stripe Connect support
+  // migration) — fan_free is the one plan every signed-in fan is always on, seeded with
+  // every feature granted (functions/src/admin/seedPlans.ts). The fanOfferClaims create
+  // rule still calls hasFanFeature('artistDefinedPerks') for real, server-side enforcement
+  // — it just now reads fan_free's features directly rather than a per-user subscription
+  // doc that no longer gets created, so the answer is genuinely "yes" for every fan.
   const rules = read('firestore.rules')
   assert.match(
     rules,
-    /function hasFanFeature\(feature\) \{\s*\n\s*return isSignedIn\(\)\s*\n\s*&& exists\(\/databases\/\$\(database\)\/documents\/subscriptions\/\$\(request\.auth\.uid \+ '_fan'\)\)/,
+    /function hasFanFeature\(feature\) \{\s*\n\s*return isSignedIn\(\)\s*\n\s*&& get\(\/databases\/\$\(database\)\/documents\/subscriptionPlans\/fan_free\)\.data\.features\.get\(feature, false\) == true;/,
   )
-  assert.match(rules, /get\(\/databases\/\$\(database\)\/documents\/subscriptions\/\$\(request\.auth\.uid \+ '_fan'\)\)\.data\.status in \['active', 'trialing'\]/)
-  assert.match(rules, /\.data\.features\.get\(feature, false\) == true;/)
   const claimsRule = rules.slice(rules.indexOf('match /fanOfferClaims'), rules.indexOf('match /fanOfferClaims') + 1800)
   assert.match(claimsRule, /&& hasFanFeature\('artistDefinedPerks'\);/)
 
-  // Client: the offer card shows a clear upgrade CTA instead of either a silently-rejected
-  // claim attempt or an invisible feature gate the fan never finds out about.
+  // Client: the same real check, without depending on a subscription doc.
   const hook = read('src/hooks/useFanFeature.ts')
   assert.match(hook, /export function useFanFeature\(feature: PlanFeatureKey\): boolean \| undefined/)
-  assert.match(hook, /const isActive = subscription\?\.status === 'active' \|\| subscription\?\.status === 'trialing'/)
-  assert.match(hook, /return Boolean\(isActive && activePlan\?\.features\[feature\]\)/)
+  assert.match(hook, /const freePlan = plans\.find\(\(p\) => p\.isDefaultFree\)/)
+  assert.match(hook, /setHasFeature\(Boolean\(freePlan\?\.features\[feature\]\)\)/)
 
-  const card = read('src/components/music/FanOfferCard.tsx')
-  assert.match(card, /locked && !claimed \? \(/)
-  assert.match(card, /Upgrade to claim/)
-  assert.match(card, /to="\/app\/subscription"/)
-
-  const page = read('src/pages/fan/FanOffersPage.tsx')
-  assert.match(page, /import \{ useFanFeature \} from '@\/hooks\/useFanFeature'/)
-  assert.match(page, /const hasArtistDefinedPerks = useFanFeature\('artistDefinedPerks'\)/)
-  assert.match(page, /locked=\{hasArtistDefinedPerks === false\}/)
+  const seedPlans = read('functions/src/admin/seedPlans.ts')
+  assert.match(seedPlans, /planId: 'fan_free'[\s\S]*?features: \{ supporterContent: true, earlyAccess: true, polls: true, artistDefinedPerks: true \}/)
 
   // The artist-facing offers dashboard is untouched — ownerView still takes precedence and
   // locked defaults to false, so nothing there needed to change.
@@ -2786,30 +2797,24 @@ test('the public-profile link card on the Growth page stacks cleanly on mobile i
   assert.match(shareButton, /<Button variant="secondary" size="sm" onClick=\{handleClick\} className=\{className\}>/)
 })
 
-test('the Revenue page\'s Payouts box matches the marketing mockup\'s card style — icon tiles, a Stripe brand square, and real balance data instead of the old plain text/button block (user-reported, with a "Build your community" marketing image attached: "on the revenue page i want the payouts box to look the same as the one in the image")', () => {
+test('the Revenue page uses the established icon-badge StatCard style and explains Stripe Connect direct payouts instead of an internal balance/payout-request flow', () => {
   const page = read('src/pages/artist/dashboard/RevenuePage.tsx')
-  // The "Get paid, your way" header, matching the mockup's copy.
   assert.match(page, /<p className="eyebrow text-brand-400">Revenue<\/p>/)
-  assert.match(page, /Get paid, your way/)
-  assert.match(page, /Connect Stripe to receive your earnings securely and track your revenue\./)
+  assert.match(page, /Get paid directly by Stripe/)
 
-  // Disconnected state: a Stripe-brand icon tile + title + description + button, matching the
-  // mockup's "Connect Stripe" card, not the old bare paragraph + button.
+  // Disconnected state: the same Stripe-brand icon tile + title + description + button pattern.
   assert.match(page, /bg-\[#635bff\] text-base font-bold text-white">S</)
-  assert.match(page, /Payouts, payments and earnings all in one place\./)
 
-  // Connected state: an icon-badge stat tile for the real available balance (never a fabricated
-  // "next payout in N days" countdown — this app's payouts are on-demand, not scheduled).
-  assert.match(page, /Available to pay out/)
-  assert.doesNotMatch(page, /In \d+ days?/)
+  // There is no internal balance/payout-request UI any more — every payment reaches the artist
+  // directly via a Stripe Connect destination charge, so payouts are Stripe's own to schedule.
+  assert.doesNotMatch(page, /requestPayout|subscribeArtistBalance|subscribeArtistPayouts/)
+  assert.match(page, /Stripe pays out to your bank on its own\s+schedule/)
 
-  // The top three balance cards now use the same icon-badge StatCard language as the mockup's
-  // stat tiles (and match GrowthPage's established accent-badge pattern), not a plain text card.
+  // The stat cards still use the same icon-badge StatCard language as the mockup/GrowthPage's
+  // established accent-badge pattern, not a plain text card.
   assert.match(page, /icon: ReactNode/)
   assert.match(page, /accent: 'brand' \| 'support' \| 'neutral'/)
-  assert.match(page, /<StatCard icon=\{<Clock3 className="h-4\.5 w-4\.5" \/>\} label="Pending"/)
-  assert.match(page, /<StatCard icon=\{<Wallet className="h-4\.5 w-4\.5" \/>\} label="Available"/)
-  assert.match(page, /<StatCard icon=\{<PiggyBank className="h-4\.5 w-4\.5" \/>\} label="Paid out"/)
+  assert.match(page, /<StatCard icon=\{<HandCoins className="h-4\.5 w-4\.5" \/>\} label="Lifetime earnings on BackTheVibes"/)
 })
 
 test('every tool hub page has a working back button (user-reported: "add a back button for the tool hub pages")', () => {

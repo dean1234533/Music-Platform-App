@@ -27,13 +27,10 @@ const CATEGORIES = [
 const VISIBILITIES = ['public', 'followers', 'supporters', 'dj'] as const
 const CTA_TYPES = ['track', 'follow', 'support'] as const
 
+/** "Supporter" means: has ever made a one-off support payment to this artist — see functions/src/tracks.ts's isActiveSupporter for the same definition. */
 async function isActiveSupporter(uid: string, artistId: string): Promise<boolean> {
-  const [relationship, subscription] = await Promise.all([
-    db.collection('supportRelationships').doc(`${uid}_${artistId}`).get(),
-    db.collection('subscriptions').doc(`${uid}_fan`).get(),
-  ])
-  const status = subscription.data()?.status
-  return relationship.exists && (status === 'active' || status === 'trialing')
+  const relationship = await db.collection('supportRelationships').doc(`${uid}_${artistId}`).get()
+  return relationship.exists
 }
 
 /**

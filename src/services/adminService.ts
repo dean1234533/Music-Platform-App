@@ -86,7 +86,7 @@ export const adminUpsertSubscriptionPlan = callable<
 export const adminUpdatePlatformSettings = callable<Record<string, unknown>, { ok: boolean }>(
   'adminUpdatePlatformSettings',
 )
-export const adminSeedSubscriptionPlans = callable<void, { ok: boolean; seeded: string[]; skipped: string[]; retired: string[] }>(
+export const adminSeedSubscriptionPlans = callable<void, { ok: boolean; seeded: string[]; updated: string[]; retired: string[] }>(
   'adminSeedSubscriptionPlans',
 )
 export const adminUpdateDataRetentionSettings = callable<Partial<DataRetentionSettings>, { ok: boolean }>(

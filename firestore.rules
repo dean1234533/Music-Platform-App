@@ -25,23 +25,23 @@ service cloud.firestore {
       return hasRole('admin');
     }
 
+    // "Supporter" means: has ever made a one-off Stripe Connect support
+    // payment to this artist — a supportRelationships doc only ever exists
+    // because of a real, server-recorded payment (see
+    // functions/src/stripe/webhook.ts's handleSupportCheckoutCompleted).
+    // There is no more recurring fan subscription to additionally check.
     function hasActiveSupportFor(artistId) {
       return isSignedIn()
-        && exists(/databases/$(database)/documents/supportRelationships/$(request.auth.uid + '_' + artistId))
-        && exists(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_fan'))
-        && get(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_fan')).data.status in ['active', 'trialing'];
+        && exists(/databases/$(database)/documents/supportRelationships/$(request.auth.uid + '_' + artistId));
     }
 
-    // A free fan (no active fan-role subscription, or a plan that doesn't include this
-    // feature) fails every branch here — deliberately, since the free plan's seeded
-    // features map is {} (see functions/src/admin/seedPlans.ts).
+    // Fans never hold a paid subscription any more — fan_free is the one
+    // plan every fan is always on, so this reads its features directly
+    // rather than a per-user subscriptions/{uid}_fan doc that no longer
+    // gets created (see functions/src/admin/seedPlans.ts).
     function hasFanFeature(feature) {
       return isSignedIn()
-        && exists(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_fan'))
-        && get(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_fan')).data.status in ['active', 'trialing']
-        && get(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_fan')).data.planId is string
-        && exists(/databases/$(database)/documents/subscriptionPlans/$(get(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_fan')).data.planId))
-        && get(/databases/$(database)/documents/subscriptionPlans/$(get(/databases/$(database)/documents/subscriptions/$(request.auth.uid + '_fan')).data.planId)).data.features.get(feature, false) == true;
+        && get(/databases/$(database)/documents/subscriptionPlans/fan_free).data.features.get(feature, false) == true;
     }
 
     // ---------------------------------------------------------------------
@@ -470,22 +470,14 @@ service cloud.firestore {
       allow write: if false; // Stripe webhook only
     }
 
-    match /supportAllocations/{fanId} {
-      allow read: if isSelf(fanId);
-      allow write: if false; // updateSupportAllocations callable only
-    }
-
     match /supportRelationships/{relationshipId} {
       // resource == null short-circuits for the common "not supporting" case
-      // — subscribeIsSupporting reads a doc that usually doesn't exist.
+      // — subscribeIsSupporting reads a doc that usually doesn't exist. Only
+      // ever created by the Stripe webhook after a real payment — see
+      // functions/src/stripe/webhook.ts's handleSupportCheckoutCompleted.
       allow read: if isSignedIn() &&
         (resource == null || resource.data.fanId == request.auth.uid || resource.data.artistId == request.auth.uid);
-      allow write: if false; // updateSupportAllocations callable only
-    }
-
-    match /artistBalances/{artistId} {
-      allow read: if isSelf(artistId) || isAdmin();
-      allow write: if false; // Cloud Functions only
+      allow write: if false; // Stripe webhook only
     }
 
     match /artistPayoutAccounts/{artistId} {
@@ -558,14 +550,13 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------------
-    // Phase 5 — payouts, verification, moderation, admin.
+    // Phase 5 — Stripe Connect, verification, moderation, admin.
+    // Every payment (fan support, DJ licence) is a Stripe Connect
+    // destination charge paid directly to the artist — there is no
+    // artistBalances/payouts ledger; transactions is bookkeeping only.
     // ---------------------------------------------------------------------
     match /transactions/{docId} {
-      allow read: if isSignedIn() && (resource.data.artistId == request.auth.uid || isAdmin());
-      allow write: if false;
-    }
-    match /payouts/{docId} {
-      allow read: if isSignedIn() && (resource.data.artistId == request.auth.uid || isAdmin());
+      allow read: if isSignedIn() && (resource.data.artistId == request.auth.uid || resource.data.fanId == request.auth.uid || isAdmin());
       allow write: if false;
     }
     match /verificationRequests/{docId} {
@@ -591,8 +582,11 @@ service cloud.firestore {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow write: if false;
     }
-    // payoutHolds/{artistId} — admin/system only. An active hold blocks
-    // requestPayout; artists can see their own hold status but never set it.
+    // payoutHolds/{artistId} — admin/system only. An active hold blocks new
+    // support/licence payment checkout sessions from being created for this
+    // artist (see functions/src/support/checkout.ts and
+    // functions/src/stripe/licencePayment.ts); artists can see their own
+    // hold status but never set it.
     match /payoutHolds/{artistId} {
       allow read: if isSelf(artistId) || isAdmin();
       allow write: if false;

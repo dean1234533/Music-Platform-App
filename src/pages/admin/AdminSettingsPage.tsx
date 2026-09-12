@@ -15,7 +15,6 @@ import { formatCurrency } from '@/utils/format'
 import { DEFAULT_DATA_RETENTION, DEFAULT_PLATFORM_FEES, type DataRetentionSettings, type SubscriptionPlan } from '@/types/platformSettings'
 import { PLAN_TIERS, type PlanFeatureKey, type PlanLimitKey, type PlanTier } from '@/types/entitlements'
 import { AccountSecuritySection } from '@/components/account/AccountSecuritySection'
-import { PREVIEW_DEFAULT_DURATION_SEC, SUGGESTED_PREVIEW_DURATIONS_SEC } from '@/constants/mediaConfig'
 import type { TrackVisibility } from '@/types/track'
 
 const RETENTION_FIELDS: { key: keyof DataRetentionSettings; label: string }[] = [
@@ -69,12 +68,10 @@ export function AdminSettingsPage() {
   const [form, setForm] = useState<PlanFormState>(EMPTY_FORM)
   const [savingPlan, setSavingPlan] = useState(false)
   const [seeding, setSeeding] = useState(false)
-  const [feeForm, setFeeForm] = useState({ platformFeePercent: '', artistAllocationPercent: '', djServiceFeePercent: '', minimumPayoutMinor: '' })
+  const [feeForm, setFeeForm] = useState({ platformFeePercent: '', artistAllocationPercent: '', djServiceFeePercent: '' })
   const [savingFees, setSavingFees] = useState(false)
   const [trackDefaultsForm, setTrackDefaultsForm] = useState({
     defaultTrackVisibility: 'followers' as TrackVisibility,
-    defaultPreviewDurationSec: String(PREVIEW_DEFAULT_DURATION_SEC),
-    allowedPreviewDurationsSec: SUGGESTED_PREVIEW_DURATIONS_SEC.join(', '),
   })
   const [savingTrackDefaults, setSavingTrackDefaults] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)
@@ -106,12 +103,9 @@ export function AdminSettingsPage() {
         platformFeePercent: String(settings?.platformFeePercent ?? DEFAULT_PLATFORM_FEES.platformFeePercent),
         artistAllocationPercent: String(settings?.artistAllocationPercent ?? DEFAULT_PLATFORM_FEES.artistAllocationPercent),
         djServiceFeePercent: String(settings?.djServiceFeePercent ?? DEFAULT_PLATFORM_FEES.djServiceFeePercent),
-        minimumPayoutMinor: String(settings?.minimumPayoutMinor ?? DEFAULT_PLATFORM_FEES.minimumPayoutMinor),
       })
       setTrackDefaultsForm({
         defaultTrackVisibility: settings?.defaultTrackVisibility ?? 'followers',
-        defaultPreviewDurationSec: String(settings?.defaultPreviewDurationSec ?? PREVIEW_DEFAULT_DURATION_SEC),
-        allowedPreviewDurationsSec: (settings?.allowedPreviewDurationsSec ?? SUGGESTED_PREVIEW_DURATIONS_SEC).join(', '),
       })
     })
     void getDataRetentionSettings().then((settings) => {
@@ -167,7 +161,7 @@ export function AdminSettingsPage() {
     setSaved(null)
     try {
       const result = await adminSeedSubscriptionPlans()
-      setSaved(`Synced ${result.seeded.length} fan plan(s) and retired ${result.retired.length} legacy creator plan(s).`)
+      setSaved(`Synced ${result.seeded.length} plan(s), updated ${result.updated?.length ?? 0}, and retired ${result.retired.length} legacy plan(s).`)
       await refreshPlans()
     } finally {
       setSeeding(false)
@@ -182,7 +176,6 @@ export function AdminSettingsPage() {
         platformFeePercent: Number(feeForm.platformFeePercent),
         artistAllocationPercent: Number(feeForm.artistAllocationPercent),
         djServiceFeePercent: Number(feeForm.djServiceFeePercent),
-        minimumPayoutMinor: Math.round(Number(feeForm.minimumPayoutMinor)),
       })
       setSaved('Platform settings saved.')
     } finally {
@@ -194,14 +187,8 @@ export function AdminSettingsPage() {
     setSavingTrackDefaults(true)
     setSaved(null)
     try {
-      const allowedPreviewDurationsSec = trackDefaultsForm.allowedPreviewDurationsSec
-        .split(',')
-        .map((s) => Number(s.trim()))
-        .filter((n) => Number.isInteger(n) && n > 0)
       await adminUpdatePlatformSettings({
         defaultTrackVisibility: trackDefaultsForm.defaultTrackVisibility,
-        defaultPreviewDurationSec: Number(trackDefaultsForm.defaultPreviewDurationSec),
-        allowedPreviewDurationsSec,
       })
       setSaved('Track defaults saved.')
     } finally {
@@ -259,16 +246,18 @@ export function AdminSettingsPage() {
           <h2 className="text-lg font-semibold text-ink-0">Subscription plans</h2>
           <div className="flex gap-2">
             <Button size="sm" variant="secondary" onClick={handleSeed} loading={seeding}>
-              Sync fan plan templates
+              Sync plan templates
             </Button>
           </div>
         </div>
         <p className="mb-3 text-xs text-ink-3">
-          Only listener subscriptions are billed. Artist and DJ accounts have full core access without a recurring fee.
+          Fans never pay a subscription — supporting an artist is a one-off Stripe Connect payment
+          (set the fee below). Artist Membership is the only recurring subscription; DJ/business
+          accounts have full free access.
         </p>
 
           <div className="mb-4">
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-3">Fan subscriptions</h3>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-3">Fan plan (always free)</h3>
             <div className="flex flex-col divide-y divide-surface-border rounded-xl border border-surface-border">
               {plans.length === 0 ? (
                 <p className="px-4 py-3 text-sm text-ink-3">No plans yet.</p>
@@ -403,24 +392,26 @@ export function AdminSettingsPage() {
 
       <section>
         <h2 className="mb-3 text-lg font-semibold text-ink-0">Platform fees</h2>
-        <div className="grid grid-cols-2 gap-3 rounded-xl border border-surface-border bg-surface-1 p-4 sm:grid-cols-4">
+        <p className="mb-3 text-xs text-ink-2">
+          Every fan support payment and DJ/business licence fee is paid directly to the artist's
+          connected Stripe account (a destination charge) — these percentages set BackTheVibes'
+          application fee on each. There is no internal balance; the artist's share is never held
+          by BackTheVibes.
+        </p>
+        <div className="grid grid-cols-2 gap-3 rounded-xl border border-surface-border bg-surface-1 p-4 sm:grid-cols-3">
           <div>
-            <Label>Platform share of net subscriptions %</Label>
+            <Label>Platform fee on fan support %</Label>
             <Input type="number" value={feeForm.platformFeePercent} onChange={(e) => setFeeForm((f) => ({ ...f, platformFeePercent: e.target.value }))} />
           </div>
           <div>
-            <Label>Artist share of net subscriptions %</Label>
+            <Label>Artist share of fan support %</Label>
             <Input type="number" value={feeForm.artistAllocationPercent} onChange={(e) => setFeeForm((f) => ({ ...f, artistAllocationPercent: e.target.value }))} />
           </div>
           <div>
-            <Label>Platform share of net DJ licences %</Label>
+            <Label>Platform fee on DJ/business licences %</Label>
             <Input type="number" value={feeForm.djServiceFeePercent} onChange={(e) => setFeeForm((f) => ({ ...f, djServiceFeePercent: e.target.value }))} />
           </div>
-          <div>
-            <Label>Minimum artist payout (pence)</Label>
-            <Input type="number" value={feeForm.minimumPayoutMinor} onChange={(e) => setFeeForm((f) => ({ ...f, minimumPayoutMinor: e.target.value }))} />
-          </div>
-          <div className="col-span-2 sm:col-span-4">
+          <div className="col-span-2 sm:col-span-3">
             <Button size="sm" onClick={handleSaveFees} loading={savingFees}>
               Save platform settings
             </Button>
@@ -446,24 +437,6 @@ export function AdminSettingsPage() {
               <option value="dj_only">DJ only</option>
               <option value="private">Private</option>
             </select>
-          </div>
-          <div>
-            <Label>Default preview duration (seconds)</Label>
-            <Input
-              type="number"
-              min={5}
-              max={90}
-              value={trackDefaultsForm.defaultPreviewDurationSec}
-              onChange={(e) => setTrackDefaultsForm((f) => ({ ...f, defaultPreviewDurationSec: e.target.value }))}
-            />
-          </div>
-          <div className="col-span-2">
-            <Label>Suggested preview durations shown to artists (seconds, comma separated)</Label>
-            <Input
-              value={trackDefaultsForm.allowedPreviewDurationsSec}
-              onChange={(e) => setTrackDefaultsForm((f) => ({ ...f, allowedPreviewDurationsSec: e.target.value }))}
-              placeholder="30, 45, 60"
-            />
           </div>
           <div className="col-span-2 sm:col-span-4">
             <Button size="sm" onClick={handleSaveTrackDefaults} loading={savingTrackDefaults}>

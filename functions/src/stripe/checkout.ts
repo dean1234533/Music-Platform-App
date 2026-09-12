@@ -9,6 +9,10 @@ import { getStripe, stripeSecretKey } from './client.js'
  * ever receives back a redirect URL — no Stripe secret key, no price/amount
  * trust decisions happen here beyond looking up the plan the admin actually
  * configured for the requested role.
+ *
+ * Artist Membership (a flat platform-access fee) is the only subscription
+ * left — fans never subscribe. Supporting an artist is a one-off Stripe
+ * Connect payment instead; see functions/src/support/checkout.ts.
  */
 export const createCheckoutSession = onCall({ secrets: [stripeSecretKey] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
@@ -21,7 +25,7 @@ export const createCheckoutSession = onCall({ secrets: [stripeSecretKey] }, asyn
   if (!planId || !role || !successUrl || !cancelUrl) {
     throw new HttpsError('invalid-argument', 'planId, role, successUrl, and cancelUrl are required.')
   }
-  if (role !== 'fan' && role !== 'artist') throw new HttpsError('invalid-argument', 'Unsupported subscription role.')
+  if (role !== 'artist') throw new HttpsError('invalid-argument', 'Unsupported subscription role.')
 
   const planSnap = await db.collection('subscriptionPlans').doc(planId).get()
   if (!planSnap.exists) throw new HttpsError('not-found', 'Subscription plan not found.')

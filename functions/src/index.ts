@@ -6,11 +6,11 @@ export { recordProfileView, recordTrackView } from './analytics.js'
 export { onNotificationCreatePush } from './notifications/pushTrigger.js'
 export { onFanOfferCreate, onFanOfferDelete } from './fanOffers.js'
 
-// Phase 2 — platform subscriptions, fan support allocation, revenue.
+// Phase 2 — Artist Membership subscription, one-off fan support (Stripe Connect), revenue.
 export { createCheckoutSession } from './stripe/checkout.js'
 export { createBillingPortalSession } from './stripe/portal.js'
 export { stripeWebhook } from './stripe/webhook.js'
-export { updateSupportAllocations } from './support/allocations.js'
+export { createSupportCheckoutSession } from './support/checkout.js'
 export { onSupportRelationshipCreate, onSupportRelationshipDelete } from './support/triggers.js'
 
 // Phase 3 — DJ discovery, licence requests, negotiation (structured offers/counter-offers — no general chat).
@@ -22,11 +22,12 @@ export { proposeAgreement, signAgreement, voidAgreement, getSignatureImageUrls }
 export { createLicencePaymentSession } from './stripe/licencePayment.js'
 export { downloadLicensedTrack } from './licensing/downloads.js'
 
-// Phase 5 — Stripe Connect payouts, verification, moderation, admin.
+// Phase 5 — Stripe Connect onboarding, verification, moderation, admin.
+// Payouts to an artist's bank happen automatically on Stripe's own schedule
+// once their Express account is verified — there is no manual payout
+// request or internal balance/ledger to promote here any more.
 export { createConnectOnboardingLink, createConnectDashboardLink } from './stripe/connect.js'
 export { stripeConnectWebhook } from './stripe/connectWebhook.js'
-export { requestPayout } from './payouts/requestPayout.js'
-export { promotePendingBalances } from './payouts/promoteBalances.js'
 export { submitVerificationRequest, reviewVerificationRequest } from './admin/verification.js'
 export { submitCopyrightClaim, reviewCopyrightClaim, submitArtistResponse, submitCounterNotice, getCopyrightEvidenceUrls } from './admin/copyright.js'
 export { adminSetUserSuspension, adminSetTrackTakedown, adminDeleteStory } from './admin/moderation.js'

@@ -1,10 +1,12 @@
 import { db } from './admin.js'
 
 export interface PlatformSettings {
+  /** BackTheVibes' cut of every one-off fan support payment, enforced server-side only — see functions/src/support/checkout.ts. */
   platformFeePercent: number
+  /** The artist's complementary share of a support payment (100 - platformFeePercent). Paid directly via Stripe Connect — never held by BackTheVibes. */
   artistAllocationPercent: number
+  /** BackTheVibes' cut of a DJ/business licence payment — same Stripe Connect destination-charge mechanism. */
   djServiceFeePercent: number
-  minimumPayoutMinor: number
 }
 
 export interface DataRetentionSettings {
@@ -57,10 +59,9 @@ export async function getDataRetentionSettings(): Promise<DataRetentionSettings>
  * on these for real payouts.
  */
 export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
-  platformFeePercent: 15,
-  artistAllocationPercent: 85,
+  platformFeePercent: 20,
+  artistAllocationPercent: 80,
   djServiceFeePercent: 10,
-  minimumPayoutMinor: 2000,
 }
 
 /** Single source of truth for every revenue split. Falls back to DEFAULT_PLATFORM_SETTINGS until an admin configures real values. */
@@ -72,7 +73,6 @@ export async function getPlatformSettings(): Promise<PlatformSettings> {
     platformFeePercent: data.platformFeePercent,
     artistAllocationPercent: data.artistAllocationPercent,
     djServiceFeePercent: data.djServiceFeePercent,
-    minimumPayoutMinor: data.minimumPayoutMinor,
   }
   // A doc that exists but is only partially filled in (an admin mid-edit, or a stray write)
   // still fails loudly rather than silently mixing saved and default values — the fallback

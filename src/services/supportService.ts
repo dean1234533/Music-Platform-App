@@ -1,79 +1,72 @@
-import { collection, doc, getDoc, getDocs, onSnapshot, query, where } from 'firebase/firestore'
+import { collection, doc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { callable } from '@/lib/callable'
-import type { SupportAllocationDoc } from '@/types/subscription'
+import type { TransactionDoc } from '@/types/finance'
 
+/**
+ * "Supporting" an artist is a one-off Stripe Connect payment, never a
+ * subscription — a supportRelationships doc only ever exists because a real
+ * payment was recorded server-side (see functions/src/stripe/webhook.ts).
+ */
 export function subscribeIsSupporting(
   fanId: string,
   artistId: string,
   onChange: (supporting: boolean) => void,
   onError?: (error: Error) => void,
 ) {
-  let relationshipExists = false
-  let activeSubscription = false
-  let relationshipReady = false
-  let subscriptionReady = false
-  const emit = () => {
-    if (relationshipReady && subscriptionReady) onChange(relationshipExists && activeSubscription)
-  }
-  const handleError = (error: Error) => {
+  return onSnapshot(
+    doc(db, 'supportRelationships', `${fanId}_${artistId}`),
+    (snap) => onChange(snap.exists()),
+    (error) => {
       console.error('[subscribeIsSupporting] listener error:', error)
       onError?.(error)
-  }
-  const unsubscribeRelationship = onSnapshot(doc(db, 'supportRelationships', `${fanId}_${artistId}`), (snap) => {
-    relationshipExists = snap.exists()
-    relationshipReady = true
-    emit()
-  }, handleError)
-  const unsubscribeSubscription = onSnapshot(doc(db, 'subscriptions', `${fanId}_fan`), (snap) => {
-    const status = snap.data()?.status
-    activeSubscription = status === 'active' || status === 'trialing'
-    subscriptionReady = true
-    emit()
-  }, handleError)
-  return () => {
-    unsubscribeRelationship()
-    unsubscribeSubscription()
-  }
+    },
+  )
 }
 
 export async function listSupportedArtistIds(fanId: string): Promise<string[]> {
-  const [subscription, snap] = await Promise.all([
-    getDoc(doc(db, 'subscriptions', `${fanId}_fan`)),
-    getDocs(query(collection(db, 'supportRelationships'), where('fanId', '==', fanId))),
-  ])
-  const status = subscription.data()?.status
-  if (status !== 'active' && status !== 'trialing') return []
+  const snap = await getDocs(query(collection(db, 'supportRelationships'), where('fanId', '==', fanId)))
   return snap.docs.map((d) => (d.data() as { artistId: string }).artistId)
 }
 
-interface AllocationInput {
-  artistId: string
-  amountMinor: number
+const startSupportCheckout = callable<
+  { artistId: string; amountMinor: number; successUrl: string; cancelUrl: string },
+  { url: string }
+>('createSupportCheckoutSession')
+
+/**
+ * Starts a Stripe Checkout session for a one-off support payment to a
+ * single artist. The 20% (configurable) platform fee is computed and
+ * enforced entirely server-side — see functions/src/support/checkout.ts.
+ */
+export async function startSupportPayment(artistId: string, amountMinor: number, returnPath = '/app/support'): Promise<void> {
+  const origin = window.location.origin
+  const { url } = await startSupportCheckout({
+    artistId,
+    amountMinor,
+    successUrl: `${origin}${returnPath}?support=success`,
+    cancelUrl: `${origin}${returnPath}?support=cancelled`,
+  })
+  window.location.href = url
 }
 
-const updateAllocationsCallable = callable<{ allocations: AllocationInput[] }, { ok: boolean; totalMinor: number }>(
-  'updateSupportAllocations',
-)
-
-/** The server validates the total against the fan's actual subscription — see functions/src/support/allocations.ts. */
-export async function updateSupportAllocations(allocations: AllocationInput[]): Promise<{ totalMinor: number }> {
-  const result = await updateAllocationsCallable({ allocations })
-  return { totalMinor: result.totalMinor }
-}
-
-export function subscribeSupportAllocations(
+/** A fan's own support history — every artist_support transaction they've made. */
+export function subscribeMySupportHistory(
   fanId: string,
-  onChange: (doc: SupportAllocationDoc | null) => void,
+  onChange: (rows: TransactionDoc[]) => void,
   onError?: (error: Error) => void,
 ) {
+  const q = query(
+    collection(db, 'transactions'),
+    where('fanId', '==', fanId),
+    where('type', '==', 'artist_support'),
+    orderBy('createdAt', 'desc'),
+  )
   return onSnapshot(
-    doc(db, 'supportAllocations', fanId),
-    (snap) => {
-      onChange(snap.exists() ? (snap.data() as SupportAllocationDoc) : null)
-    },
+    q,
+    (snap) => onChange(snap.docs.map((d) => d.data() as TransactionDoc)),
     (error) => {
-      console.error('[subscribeSupportAllocations] listener error:', error)
+      console.error('[subscribeMySupportHistory] listener error:', error)
       onError?.(error)
     },
   )

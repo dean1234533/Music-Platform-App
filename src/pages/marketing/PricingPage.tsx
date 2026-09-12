@@ -1,40 +1,17 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import { listActiveSubscriptionPlansForRole } from '@/services/platformSettingsService'
-import { LoadingState } from '@/components/common/StateViews'
 import { BrandMark } from '@/components/common/BrandMark'
 import { PriceCard } from '@/components/marketing/PriceCard'
-import { formatCurrency } from '@/utils/format'
 import { useSeo } from '@/lib/seo'
-import type { PlanFeatureKey } from '@/types/entitlements'
-import type { SubscriptionPlan } from '@/types/platformSettings'
-
-const FEATURE_LABELS: Partial<Record<PlanFeatureKey, string>> = {
-  supporterContent: 'Supporter-only posts & tracks',
-  earlyAccess: 'Early access to releases',
-  polls: 'Supporter-only polls',
-  artistDefinedPerks: 'Artist-defined perks',
-}
-
-function featureLabels(plan: SubscriptionPlan): string[] {
-  const labels = Object.entries(plan.features)
-    .filter(([, enabled]) => enabled)
-    .map(([key]) => FEATURE_LABELS[key as PlanFeatureKey] ?? key)
-  return [...labels, '80% of net membership revenue goes to artists']
-}
+import { Link } from 'react-router-dom'
 
 export function PricingPage() {
   const { firebaseUser, profile, hasRole } = useAuth()
-  const [plans, setPlans] = useState<SubscriptionPlan[] | null>(null)
 
   useSeo({
     title: 'Pricing',
-    description: 'Listeners and DJs join free. Artists publish for £29.99/year — no revenue percentage. Fans keep 80% of support going straight to artists; DJs pay only for the licences they agree to.',
+    description: 'Listeners and DJs join free. Artists publish for £29.99/year — no revenue percentage. Supporting an artist is a one-off payment straight to them via Stripe, minus a 20% BackTheVibes platform fee. DJs/businesses pay only for the licences they agree to.',
     path: '/pricing',
   })
-
-  useEffect(() => { void listActiveSubscriptionPlansForRole('fan').then(setPlans) }, [])
 
   return (
     <div className="min-h-svh bg-surface-0 text-ink-0">
@@ -50,33 +27,37 @@ export function PricingPage() {
           <p className="eyebrow">Simple pricing</p>
           <h1 className="mt-4 text-4xl font-medium tracking-[-0.045em] sm:text-6xl">Clear prices. Finite limits. Fair earnings.</h1>
           <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-ink-2">
-            Listeners and DJs can start free. Artists pay one modest annual membership to publish and earn; listener memberships fund the artists fans choose.
+            Listeners and DJs can start free. Artists pay one modest annual membership to publish
+            and earn; supporting an artist is a one-off payment, not a subscription.
           </p>
         </div>
 
         <section className="mt-16">
           <div className="mb-7 flex items-end justify-between gap-6 border-b border-white/10 pb-5">
-            <div><p className="eyebrow">For listeners</p><h2 className="mt-2 text-3xl font-medium tracking-[-0.04em]">Listen free, or become a supporter.</h2></div>
-            <p className="hidden max-w-sm text-right text-sm leading-6 text-ink-2 md:block">One optional £4.99 monthly membership. No confusing upgrade ladder.</p>
+            <div><p className="eyebrow">For listeners</p><h2 className="mt-2 text-3xl font-medium tracking-[-0.04em]">Listen free. Support artists directly, whenever you want.</h2></div>
+            <p className="hidden max-w-sm text-right text-sm leading-6 text-ink-2 md:block">No subscription. Choose an artist and an amount — the rest goes straight to them.</p>
           </div>
-          {plans === null ? <LoadingState /> : (
-            <div className="grid gap-3 md:grid-cols-2">
-              {plans.map((plan, index) => (
-                <PriceCard
-                  key={plan.planId}
-                  index={index}
-                  featured={plan.recommended}
-                  title={plan.name}
-                  price={plan.priceMinor === 0 ? 'Free' : formatCurrency(plan.priceMinor, plan.currency)}
-                  suffix={plan.priceMinor === 0 ? undefined : `/${plan.interval}`}
-                  description={plan.isDefaultFree ? 'Discover, follow, save, and build your library.' : 'Direct your monthly support to the independent artists you choose.'}
-                  features={plan.isDefaultFree ? ['Full music discovery', 'Library and playlists', 'Follow independent artists'] : featureLabels(plan)}
-                  cta={firebaseUser ? (plan.priceMinor === 0 ? 'Open your library' : 'Manage subscription') : 'Create free account'}
-                  to={firebaseUser ? '/app/subscription' : '/sign-up?role=fan'}
-                />
-              ))}
-            </div>
-          )}
+          <div className="grid gap-3 md:grid-cols-2">
+            <PriceCard
+              index={0}
+              featured
+              title="Listener account"
+              price="Free"
+              description="Discover, follow, save, and build your library. Music always plays through the official YouTube player."
+              features={['Full music discovery', 'Library and playlists', 'Follow independent artists']}
+              cta={firebaseUser ? 'Open your library' : 'Create free account'}
+              to={firebaseUser ? '/app' : '/sign-up?role=fan'}
+            />
+            <PriceCard
+              index={1}
+              title="Supporting an artist"
+              price="You choose"
+              description="A one-off payment to one artist, paid directly to them via Stripe."
+              features={['You pick the artist and amount', 'BackTheVibes platform fee: 20%', 'The other 80% goes straight to the artist', 'No recurring charge']}
+              cta={firebaseUser ? 'Find an artist to support' : 'Create free account'}
+              to={firebaseUser ? '/app/discover' : '/sign-up?role=fan'}
+            />
+          </div>
         </section>
 
         <section className="mt-20">
@@ -101,12 +82,12 @@ export function PricingPage() {
               )
             })()}
           </div>
-          <p className="mt-6 text-center text-xs leading-5 text-ink-3">DJ licence prices are agreed with each artist. BackTheVibes takes 15% of net transaction revenue; the artist receives 85%.</p>
-          <p className="mt-2 text-center text-xs leading-5 text-ink-3">Artist earnings clear after 7 days. Artists can request a payout whenever their available balance reaches £25.</p>
+          <p className="mt-6 text-center text-xs leading-5 text-ink-3">DJ/business licence prices are agreed with each artist and paid directly to them via Stripe. BackTheVibes takes a 10% platform fee; the artist receives the rest.</p>
+          <p className="mt-2 text-center text-xs leading-5 text-ink-3">Payouts to your bank happen automatically on Stripe's own schedule once your account is connected and verified — BackTheVibes never holds your earnings.</p>
         </section>
 
         <p className="mx-auto mt-12 max-w-3xl text-center text-xs leading-5 text-ink-3">
-          Revenue shares are calculated after applicable tax, refunds and payment-processing fees. Exact amounts are recorded for every completed payment.
+          Platform fees are calculated on the payment amount before Stripe's own processing fees. Exact amounts are recorded for every completed payment.
         </p>
       </main>
     </div>

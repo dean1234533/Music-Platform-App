@@ -154,110 +154,29 @@ async function recordArtistMembershipIncome(invoice: Stripe.Invoice, uid: string
     stripePaymentIntentId: paymentIntentIds[0] ?? null,
     stripePaymentIntentIds: paymentIntentIds,
     revenueBasis: 'net_after_tax_and_processing',
-    promotedAt: null,
     refundedAt: null,
     createdAt: FieldValue.serverTimestamp(),
   })
 }
 
+/**
+ * The only recurring subscription left is Artist Membership (a flat
+ * platform-access fee, not revenue shared with any artist). Fan support is a
+ * one-off Stripe Connect destination charge handled entirely in
+ * handleSupportCheckoutCompleted below — there is no more monthly
+ * allocation, internal artist balance, or supporter subscription plan.
+ */
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
   if (!invoice.billing_reason || !['subscription_create', 'subscription_cycle', 'subscription_update'].includes(invoice.billing_reason)) {
     return
   }
   const subscriptionRole = invoice.parent?.subscription_details?.metadata?.role
-  if (subscriptionRole && !SUPPORTED_SUBSCRIPTION_ROLES.has(subscriptionRole)) return
+  if (subscriptionRole !== 'artist') return
   const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id
   if (!customerId) return
   const uid = await findUidByCustomerId(customerId)
   if (!uid) return
-
-  if (subscriptionRole === 'artist') {
-    await recordArtistMembershipIncome(invoice, uid)
-    return
-  }
-
-  const allocationSnap = await db.collection('supportAllocations').doc(uid).get()
-  if (!allocationSnap.exists) return
-  const allocations = (allocationSnap.data()?.allocations ?? {}) as Record<string, number>
-  const entries = Object.entries(allocations).filter(([, amount]) => amount > 0)
-  if (entries.length === 0) return
-
-  const settings = await getPlatformSettings()
-  const subscriptionSnap = await db.collection('subscriptions').doc(`${uid}_fan`).get()
-  const planId = subscriptionSnap.data()?.planId as string | undefined
-  if (!planId) throw new Error(`Paid invoice ${invoice.id} has no subscription plan.`)
-  const planSnap = await db.collection('subscriptionPlans').doc(planId).get()
-  if (!planSnap.exists) throw new Error(`Paid invoice ${invoice.id} references missing plan ${planId}.`)
-  const planPriceMinor = planSnap.data()!.priceMinor as number
-  const configuredArtistPoolMinor = Math.round(planPriceMinor * (settings.artistAllocationPercent / 100))
-  if (configuredArtistPoolMinor <= 0) throw new Error(`Plan ${planId} has no artist allocation.`)
-
-  const totalTaxMinor = Math.max(0, invoice.total - (invoice.total_excluding_tax ?? invoice.total))
-  const { processingFeeMinor, paymentIntentIds } = await paymentDetailsForInvoice(invoice.id)
-  const settlement = calculateNetRevenue(invoice.amount_paid, totalTaxMinor, processingFeeMinor)
-  const artistPoolMinor = Math.round(settlement.netRevenueMinor * (settings.artistAllocationPercent / 100))
-  const settlementRef = db.collection('billingSettlements').doc(invoice.id)
-
-  await db.runTransaction(async (tx) => {
-    const existingSettlement = await tx.get(settlementRef)
-    if (existingSettlement.exists) return
-
-    let allocatedToArtistsMinor = 0
-    for (const [artistId, requestedAllocationMinor] of entries) {
-      const allocationRatio = Math.min(1, requestedAllocationMinor / configuredArtistPoolMinor)
-      const grossMinor = Math.round(settlement.netRevenueMinor * allocationRatio)
-      const netMinor = Math.round(artistPoolMinor * allocationRatio)
-      const platformFeeMinor = Math.max(0, grossMinor - netMinor)
-      allocatedToArtistsMinor += netMinor
-      const txId = `${invoice.id}_${artistId}`
-
-      tx.set(db.collection('transactions').doc(txId), {
-        transactionId: txId,
-        type: 'subscription_income',
-        artistId,
-        fanId: uid,
-        grossMinor,
-        platformFeeMinor,
-        netMinor,
-        currency: invoice.currency,
-        stripeInvoiceId: invoice.id,
-        stripePaymentIntentId: paymentIntentIds[0] ?? null,
-        stripePaymentIntentIds: paymentIntentIds,
-        revenueBasis: 'net_after_tax_and_processing',
-        promotedAt: null,
-        refundedAt: null,
-        createdAt: FieldValue.serverTimestamp(),
-      })
-
-      tx.set(
-        db.collection('artistBalances').doc(artistId),
-        {
-          artistId,
-          pendingMinor: FieldValue.increment(netMinor),
-          currency: invoice.currency,
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true },
-      )
-    }
-
-    tx.set(settlementRef, {
-      settlementId: invoice.id,
-      type: 'supporter_subscription',
-      userId: uid,
-      planId,
-      ...settlement,
-      platformFeePercent: settings.platformFeePercent,
-      artistAllocationPercent: settings.artistAllocationPercent,
-      artistPoolMinor,
-      allocatedToArtistsMinor,
-      unallocatedArtistPoolMinor: Math.max(0, artistPoolMinor - allocatedToArtistsMinor),
-      platformRevenueMinor: Math.max(0, settlement.netRevenueMinor - allocatedToArtistsMinor),
-      currency: invoice.currency,
-      stripePaymentIntentIds: paymentIntentIds,
-      createdAt: FieldValue.serverTimestamp(),
-    })
-  })
+  await recordArtistMembershipIncome(invoice, uid)
 }
 
 async function handleInvoiceFailed(invoice: Stripe.Invoice) {
@@ -288,8 +207,75 @@ async function handleInvoiceFailed(invoice: Stripe.Invoice) {
   })
 }
 
+/**
+ * A fan's one-off support payment. The artist was already paid directly by
+ * Stripe via the destination charge created in createSupportCheckoutSession
+ * — this only records the accounting entry and the supporter relationship.
+ * Idempotent on the checkout session id, since Stripe delivers webhooks at
+ * least once and can retry/duplicate a delivery.
+ */
+async function handleSupportCheckoutCompleted(session: Stripe.Checkout.Session) {
+  const artistId = session.metadata?.artistId
+  const fanId = session.metadata?.fanId
+  if (!artistId || !fanId) return
+
+  const txId = `support_${session.id}`
+  const txRef = db.collection('transactions').doc(txId)
+  const relationshipRef = db.collection('supportRelationships').doc(`${fanId}_${artistId}`)
+
+  await db.runTransaction(async (tx) => {
+    const existing = await tx.get(txRef)
+    if (existing.exists) return
+
+    const grossMinor = session.amount_total ?? 0
+    const platformFeeMinor = Number(session.metadata?.platformFeeMinor ?? 0)
+    const netMinor = Number(session.metadata?.artistNetMinor ?? grossMinor - platformFeeMinor)
+    const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id ?? null
+
+    tx.set(txRef, {
+      transactionId: txId,
+      type: 'artist_support',
+      artistId,
+      fanId,
+      grossMinor,
+      platformFeeMinor,
+      netMinor,
+      currency: session.currency ?? 'gbp',
+      stripeCheckoutSessionId: session.id,
+      stripePaymentIntentId: paymentIntentId,
+      revenueBasis: 'gross_minus_application_fee',
+      refundedAt: null,
+      createdAt: FieldValue.serverTimestamp(),
+    })
+    tx.set(
+      relationshipRef,
+      {
+        fanId,
+        artistId,
+        lastSupportedAt: FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    )
+    tx.set(db.collection('notifications').doc(), {
+      userId: artistId,
+      type: 'support_received',
+      title: 'You received support!',
+      body: `Someone supported you with ${(grossMinor / 100).toFixed(2)} ${(session.currency ?? 'gbp').toUpperCase()}.`,
+      linkTo: '/dashboard/artist/revenue',
+      read: false,
+      createdAt: FieldValue.serverTimestamp(),
+    })
+  })
+}
+
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
-  if (session.mode !== 'payment' || session.metadata?.kind !== 'licence_payment') return
+  if (session.mode !== 'payment') return
+  if (session.metadata?.kind === 'artist_support') {
+    await handleSupportCheckoutCompleted(session)
+    return
+  }
+  if (session.metadata?.kind !== 'licence_payment') return
   const agreementId = session.metadata?.agreementId
   if (!agreementId) return
 
@@ -357,20 +343,9 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       taxMinor: settlement.taxMinor,
       processingFeeMinor: settlement.processingFeeMinor,
       revenueBasis: 'net_after_tax_and_processing',
-      promotedAt: null,
       refundedAt: null,
       createdAt: FieldValue.serverTimestamp(),
     })
-    tx.set(
-      db.collection('artistBalances').doc(agreement.artistId),
-      {
-        artistId: agreement.artistId,
-        pendingMinor: FieldValue.increment(netMinor),
-        currency: agreement.currency,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    )
     tx.set(db.collection('notifications').doc(), {
       userId: agreement.djId,
       type: 'download_unlocked',
@@ -398,13 +373,12 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 }
 
 /**
- * Reverses the corresponding share of an artist-balance credit for a
- * partially or fully refunded charge. Matches payment intents for both
- * supporter subscriptions and DJ licence payments. Reverses from pendingMinor first, then
- * availableMinor; if the funds have already been paid out (moved to
- * paidMinor), automatic reversal would push a balance negative for money
- * that already left the platform, so that case is flagged for manual admin
- * reconciliation instead of silently mutating a paid-out balance.
+ * Records a refund against the matching transaction(s) for bookkeeping.
+ * There is no internal balance to reverse: every payment (fan support, DJ
+ * licence) is a Stripe Connect destination charge, so a refund is handled
+ * entirely by Stripe — it automatically reverses the application fee and
+ * pulls the artist's share back from their connected account. This handler
+ * only keeps BackTheVibes' own transaction record honest.
  */
 async function handleChargeRefunded(charge: Stripe.Charge) {
   const matches = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>()
@@ -417,42 +391,9 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
   }
 
   for (const doc of matches.values()) {
-    const balanceRef = db.collection('artistBalances').doc(doc.data().artistId as string)
-    await db.runTransaction(async (tx) => {
-      const [txSnap, balanceSnap] = await Promise.all([tx.get(doc.ref), tx.get(balanceRef)])
-      const data = txSnap.data()
-      if (!data) return
-      const netMinor = data.netMinor as number
-      const previousCustomerRefundedMinor = (data.refundedCustomerMinor as number) ?? 0
-      const newlyRefundedCustomerMinor = Math.max(0, charge.amount_refunded - previousCustomerRefundedMinor)
-      if (newlyRefundedCustomerMinor === 0) return
-      const refundedMinor = Math.min(
-        netMinor - ((data.refundedMinor as number) ?? 0),
-        Math.round(netMinor * (newlyRefundedCustomerMinor / charge.amount)),
-      )
-      if (refundedMinor <= 0) return
-      const balance = balanceSnap.data() ?? {}
-      const pending = (balance.pendingMinor as number) ?? 0
-      const available = (balance.availableMinor as number) ?? 0
-
-      tx.update(doc.ref, {
-        refundedAt: charge.refunded ? FieldValue.serverTimestamp() : null,
-        refundedCustomerMinor: charge.amount_refunded,
-        refundedMinor: FieldValue.increment(refundedMinor),
-      })
-
-      if (pending >= refundedMinor) {
-        tx.set(balanceRef, { pendingMinor: FieldValue.increment(-refundedMinor), updatedAt: FieldValue.serverTimestamp() }, { merge: true })
-      } else if (available >= refundedMinor) {
-        tx.set(balanceRef, { availableMinor: FieldValue.increment(-refundedMinor), updatedAt: FieldValue.serverTimestamp() }, { merge: true })
-      } else {
-        tx.set(db.collection('auditLogs').doc(), {
-          adminId: 'system',
-          action: 'refund_requires_manual_reconciliation',
-          details: { transactionId: doc.id, artistId: data.artistId, refundedMinor, reason: 'funds already promoted/paid out' },
-          createdAt: FieldValue.serverTimestamp(),
-        })
-      }
+    await doc.ref.update({
+      refundedAt: charge.refunded ? FieldValue.serverTimestamp() : null,
+      refundedCustomerMinor: charge.amount_refunded,
     })
   }
 }

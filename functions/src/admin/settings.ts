@@ -90,17 +90,7 @@ export const adminUpsertSubscriptionPlan = onCall(async (request) => {
 
 export const adminUpdatePlatformSettings = onCall(async (request) => {
   const adminId = await requireAdmin(request)
-  const {
-    platformFeePercent,
-    artistAllocationPercent,
-    djServiceFeePercent,
-    minimumPayoutMinor,
-    allowedPreviewDurationsSec,
-    maxUploadSizeMB,
-    supportedAudioTypes,
-    defaultTrackVisibility,
-    defaultPreviewDurationSec,
-  } = request.data ?? {}
+  const { platformFeePercent, artistAllocationPercent, djServiceFeePercent, defaultTrackVisibility } = request.data ?? {}
 
   const percentages = [platformFeePercent, artistAllocationPercent, djServiceFeePercent]
   if (percentages.some((value) => typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100)) {
@@ -109,31 +99,17 @@ export const adminUpdatePlatformSettings = onCall(async (request) => {
   if (platformFeePercent + artistAllocationPercent !== 100) {
     throw new HttpsError('invalid-argument', 'Platform share and artist allocation must total 100%.')
   }
-  if (typeof minimumPayoutMinor !== 'number' || !Number.isInteger(minimumPayoutMinor) || minimumPayoutMinor < 0) {
-    throw new HttpsError('invalid-argument', 'minimumPayoutMinor must be a non-negative integer.')
-  }
 
   const update: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() }
   if (typeof platformFeePercent === 'number') update.platformFeePercent = platformFeePercent
   if (typeof artistAllocationPercent === 'number') update.artistAllocationPercent = artistAllocationPercent
   if (typeof djServiceFeePercent === 'number') update.djServiceFeePercent = djServiceFeePercent
-  if (typeof minimumPayoutMinor === 'number') update.minimumPayoutMinor = minimumPayoutMinor
-  if (Array.isArray(allowedPreviewDurationsSec)) update.allowedPreviewDurationsSec = allowedPreviewDurationsSec
-  if (typeof maxUploadSizeMB === 'number') update.maxUploadSizeMB = maxUploadSizeMB
-  if (Array.isArray(supportedAudioTypes)) update.supportedAudioTypes = supportedAudioTypes
   const VALID_VISIBILITIES = ['public', 'followers', 'supporters', 'early_access', 'dj_only', 'private']
   if (typeof defaultTrackVisibility === 'string') {
     if (!VALID_VISIBILITIES.includes(defaultTrackVisibility)) {
       throw new HttpsError('invalid-argument', 'defaultTrackVisibility must be a valid track visibility.')
     }
     update.defaultTrackVisibility = defaultTrackVisibility
-  }
-  // 5/90 mirrors PREVIEW_MIN_DURATION_SEC/PREVIEW_MAX_DURATION_SEC in src/constants/mediaConfig.ts.
-  if (typeof defaultPreviewDurationSec === 'number') {
-    if (!Number.isInteger(defaultPreviewDurationSec) || defaultPreviewDurationSec < 5 || defaultPreviewDurationSec > 90) {
-      throw new HttpsError('invalid-argument', 'defaultPreviewDurationSec must be an integer between 5 and 90.')
-    }
-    update.defaultPreviewDurationSec = defaultPreviewDurationSec
   }
 
   await db.collection('platformSettings').doc('default').set(update, { merge: true })

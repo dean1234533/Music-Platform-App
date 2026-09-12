@@ -1,35 +1,36 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { listActiveSubscriptionPlansForRole } from '@/services/platformSettingsService'
-import { subscribeToOwnSubscription } from '@/services/subscriptionService'
 import type { PlanFeatureKey } from '@/types/entitlements'
-import type { SubscriptionPlan } from '@/types/platformSettings'
-import type { SubscriptionDoc } from '@/types/subscription'
 
 /**
- * Whether the signed-in fan's own plan includes a given feature (e.g. artistDefinedPerks) —
- * distinct from per-artist follow/support status. undefined while still loading, so callers
- * can avoid a flash of the locked state before the real answer is known.
+ * Whether the signed-in fan's plan includes a given feature (e.g.
+ * artistDefinedPerks). Fans never hold a paid subscription any more —
+ * fan_free is the one plan every signed-in fan is always on — so this reads
+ * that plan's features directly rather than checking for an active
+ * subscription doc that no longer gets created. undefined while still
+ * loading, so callers can avoid a flash of the locked state before the real
+ * answer is known.
  */
 export function useFanFeature(feature: PlanFeatureKey): boolean | undefined {
   const { firebaseUser } = useAuth()
-  const [plans, setPlans] = useState<SubscriptionPlan[] | null>(null)
-  const [subscription, setSubscription] = useState<SubscriptionDoc | null | undefined>(undefined)
-
-  useEffect(() => {
-    void listActiveSubscriptionPlansForRole('fan').then(setPlans)
-  }, [])
+  const [hasFeature, setHasFeature] = useState<boolean | undefined>(undefined)
 
   useEffect(() => {
     if (!firebaseUser) {
-      setSubscription(null)
+      setHasFeature(false)
       return
     }
-    return subscribeToOwnSubscription(firebaseUser.uid, setSubscription)
-  }, [firebaseUser])
+    let cancelled = false
+    void listActiveSubscriptionPlansForRole('fan').then((plans) => {
+      if (cancelled) return
+      const freePlan = plans.find((p) => p.isDefaultFree)
+      setHasFeature(Boolean(freePlan?.features[feature]))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [firebaseUser, feature])
 
-  if (plans === null || subscription === undefined) return undefined
-  const isActive = subscription?.status === 'active' || subscription?.status === 'trialing'
-  const activePlan = plans.find((p) => p.planId === subscription?.planId)
-  return Boolean(isActive && activePlan?.features[feature])
+  return hasFeature
 }

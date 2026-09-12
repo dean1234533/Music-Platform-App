@@ -1,6 +1,13 @@
 import type { Timestamp } from 'firebase/firestore'
 
-export type TransactionType = 'subscription_income' | 'dj_licence_income' | 'payout'
+/**
+ * `artist_support` and `dj_licence_income` are Stripe Connect destination
+ * charges — the artist was already paid directly by Stripe; these records
+ * are bookkeeping only, never an internal balance to draw down.
+ * `artist_membership_income` is BackTheVibes' own platform-access fee and
+ * is never shared with any artist (platformFeeMinor is always 0 on it).
+ */
+export type TransactionType = 'artist_support' | 'dj_licence_income' | 'artist_membership_income'
 
 export interface TransactionDoc {
   transactionId: string
@@ -13,26 +20,8 @@ export interface TransactionDoc {
   netMinor: number
   currency: string
   createdAt: Timestamp | null
-  promotedAt: Timestamp | null
-}
-
-export interface ArtistBalanceDoc {
-  artistId: string
-  pendingMinor: number
-  availableMinor: number
-  paidMinor: number
-  currency: string
-  updatedAt: Timestamp | null
-}
-
-export interface PayoutDoc {
-  payoutId: string
-  artistId: string
-  amountMinor: number
-  currency: string
-  stripeTransferId: string
-  status: string
-  createdAt: Timestamp | null
+  refundedAt?: Timestamp | null
+  refundedCustomerMinor?: number
 }
 
 export interface ArtistPayoutAccountDoc {
