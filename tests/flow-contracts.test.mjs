@@ -3042,3 +3042,26 @@ test('Stripe Connect onboarding/dashboard-link failures surface the real cause i
   assert.match(dashboardBody, /console\.error\('\[createConnectDashboardLink\] failed:', error\)/)
   assert.match(dashboardBody, /throw new HttpsError\('internal', `Could not open the Stripe dashboard: \$\{detail\}`\)/)
 })
+
+test('the upload page\'s track allowance badge stays accurate after a successful upload instead of showing the pre-upload count forever (user-reported: "i have uploaded a track but the allowance still says 0 of 10")', () => {
+  // Root cause: storedTrackCount was set once via a one-shot getArtistProfile() fetch on mount
+  // and never updated again on this page — trackCount itself was incrementing correctly server-
+  // side (onTrackCreate's trigger), the displayed badge just never learned about it without a
+  // full page remount. Switched to the same live subscribeArtistProfile() pattern already used
+  // by OverviewPage/GrowthPage for the same field.
+  const page = read('src/pages/artist/dashboard/UploadTrackPage.tsx')
+  assert.match(page, /import \{ getArtistProfile, subscribeArtistProfile \} from '@\/services\/artistService'/)
+  assert.match(
+    page,
+    /return subscribeArtistProfile\(firebaseUser\.uid, \(profile\) => \{\s*setArtistLocation\(profile\?\.location \?\? null\)\s*setStoredTrackCount\(profile\?\.trackCount \?\? 0\)/,
+  )
+  // getArtistProfile (one-shot) is still the right tool for the submit-time server-truth check
+  // — re-verifying the limit at the moment of submission, not trusting whatever the live badge
+  // last rendered — so it must still be imported and used there, not removed outright.
+  assert.match(page, /const artistProfile = await getArtistProfile\(firebaseUser\.uid\)/)
+
+  // trackCount itself really is maintained server-side unconditionally for every track — the
+  // Firestore trigger, not something createTrack itself has to remember to do.
+  const triggers = read('functions/src/tracks/triggers.ts')
+  assert.match(triggers, /await db\.collection\('artistProfiles'\)\.doc\(artistId\)\.update\(\{ trackCount: FieldValue\.increment\(1\) \}\)/)
+})

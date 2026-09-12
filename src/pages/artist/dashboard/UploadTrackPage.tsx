@@ -2,7 +2,7 @@ import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode }
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { createTrack, newTrackId, uploadTrackArtworkAsset } from '@/services/trackService'
-import { getArtistProfile } from '@/services/artistService'
+import { getArtistProfile, subscribeArtistProfile } from '@/services/artistService'
 import { getPlatformSettings } from '@/services/platformSettingsService'
 import { compressImage } from '@/services/imageProcessing'
 import { recordRightsDeclaration } from '@/services/legalService'
@@ -74,7 +74,10 @@ export function UploadTrackPage() {
 
   useEffect(() => {
     if (!firebaseUser) return
-    getArtistProfile(firebaseUser.uid).then((profile) => {
+    // A live subscription, not a one-shot fetch — this badge previously only ever fetched once
+    // on mount, so it kept showing the pre-upload count until the page was fully remounted
+    // (user-reported: "i have uploaded a track but the allowance still says 0 of 10").
+    return subscribeArtistProfile(firebaseUser.uid, (profile) => {
       setArtistLocation(profile?.location ?? null)
       setStoredTrackCount(profile?.trackCount ?? 0)
     })
