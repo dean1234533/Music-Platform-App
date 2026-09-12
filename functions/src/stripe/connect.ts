@@ -27,34 +27,45 @@ export const createConnectOnboardingLink = onCall({ secrets: [stripeSecretKey] }
   const existing = await accountRef(artistId).get()
   let stripeAccountId = existing.data()?.stripeAccountId as string | undefined
 
-  if (!stripeAccountId) {
-    const account = await stripe.accounts.create({
-      type: 'express',
-      metadata: { firebaseUid: artistId },
+  try {
+    if (!stripeAccountId) {
+      const account = await stripe.accounts.create({
+        type: 'express',
+        metadata: { firebaseUid: artistId },
+      })
+      stripeAccountId = account.id
+      await accountRef(artistId).set(
+        {
+          artistId,
+          stripeAccountId,
+          payoutsEnabled: false,
+          chargesEnabled: false,
+          onboardingComplete: false,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      )
+    }
+
+    const link = await stripe.accountLinks.create({
+      account: stripeAccountId,
+      type: 'account_onboarding',
+      return_url: returnUrl,
+      refresh_url: refreshUrl,
     })
-    stripeAccountId = account.id
-    await accountRef(artistId).set(
-      {
-        artistId,
-        stripeAccountId,
-        payoutsEnabled: false,
-        chargesEnabled: false,
-        onboardingComplete: false,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    )
+
+    return { url: link.url }
+  } catch (error) {
+    // Uncaught here, this becomes an opaque INTERNAL/500 with no detail on either side — this
+    // environment's log tooling can't reliably surface recent invocation logs, so the real
+    // cause (e.g. Stripe Connect not enabled on this account, Express unavailable in the
+    // account's country) is included directly in the message returned to the client instead,
+    // matching createLicencePaymentSession's established fix for the same problem.
+    console.error('[createConnectOnboardingLink] failed:', error)
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new HttpsError('internal', `Could not start Stripe Connect onboarding: ${detail}`)
   }
-
-  const link = await stripe.accountLinks.create({
-    account: stripeAccountId,
-    type: 'account_onboarding',
-    return_url: returnUrl,
-    refresh_url: refreshUrl,
-  })
-
-  return { url: link.url }
 })
 
 export const createConnectDashboardLink = onCall({ secrets: [stripeSecretKey] }, async (request) => {
@@ -64,6 +75,12 @@ export const createConnectDashboardLink = onCall({ secrets: [stripeSecretKey] },
   const stripeAccountId = snap.data()?.stripeAccountId as string | undefined
   if (!stripeAccountId) throw new HttpsError('failed-precondition', 'No connected Stripe account found.')
 
-  const loginLink = await getStripe().accounts.createLoginLink(stripeAccountId)
-  return { url: loginLink.url }
+  try {
+    const loginLink = await getStripe().accounts.createLoginLink(stripeAccountId)
+    return { url: loginLink.url }
+  } catch (error) {
+    console.error('[createConnectDashboardLink] failed:', error)
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new HttpsError('internal', `Could not open the Stripe dashboard: ${detail}`)
+  }
 })

@@ -3,7 +3,8 @@ import { Eye, Headphones, Heart, MessageSquare, Radio, Share2, UserPlus, Users }
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeArtistProfile, subscribeArtistTracks } from '@/services/artistService'
 import { subscribeRequestsForArtist } from '@/services/licenceService'
-import { LoadingState } from '@/components/common/StateViews'
+import { EmptyState, LoadingState } from '@/components/common/StateViews'
+import { Link } from 'react-router-dom'
 import { ShareButton } from '@/components/common/ShareButton'
 import { formatCount } from '@/utils/format'
 import { artistShareUrl, copyToClipboard, trackShareUrl } from '@/utils/shareLinks'
@@ -15,7 +16,11 @@ import type { LicenceRequestDoc } from '@/types/licence'
 export function GrowthPage() {
   const { firebaseUser } = useAuth()
   const { notify } = useToast()
-  const [artist, setArtist] = useState<ArtistProfile | null>(null)
+  // undefined = subscription hasn't reported back yet (still loading); null = it has, and
+  // there's no artist profile doc for this account — see OverviewPage's identical fix for why
+  // collapsing these into one falsy state left this page stuck on a spinner forever instead of
+  // the "finish setup" prompt.
+  const [artist, setArtist] = useState<ArtistProfile | null | undefined>(undefined)
   const [tracks, setTracks] = useState<TrackDoc[]>([])
   const [djRequests, setDjRequests] = useState<LicenceRequestDoc[]>([])
 
@@ -31,7 +36,23 @@ export function GrowthPage() {
     }
   }, [firebaseUser])
 
-  if (!artist) return <LoadingState />
+  if (artist === undefined) return <LoadingState />
+  if (artist === null) {
+    return (
+      <EmptyState
+        title="No artist profile found"
+        description="Your account has the artist role but hasn't finished profile setup yet."
+        action={
+          <Link
+            to="/onboarding/add-role?role=artist"
+            className="mt-2 inline-flex items-center rounded-full bg-brand-500 px-5 py-2.5 text-sm font-semibold text-surface-0 hover:bg-brand-400"
+          >
+            Complete artist profile
+          </Link>
+        }
+      />
+    )
+  }
 
   const profileUrl = artistShareUrl(artist.slug)
   const totalTrackViews = tracks.reduce((sum, track) => sum + (track.viewCount ?? 0), 0)

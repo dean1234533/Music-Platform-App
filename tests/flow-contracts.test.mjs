@@ -3000,3 +3000,34 @@ test('crawlers (Googlebot and non-JS-executing bots like GPTBot/ClaudeBot) get r
   const slugCount = [...content.matchAll(/slug: '/g)].length
   assert.strictEqual(slugCount, 12, `expected 12 TOOLS entries (hub + 11 tools), found ${slugCount}`)
 })
+
+test('the artist dashboard Overview and Growth pages show a "finish setup" prompt instead of spinning forever when the account has the artist role but no profile document yet (user-reported: "the overview tab is stuck in a loading state... it was because there was no profile set up")', () => {
+  // Root cause: both pages stored the subscribeArtistProfile result in `useState<ArtistProfile |
+  // null>(null)` and gated on `if (!artist) return <LoadingState />` — collapsing "the
+  // subscription hasn't reported back yet" and "it has, and there's no profile doc" into the
+  // same falsy state. An account with the artist role but no profile document (already a real,
+  // separately-handled case elsewhere — see ArtistSettingsPage/DJProfilePage) got a spinner that
+  // never resolves, instead of the "finish setup" prompt those other pages already show.
+  for (const path of ['src/pages/artist/dashboard/OverviewPage.tsx', 'src/pages/artist/dashboard/GrowthPage.tsx']) {
+    const page = read(path)
+    assert.match(page, /useState<ArtistProfile \| null \| undefined>\(undefined\)/)
+    assert.match(page, /if \(artist === undefined\) return <LoadingState \/>/)
+    assert.match(page, /if \(artist === null\) \{/)
+    assert.match(page, /title="No artist profile found"/)
+    assert.match(page, /to="\/onboarding\/add-role\?role=artist"/)
+    assert.match(page, /Complete artist profile/)
+  }
+})
+
+test('Stripe Connect onboarding/dashboard-link failures surface the real cause instead of an opaque 500, matching the earlier fix for createLicencePaymentSession (user-reported console error: "createConnectOnboardingLink:1 Failed to load resource: the server responded with a status of 500")', () => {
+  const source = read('functions/src/stripe/connect.ts')
+  const onboardingBody = source.slice(source.indexOf('createConnectOnboardingLink'), source.indexOf('createConnectDashboardLink'))
+  assert.match(onboardingBody, /try \{/)
+  assert.match(onboardingBody, /console\.error\('\[createConnectOnboardingLink\] failed:', error\)/)
+  assert.match(onboardingBody, /throw new HttpsError\('internal', `Could not start Stripe Connect onboarding: \$\{detail\}`\)/)
+
+  const dashboardBody = source.slice(source.indexOf('createConnectDashboardLink'))
+  assert.match(dashboardBody, /try \{/)
+  assert.match(dashboardBody, /console\.error\('\[createConnectDashboardLink\] failed:', error\)/)
+  assert.match(dashboardBody, /throw new HttpsError\('internal', `Could not open the Stripe dashboard: \$\{detail\}`\)/)
+})

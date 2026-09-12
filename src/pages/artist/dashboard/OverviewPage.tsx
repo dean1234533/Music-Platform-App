@@ -4,14 +4,21 @@ import { ArrowUpRight, AudioWaveform, Disc3, Eye, Headphones, Heart, Megaphone, 
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeArtistProfile, subscribeArtistTracks } from '@/services/artistService'
 import { MusicGlyph } from '@/components/common/MusicGlyph'
-import { LoadingState } from '@/components/common/StateViews'
+import { EmptyState, LoadingState } from '@/components/common/StateViews'
 import { formatCount } from '@/utils/format'
 import type { ArtistProfile } from '@/types/artist'
 import type { TrackDoc } from '@/types/track'
 
 export function OverviewPage() {
   const { firebaseUser } = useAuth()
-  const [artist, setArtist] = useState<ArtistProfile | null>(null)
+  // undefined = the subscription hasn't reported back yet (genuinely still loading); null =
+  // it has, and there's no artist profile document for this account. Collapsing both into one
+  // falsy state (as this page previously did) meant an account with the artist role but no
+  // profile doc yet — a real, already-handled case elsewhere in the app (see ArtistSettingsPage/
+  // DJProfilePage) — got stuck on a spinner forever instead of the "finish setup" prompt
+  // (user-reported: "the overview tab is stuck in a loading state... it was because there was
+  // no profile set up").
+  const [artist, setArtist] = useState<ArtistProfile | null | undefined>(undefined)
   const [tracks, setTracks] = useState<TrackDoc[]>([])
 
   useEffect(() => {
@@ -24,7 +31,23 @@ export function OverviewPage() {
     }
   }, [firebaseUser])
 
-  if (!artist) return <LoadingState />
+  if (artist === undefined) return <LoadingState />
+  if (artist === null) {
+    return (
+      <EmptyState
+        title="No artist profile found"
+        description="Your account has the artist role but hasn't finished profile setup yet."
+        action={
+          <Link
+            to="/onboarding/add-role?role=artist"
+            className="mt-2 inline-flex items-center rounded-full bg-brand-500 px-5 py-2.5 text-sm font-semibold text-surface-0 hover:bg-brand-400"
+          >
+            Complete artist profile
+          </Link>
+        }
+      />
+    )
+  }
 
   const totalYoutubeOpens = tracks.reduce((sum, track) => sum + track.playCount, 0)
   const topTracks = [...tracks].sort((a, b) => b.playCount - a.playCount).slice(0, 5)
