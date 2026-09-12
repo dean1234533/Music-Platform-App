@@ -645,7 +645,18 @@ test('the CSP allows the fonts and signed-URL image domains this app actually lo
   const headers = read('public/_headers')
   assert.match(headers, /style-src 'self' 'unsafe-inline' https:\/\/fonts\.googleapis\.com/)
   assert.match(headers, /font-src 'self' data: https:\/\/fonts\.gstatic\.com/)
-  assert.match(headers, /img-src 'self' data: blob: https:\/\/firebasestorage\.googleapis\.com https:\/\/storage\.googleapis\.com https:\/\/lh3\.googleusercontent\.com/)
+  assert.match(headers, /img-src 'self' data: blob: https:\/\/firebasestorage\.googleapis\.com https:\/\/storage\.googleapis\.com https:\/\/lh3\.googleusercontent\.com https:\/\/i\.ytimg\.com/)
+})
+
+test('the CSP allows the three YouTube domains the migrated player actually needs — thumbnail images, the iframe API script, and the embed frame itself (user-reported console errors: "Loading the image \'https://i.ytimg.com/...\' violates... Loading the script \'https://www.youtube.com/iframe_api\' violates...")', () => {
+  // The migration from hosted audio to YouTube embeds (src/components/player/YouTubePlayer.tsx,
+  // src/lib/youtubeIframeApi.ts, src/utils/youtube.ts) never updated the CSP that predates it —
+  // every track's thumbnail, the IFrame API bootstrap script, and the actual video embed were
+  // all silently blocked regardless of the player code being correct.
+  const headers = read('public/_headers')
+  assert.match(headers, /img-src[^;]*https:\/\/i\.ytimg\.com/) // youtubeThumbnailUrl()
+  assert.match(headers, /script-src[^;]*https:\/\/www\.youtube\.com/) // the https://www.youtube.com/iframe_api bootstrap script
+  assert.match(headers, /frame-src[^;]*https:\/\/www\.youtube-nocookie\.com/) // youtubeEmbedUrl()'s actual <iframe src>
 })
 
 test('admin verification review shows the actual profile and the requester\'s case, not just a raw uid (user-reported)', () => {
