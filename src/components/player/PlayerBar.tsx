@@ -23,6 +23,7 @@ export function PlayerBar() {
 
   return (
     <div
+      id="player-bar"
       className={`fixed inset-x-0 z-50 border-t border-white/[0.08] bg-[#090b0d]/95 px-3 py-2 shadow-[0_-20px_50px_rgba(0,0,0,.2)] backdrop-blur-2xl md:z-40 md:px-6 md:py-3 ${
         inDashboardShell
           ? 'bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 md:left-[264px]'

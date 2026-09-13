@@ -303,7 +303,11 @@ export const recordTrackPlay = onCall(async (request) => {
   }
   const track = snap.data()!
   const uid = request.auth?.uid ?? null
-  if (!(await canAccessTrackYoutubeLink(uid, track))) {
+  // A preview listen (see getTrackYoutubeInfo) is a real, authorised play too — it's exactly
+  // the signal previewSessions below exists to capture — so it must count here the same way a
+  // fully-entitled play does, not throw. This was the source of a noisy, silently-swallowed 403
+  // on every preview play (user-reported console spam after the preview feature shipped).
+  if (!(await canAccessTrackYoutubeLink(uid, track)) && !(await canPreviewTrackYoutubeLink(track))) {
     throw new HttpsError('permission-denied', 'This playback event is not authorised.')
   }
 

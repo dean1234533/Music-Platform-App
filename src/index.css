@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* The persistent player is a global, fixed-position element (mounted once in App.tsx, not
+   scoped to any one page), so a single page's own print stylesheet can't reliably hide it —
+   ContractPage's "Download PDF" (window.print()) otherwise put the docked player bar at the
+   bottom of every printed page (user-reported: "the play track bar is at the bottom of the
+   pdf"). Hidden here, globally, for any print/PDF output from anywhere in the app. */
+@media print {
+  #player-bar {
+    display: none !important;
+  }
+}
+
 @theme {
   --font-sans: "Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif;
 

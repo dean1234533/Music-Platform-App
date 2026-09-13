@@ -3147,3 +3147,46 @@ test('a track actually plays from a public page, not just from inside a dashboar
   const bar = read('src/components/player/PlayerBar.tsx')
   assert.match(bar, /const inDashboardShell = \/\^\\\/\(app\|dashboard\|dj\|admin\)\(\\\/\|\$\)\/\.test\(location\.pathname\)/)
 })
+
+test('a preview listen counts as a real, authorised play instead of a silently-swallowed 403 (user-reported console spam: "us-central1-music-platform-app-c45ac.cloudfunctions.net/recordTrackPlay:1 Failed to load resource: the server responded with a status of 403")', () => {
+  // recordTrackPlay ran its own, separate entitlement check that only ever accepted full
+  // access — it had no idea getTrackYoutubeInfo could legitimately hand back a previewOnly
+  // video ID, so every preview play's own "I actually played this" call was rejected outright.
+  // The rejection was caught and swallowed client-side (playback itself kept working), but
+  // playCount/previewSessions — the exact signal previewSessions exists to capture — never
+  // recorded a preview listen, and the console filled up with a real-looking 403.
+  const fn = read('functions/src/tracks.ts')
+  const start = fn.indexOf('export const recordTrackPlay = onCall')
+  const end = fn.indexOf('\n})', start)
+  const body = fn.slice(start, end)
+  assert.match(body, /if \(!\(await canAccessTrackYoutubeLink\(uid, track\)\) && !\(await canPreviewTrackYoutubeLink\(track\)\)\) \{/)
+})
+
+test('the persistent player never shows up in a printed PDF (user-reported: "the play track bar is at the bottom of the pdf")', () => {
+  // PlayerBar is a global, fixed-position element mounted once in App.tsx — no single page's
+  // own print stylesheet (e.g. ContractPage's "Download PDF" via window.print()) can reliably
+  // hide something that lives outside that page's own DOM subtree, so it has to be hidden
+  // globally by a stable selector instead.
+  const bar = read('src/components/player/PlayerBar.tsx')
+  assert.match(bar, /id="player-bar"/)
+  const css = read('src/index.css')
+  assert.match(css, /@media print \{\s*#player-bar \{\s*display: none !important;/)
+})
+
+test('a fan can actually see their own support history (missing composite index)', () => {
+  // subscribeMySupportHistory queries transactions by fanId + type + createdAt — the only
+  // pre-existing transactions indexes covered artistId+createdAt and promotedAt+createdAt,
+  // neither of which this query could ever use, so it failed outright with "query requires an
+  // index" for every fan who opened their support history (user-reported console error).
+  const indexes = JSON.parse(read('firestore.indexes.json'))
+  const hasFanTypeCreatedAtIndex = indexes.indexes.some(
+    (i) =>
+      i.collectionGroup === 'transactions' &&
+      i.fields.length === 3 &&
+      i.fields[0].fieldPath === 'fanId' &&
+      i.fields[1].fieldPath === 'type' &&
+      i.fields[2].fieldPath === 'createdAt' &&
+      i.fields[2].order === 'DESCENDING',
+  )
+  assert.ok(hasFanTypeCreatedAtIndex, 'expected a transactions index on (fanId, type, createdAt desc)')
+})
