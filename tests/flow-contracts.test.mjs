@@ -3065,3 +3065,16 @@ test('the upload page\'s track allowance badge stays accurate after a successful
   const triggers = read('functions/src/tracks/triggers.ts')
   assert.match(triggers, /await db\.collection\('artistProfiles'\)\.doc\(artistId\)\.update\(\{ trackCount: FieldValue\.increment\(1\) \}\)/)
 })
+
+test('an artist (or DJ) account can no longer like tracks or build playlists — those are fan-only, mirroring the existing hasRole(\'dj\') gate on crates (user-reported: "as a artist i am. able to click platlist and like a song when it is playing")', () => {
+  const rules = read('firestore.rules')
+  const likesBlock = rules.slice(rules.indexOf('match /trackLikes/'), rules.indexOf('match /playlists/'))
+  assert.match(likesBlock, /allow create: if isSignedIn\(\)\s*&& request\.resource\.data\.fanId == request\.auth\.uid\s*&& likeId == request\.resource\.data\.fanId \+ '_' \+ request\.resource\.data\.trackId\s*&& hasRole\('fan'\)/)
+
+  const playlistsBlock = rules.slice(rules.indexOf('match /playlists/'))
+  assert.match(playlistsBlock, /allow create: if isSignedIn\(\) && request\.resource\.data\.ownerId == request\.auth\.uid && hasRole\('fan'\)/)
+
+  const actions = read('src/components/music/TrackActions.tsx')
+  assert.match(actions, /const \{ firebaseUser, hasRole \} = useAuth\(\)/)
+  assert.match(actions, /if \(!hasRole\('fan'\)\) \{/)
+})

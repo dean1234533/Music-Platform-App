@@ -272,17 +272,23 @@ service cloud.firestore {
     match /trackLikes/{likeId} {
       // resource == null short-circuits for the common "not liked" case —
       // subscribeIsLiked reads a doc that usually doesn't exist.
+      // create requires hasRole('fan') — this is fan library/discovery
+      // functionality, the same reasoning crates below requires hasRole('dj')
+      // for its own equivalent feature (user-reported: an artist account
+      // could like tracks and build playlists, which shouldn't be possible
+      // now that artist/dj/fan are strictly single, mutually exclusive roles).
       allow read: if isSignedIn() && (resource == null || resource.data.fanId == request.auth.uid);
       allow create: if isSignedIn()
         && request.resource.data.fanId == request.auth.uid
-        && likeId == request.resource.data.fanId + '_' + request.resource.data.trackId;
+        && likeId == request.resource.data.fanId + '_' + request.resource.data.trackId
+        && hasRole('fan');
       allow delete: if isSignedIn() && resource.data.fanId == request.auth.uid;
       allow update: if false;
     }
 
     match /playlists/{playlistId} {
       allow read: if isSignedIn() && (resource == null || resource.data.ownerId == request.auth.uid);
-      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid && hasRole('fan');
       allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
     }
 

@@ -9,7 +9,7 @@ import { PlaylistPickerModal } from '@/components/music/PlaylistPickerModal'
 import type { TrackDoc } from '@/types/track'
 
 export function TrackActions({ track, labels = false }: { track: TrackDoc; labels?: boolean }) {
-  const { firebaseUser } = useAuth()
+  const { firebaseUser, hasRole } = useAuth()
   const { notify } = useToast()
   const navigate = useNavigate()
   const [liked, setLiked] = useState(false)
@@ -28,6 +28,10 @@ export function TrackActions({ track, labels = false }: { track: TrackDoc; label
     if (!firebaseUser) {
       notify('Sign in to save music and build playlists.', 'info')
       navigate('/sign-in')
+      return
+    }
+    if (!hasRole('fan')) {
+      notify('Liking tracks and building playlists is a fan account feature.', 'info')
       return
     }
     action()
