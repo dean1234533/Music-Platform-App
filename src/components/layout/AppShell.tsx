@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 import { Sidebar } from './Sidebar'
 import { MobileNav } from './MobileNav'
 import { TopBar } from './TopBar'
-import { PlayerBar } from '@/components/player/PlayerBar'
 import type { NavItem } from './navConfig'
 
 export function AppShell({
@@ -29,7 +28,6 @@ export function AppShell({
           </main>
         </div>
       </div>
-      <PlayerBar />
       <MobileNav items={mobileNavItems} moreExclude={mobileMoreExclude} />
     </div>
   )

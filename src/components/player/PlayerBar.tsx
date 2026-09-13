@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Pause, Play, SkipBack, SkipForward, Volume2, X } from 'lucide-react'
 import { usePlayer } from '@/contexts/PlayerContext'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
@@ -13,11 +13,22 @@ export function PlayerBar() {
     usePlayer()
   const artist = useArtistSummary(currentTrack?.artistId ?? null)
   const { firebaseUser } = useAuth()
+  const location = useLocation()
 
   if (!currentTrack) return null
 
+  // Rendered globally now (not just inside AppShell), so it can't assume the dashboard's
+  // sidebar/MobileNav are on screen — only offset around them when they actually are.
+  const inDashboardShell = /^\/(app|dashboard|dj|admin)(\/|$)/.test(location.pathname)
+
   return (
-    <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-50 border-t border-white/[0.08] bg-[#090b0d]/95 px-3 py-2 shadow-[0_-20px_50px_rgba(0,0,0,.2)] backdrop-blur-2xl md:bottom-0 md:left-[264px] md:z-40 md:px-6 md:py-3">
+    <div
+      className={`fixed inset-x-0 z-50 border-t border-white/[0.08] bg-[#090b0d]/95 px-3 py-2 shadow-[0_-20px_50px_rgba(0,0,0,.2)] backdrop-blur-2xl md:z-40 md:px-6 md:py-3 ${
+        inDashboardShell
+          ? 'bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 md:left-[264px]'
+          : 'bottom-[env(safe-area-inset-bottom)]'
+      }`}
+    >
       <div className="mb-1.5 flex items-center gap-2 md:hidden">
         <input
           type="range"

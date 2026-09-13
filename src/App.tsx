@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Routes, Route, useParams } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { PlayerProvider } from '@/contexts/PlayerContext'
+import { PlayerBar } from '@/components/player/PlayerBar'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { ProtectedRoute, RequireOnboarding } from '@/components/auth/ProtectedRoute'
 import { RoleRoute } from '@/components/auth/RoleRoute'
@@ -322,6 +323,11 @@ function App() {
             <Route path="*" element={<NotFoundPage />} />
             </Routes>
             </Suspense>
+            {/* Rendered globally, not just inside AppShell — this holds the actual YouTube
+                iframe mount, so playback works from public pages too (artist profiles, track
+                pages), not only from inside a dashboard (user-reported: "the track wont play
+                from the link profile page"). */}
+            <PlayerBar />
           </PlayerProvider>
         </ToastProvider>
       </AuthProvider>

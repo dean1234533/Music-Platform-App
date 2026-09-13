@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Heart, ListPlus } from 'lucide-react'
 import { clsx } from 'clsx'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { likeTrack, subscribeIsLiked, unlikeTrack } from '@/services/likeService'
@@ -12,6 +12,7 @@ export function TrackActions({ track, labels = false }: { track: TrackDoc; label
   const { firebaseUser, hasRole } = useAuth()
   const { notify } = useToast()
   const navigate = useNavigate()
+  const location = useLocation()
   const [liked, setLiked] = useState(false)
   const [pending, setPending] = useState(false)
   const [showPlaylistPicker, setShowPlaylistPicker] = useState(false)
@@ -35,7 +36,14 @@ export function TrackActions({ track, labels = false }: { track: TrackDoc; label
 
   // Liking/playlists are fan-only (mirrors crates being dj-only) — hide the controls
   // entirely for a signed-in artist/dj account instead of showing a dead-end button.
-  if (firebaseUser && !hasRole('fan')) return null
+  // A role check alone isn't enough: admin accounts are exempt from the one-role-per-
+  // account rule and can genuinely hold fan+artist+dj together, so also hide while the
+  // persistent player is docked inside an artist/dj/admin management workspace — that's
+  // the "as an artist" context the report was actually about, not the account's full
+  // role set (user-reported, after the role-only gate landed but the buttons stayed
+  // visible: "the like/playlist bit is still showing when i play a track as an artist").
+  const inManagementWorkspace = /^\/(dashboard\/artist|dj|admin)(\/|$)/.test(location.pathname)
+  if (firebaseUser && (!hasRole('fan') || inManagementWorkspace)) return null
 
   async function toggleLike() {
     if (!firebaseUser || pending) return

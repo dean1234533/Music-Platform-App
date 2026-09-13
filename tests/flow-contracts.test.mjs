@@ -3079,5 +3079,33 @@ test('an artist (or DJ) account can no longer like tracks or build playlists —
   // be hidden outright for a signed-in non-fan account, not just made a dead-end when clicked.
   const actions = read('src/components/music/TrackActions.tsx')
   assert.match(actions, /const \{ firebaseUser, hasRole \} = useAuth\(\)/)
-  assert.match(actions, /if \(firebaseUser && !hasRole\('fan'\)\) return null/)
+  // hasRole('fan') alone isn't enough: an admin account is exempt from the one-role rule and can
+  // legitimately hold fan+artist+dj at once, so a role-only gate does nothing for it — confirmed
+  // by the user's own admin test account still showing the buttons while inside the artist
+  // dashboard (user-reported: "the like/playlist bit is still showing when i play a track as an
+  // artist"). The controls must also hide whenever the persistent player is docked inside an
+  // artist/dj/admin management workspace, regardless of what else the account's roles include.
+  assert.match(actions, /const inManagementWorkspace = \/\^\\\/\(dashboard\\\/artist\|dj\|admin\)\(\\\/\|\$\)\/\.test\(location\.pathname\)/)
+  assert.match(actions, /if \(firebaseUser && \(!hasRole\('fan'\) \|\| inManagementWorkspace\)\) return null/)
+})
+
+test('a track actually plays from a public page, not just from inside a dashboard (user-reported: "the track wont plan from the link profile page")', () => {
+  // Root cause: PlayerBar holds the only <div ref={attachContainer}> the YouTube iframe ever
+  // mounts into, but it was only ever rendered inside AppShell — which only wraps the four
+  // dashboard layouts (/app, /dashboard/*, /dj, /admin). Public routes like /artist/:slug and
+  // /track/:trackId (including the artist's own "Preview live profile" link) render outside
+  // AppShell entirely, so playTrack()'s loadAndPlay found containerRef.current still null and
+  // threw "Player is not ready yet." before a single frame of video ever loaded.
+  const app = read('src/App.tsx')
+  assert.match(app, /import \{ PlayerBar \} from '@\/components\/player\/PlayerBar'/)
+  assert.match(app, /<\/Suspense>\s*\{\/\* Rendered globally/)
+  assert.match(app, /<PlayerBar \/>\s*<\/PlayerProvider>/)
+
+  const shell = read('src/components/layout/AppShell.tsx')
+  assert.doesNotMatch(shell, /PlayerBar/)
+
+  // Moving it out of AppShell means it can no longer assume the dashboard's Sidebar/MobileNav
+  // are on screen to offset around — it must size itself correctly on a bare public page too.
+  const bar = read('src/components/player/PlayerBar.tsx')
+  assert.match(bar, /const inDashboardShell = \/\^\\\/\(app\|dashboard\|dj\|admin\)\(\\\/\|\$\)\/\.test\(location\.pathname\)/)
 })
