@@ -3277,3 +3277,12 @@ test('a signed-out visitor clicking Follow/Support on a public artist profile go
   assert.match(page, /<FollowButton[\s\S]*?signedOutDestination="sign-up"/)
   assert.match(page, /<SupportButton[\s\S]*?signedOutDestination="sign-up"/)
 })
+
+test('a track row on the Music page no longer overflows past the card edge on mobile (user-reported screenshot: action icons rendering outside the card border)', () => {
+  // Root cause: the row packed a thumbnail, title/genre, two badges, and six icon buttons
+  // (promote/edit/fan-access/DJ-access/deals/delete) into one non-wrapping flex row — on a
+  // narrow phone viewport there was nowhere near enough width, so the trailing icons spilled
+  // past the card's own rounded border instead of staying inside it.
+  const musicPage = read('src/pages/artist/dashboard/MusicPage.tsx')
+  assert.match(musicPage, /className="flex flex-wrap items-center gap-3 px-4 py-3"/)
+})

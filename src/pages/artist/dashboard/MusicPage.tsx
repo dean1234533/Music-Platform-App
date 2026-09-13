@@ -108,7 +108,7 @@ export function MusicPage() {
       ) : (
         <div className="flex flex-col divide-y divide-surface-border rounded-xl border border-surface-border">
           {tracks.map((track) => (
-            <div key={track.trackId} className="flex items-center gap-3 px-4 py-3">
+            <div key={track.trackId} className="flex flex-wrap items-center gap-3 px-4 py-3">
               <button
                 type="button"
                 onClick={() => (currentTrack?.trackId === track.trackId ? togglePlay() : playTrack(track, tracks))}
