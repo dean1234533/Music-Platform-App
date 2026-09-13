@@ -1,6 +1,6 @@
 import { doc, collection, onSnapshot, orderBy, query, where } from 'firebase/firestore'
 import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage'
-import { db, storage } from '@/lib/firebase'
+import { db, getFirebaseStorage } from '@/lib/firebase'
 import { callable } from '@/lib/callable'
 import type { CopyrightClaimDoc } from '@/types/moderation'
 
@@ -11,6 +11,7 @@ export function newCopyrightClaimId(): string {
 /** Evidence must be uploaded before submitCopyrightClaim, using this same pre-generated claimId. */
 export async function uploadCopyrightEvidence(claimId: string, file: File): Promise<string> {
   const path = `copyrightEvidence/${claimId}/${crypto.randomUUID()}-${file.name}`
+  const storage = await getFirebaseStorage()
   const task = uploadBytesResumable(ref(storage, path), file)
   await new Promise<void>((resolve, reject) => task.on('state_changed', undefined, reject, () => resolve()))
   return getDownloadURL(task.snapshot.ref)

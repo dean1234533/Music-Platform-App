@@ -3401,3 +3401,51 @@ test('the homepage footer has a visible email, social links, and a working Conta
   // would otherwise try to treat "mailto:..." as an internal route).
   assert.match(landing, /to\.startsWith\('mailto:'\) \|\| to\.startsWith\('http'\)/)
 })
+
+test('Storage/Functions stay out of the eager homepage bundle (SEO audit finding: Speed Index 5.4s, ~435KB estimated unused JS) — trackService, callable.ts, and every service reach them through the lazy getters, not a static import', () => {
+  const firebase = read('src/lib/firebase.ts')
+  assert.match(firebase, /export async function getFirebaseStorage\(\): Promise<FirebaseStorage>/)
+  assert.match(firebase, /export async function getFirebaseFunctions\(\): Promise<Functions>/)
+  assert.doesNotMatch(firebase, /export const storage = getStorage/)
+  assert.doesNotMatch(firebase, /export const functions = getFunctions/)
+  // A *static* `import ... from 'firebase/storage'` pulls the whole SDK into every eager caller's
+  // bundle regardless of when the resulting binding is called — Rollup resolves static imports at
+  // the module-graph level, not at call time. Only a type-only import (or none at all) is safe here.
+  assert.doesNotMatch(firebase, /^import \{ getStorage/m)
+  assert.doesNotMatch(firebase, /^import \{ getFunctions/m)
+  assert.match(firebase, /await import\('firebase\/storage'\)/)
+  assert.match(firebase, /await import\('firebase\/functions'\)/)
+
+  // callable.ts is the shared httpsCallable() wrapper behind ~14 service files (storyService,
+  // supportService, accountService, djService, etc). PlayerBar -> SupportButton -> SupportModal is
+  // mounted on every route, so if this file touched `functions` eagerly it would silently drag
+  // firebase/functions back into the homepage bundle regardless of how careful trackService.ts is.
+  const callable = read('src/lib/callable.ts')
+  assert.doesNotMatch(callable, /^import \{[^}]*\} from 'firebase\/functions'/m)
+  assert.match(callable, /await import\('firebase\/functions'\)/)
+  assert.match(callable, /await getFirebaseFunctions\(\)/)
+
+  for (const file of [
+    'src/services/trackService.ts',
+    'src/services/profileMediaService.ts',
+    'src/services/analyticsService.ts',
+    'src/services/moderationService.ts',
+    'src/services/storyService.ts',
+    'src/services/licenceService.ts',
+  ]) {
+    const src = read(file)
+    assert.doesNotMatch(src, /import \{[^}]*\b(storage|functions)\b[^}]*\} from '@\/lib\/firebase'/, `${file} still statically imports storage/functions`)
+  }
+
+  // trackService.ts is the one file reached eagerly (App.tsx -> PlayerProvider -> PlayerContext ->
+  // trackService.ts, unconditionally on every route, not behind React.lazy). A static
+  // `import { httpsCallable } from 'firebase/functions'` or `import { ref } from 'firebase/storage'`
+  // here — even though every call site already awaits getFirebaseFunctions()/getFirebaseStorage() —
+  // would still drag both SDKs back into the eager homepage bundle, since Rollup keeps a statically
+  // imported module in the eager chunk graph irrespective of whether the binding is actually used.
+  const trackService = read('src/services/trackService.ts')
+  assert.doesNotMatch(trackService, /^import \{[^}]*\} from 'firebase\/functions'/m)
+  assert.doesNotMatch(trackService, /^import \{[^}]*\} from 'firebase\/storage'/m)
+  assert.match(trackService, /await import\('firebase\/functions'\)/)
+  assert.match(trackService, /await import\('firebase\/storage'\)/)
+})

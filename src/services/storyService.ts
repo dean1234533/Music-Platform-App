@@ -1,7 +1,7 @@
 import { collection, getDocs, limit, onSnapshot, orderBy, query, Timestamp, where } from 'firebase/firestore'
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
 import { doc, setDoc, deleteDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore'
-import { db, storage } from '@/lib/firebase'
+import { db, getFirebaseStorage } from '@/lib/firebase'
 import { callable } from '@/lib/callable'
 import { compressImage } from './imageProcessing'
 import { MAX_VIDEO_MB, MAX_AUDIO_MB } from '@/constants/mediaConfig'
@@ -45,6 +45,7 @@ export async function uploadStoryMedia(
 
   const ext = uploadFile.name.split('.').pop() ?? 'bin'
   const path = `artists/${artistId}/stories/${STORAGE_TIER[visibility]}/${crypto.randomUUID()}.${ext}`
+  const storage = await getFirebaseStorage()
   const task = uploadBytesResumable(ref(storage, path), uploadFile)
   await new Promise<void>((resolve, reject) => {
     task.on(

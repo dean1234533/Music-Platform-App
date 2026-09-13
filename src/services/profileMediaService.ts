@@ -1,5 +1,5 @@
 import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage'
-import { storage } from '@/lib/firebase'
+import { getFirebaseStorage } from '@/lib/firebase'
 import { compressImage } from './imageProcessing'
 
 /** Fan/DJ avatar — reuses the existing (previously unused) users/{uid}/profile/ Storage path. */
@@ -20,6 +20,7 @@ export async function uploadArtistCover(artistId: string, file: File, onProgress
 }
 
 async function uploadWithProgress(path: string, file: File, onProgress?: (percent: number) => void): Promise<string> {
+  const storage = await getFirebaseStorage()
   const task = uploadBytesResumable(ref(storage, path), file)
   await new Promise<void>((resolve, reject) => {
     task.on(

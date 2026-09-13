@@ -1,6 +1,6 @@
 import { and, collection, doc, getDocs, onSnapshot, or, orderBy, query, where } from 'firebase/firestore'
 import { ref, uploadBytes } from 'firebase/storage'
-import { auth, db, firebaseApp, storage } from '@/lib/firebase'
+import { auth, db, firebaseApp, getFirebaseStorage } from '@/lib/firebase'
 import { callable } from '@/lib/callable'
 import type { DownloadLogDoc, IntendedUse, LicenceAgreementDoc, LicenceOfferDoc, LicenceRequestDoc, LicenceRequestEventDoc } from '@/types/licence'
 
@@ -182,6 +182,7 @@ export const withdrawOffer = callable<{ requestId: string; actingRole: LicencePa
  */
 export async function uploadDrawnSignature(agreementId: string, uid: string, actingRole: LicencePartyRole, blob: Blob): Promise<string> {
   const path = `licenceSignatures/${agreementId}/${actingRole}-${uid}.png`
+  const storage = await getFirebaseStorage()
   const snap = await uploadBytes(ref(storage, path), blob)
   return snap.ref.fullPath
 }

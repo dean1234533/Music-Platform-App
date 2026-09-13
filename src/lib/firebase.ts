@@ -1,9 +1,9 @@
 import { getApps, initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
-import { getFunctions } from 'firebase/functions'
-import { getStorage } from 'firebase/storage'
-import { getMessaging, isSupported, type Messaging } from 'firebase/messaging'
+import type { Functions } from 'firebase/functions'
+import type { FirebaseStorage } from 'firebase/storage'
+import type { Messaging } from 'firebase/messaging'
 
 // Falls back to the real project config rather than failing outright when
 // VITE_* env vars don't reach the build (seen in practice with Cloudflare's
@@ -29,8 +29,33 @@ export const firebaseApp = getApps().length ? getApps()[0]! : initializeApp(fire
 
 export const auth = getAuth(firebaseApp)
 export const db = getFirestore(firebaseApp)
-export const storage = getStorage(firebaseApp)
-export const functions = getFunctions(firebaseApp)
+
+// Storage and Functions are lazy, not eager top-level exports like auth/db above — a *static*
+// `import ... from 'firebase/storage'` pulls that whole SDK into every page's bundle regardless of
+// whether the resulting binding is actually called, since Rollup resolves static imports at the
+// module-graph level, not at call time. PlayerContext is mounted unconditionally on every route
+// and used to import trackService.ts's static `functions`/`storage` exports just to reach two
+// db-only playback calls, dragging both SDKs into the homepage's eager chunk (SEO audit: Speed
+// Index 5.4s, ~435KB estimated unused JS). The `import('firebase/storage')` calls below are
+// dynamic — only these getters' own call sites, all of them already behind a lazy route/component
+// boundary, ever trigger the actual module fetch.
+let storageInstance: FirebaseStorage | undefined
+export async function getFirebaseStorage(): Promise<FirebaseStorage> {
+  if (!storageInstance) {
+    const { getStorage } = await import('firebase/storage')
+    storageInstance = getStorage(firebaseApp)
+  }
+  return storageInstance
+}
+
+let functionsInstance: Functions | undefined
+export async function getFirebaseFunctions(): Promise<Functions> {
+  if (!functionsInstance) {
+    const { getFunctions } = await import('firebase/functions')
+    functionsInstance = getFunctions(firebaseApp)
+  }
+  return functionsInstance
+}
 
 let messagingInstance: Messaging | null | undefined
 /**
@@ -40,6 +65,7 @@ let messagingInstance: Messaging | null | undefined
  */
 export async function getMessagingInstance(): Promise<Messaging | null> {
   if (messagingInstance !== undefined) return messagingInstance
+  const { getMessaging, isSupported } = await import('firebase/messaging')
   messagingInstance = (await isSupported()) ? getMessaging(firebaseApp) : null
   return messagingInstance
 }

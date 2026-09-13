@@ -13,9 +13,7 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore'
-import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage'
-import { httpsCallable } from 'firebase/functions'
-import { db, functions, storage } from '@/lib/firebase'
+import { db, getFirebaseFunctions, getFirebaseStorage } from '@/lib/firebase'
 import type { LicenceMode, TrackCredits, TrackDoc, TrackVisibility } from '@/types/track'
 import type { TrackDjDealSettings } from '@/types/deal'
 import { slugify } from '@/utils/slug'
@@ -43,6 +41,8 @@ export async function getTrackIdForSlug(artistId: string, slug: string): Promise
 export async function uploadTrackArtworkAsset(artistId: string, trackId: string, artwork: File | null): Promise<string | null> {
   if (!artwork) return null
   const artworkPath = `artists/${artistId}/artwork/${trackId}.${extOf(artwork)}`
+  const { getDownloadURL, ref, uploadBytesResumable } = await import('firebase/storage')
+  const storage = await getFirebaseStorage()
   const snap = await uploadBytesResumable(ref(storage, artworkPath), artwork)
   return getDownloadURL(snap.ref)
 }
@@ -113,7 +113,8 @@ export async function createTrack(
     return candidate
   })
 
-  const fn = httpsCallable(functions, 'createTrack')
+  const { httpsCallable } = await import('firebase/functions')
+  const fn = httpsCallable(await getFirebaseFunctions(), 'createTrack')
   await fn({
     trackId,
     trackSlug,
@@ -194,6 +195,8 @@ export async function updateTrackDetails(trackId: string, input: TrackDetailsInp
 /** Re-uploads cover artwork to the same owner-only Storage path used at creation, overwriting it. */
 export async function uploadTrackArtwork(artistId: string, trackId: string, file: File): Promise<string> {
   const artworkPath = `artists/${artistId}/artwork/${trackId}.${extOf(file)}`
+  const { getDownloadURL, ref, uploadBytesResumable } = await import('firebase/storage')
+  const storage = await getFirebaseStorage()
   const snap = await uploadBytesResumable(ref(storage, artworkPath), file)
   return getDownloadURL(snap.ref)
 }
@@ -274,15 +277,17 @@ export async function updateTrackDjAccess(
 export async function getTrackYoutubeInfo(
   track: TrackDoc,
 ): Promise<{ youtubeVideoId: string; youtubeUrl: string; previewOnly?: boolean; previewSeconds?: number }> {
+  const { httpsCallable } = await import('firebase/functions')
   const fn = httpsCallable<
     { trackId: string },
     { youtubeVideoId: string; youtubeUrl: string; previewOnly?: boolean; previewSeconds?: number }
-  >(functions, 'getTrackYoutubeInfo')
+  >(await getFirebaseFunctions(), 'getTrackYoutubeInfo')
   return (await fn({ trackId: track.trackId })).data
 }
 
 export async function deleteTrack(trackId: string): Promise<void> {
-  const fn = httpsCallable(functions, 'deleteTrack')
+  const { httpsCallable } = await import('firebase/functions')
+  const fn = httpsCallable(await getFirebaseFunctions(), 'deleteTrack')
   await fn({ trackId })
 }
 
@@ -378,6 +383,7 @@ export async function listDJPromotionTracks(count = 20): Promise<TrackDoc[]> {
 
 /** Server-side view counting keeps counts out of reach of client tampering. */
 export async function recordTrackPlay(trackId: string): Promise<void> {
-  const fn = httpsCallable(functions, 'recordTrackPlay')
+  const { httpsCallable } = await import('firebase/functions')
+  const fn = httpsCallable(await getFirebaseFunctions(), 'recordTrackPlay')
   await fn({ trackId })
 }
