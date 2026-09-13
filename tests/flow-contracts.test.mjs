@@ -346,8 +346,10 @@ test('playback and track deletion are server-authorised', () => {
   assert.match(functions, /active licence/)
   const firestoreRules = read('firestore.rules')
   // The actual video ID never lives on the publicly-readable tracks/{trackId} doc (which
-  // exposes locked-tier metadata to any visitor) — it lives in a doc no client can read at all.
-  assert.match(firestoreRules, /match \/trackMedia\/\{trackId\}[\s\S]*?allow read, write: if false/)
+  // exposes locked-tier metadata to any visitor) — it lives in trackMedia, readable directly
+  // only for a track that's already fully public (see isPublicPlayableTrack), never written by
+  // a client at all, and gated by getTrackYoutubeInfo's own re-checked ladder for every other tier.
+  assert.match(firestoreRules, /match \/trackMedia\/\{trackId\}[\s\S]*?allow read: if isPublicPlayableTrack\(trackId\);\s*allow write: if false/)
 })
 
 test('copyright-restricted tracks are gated out of new DJ requests and contracts; master downloads are gone entirely', () => {
@@ -1070,10 +1072,11 @@ test('music access ladder: playback is the official YouTube embed for everyone, 
   // Firestore rules: track metadata (never the video ID) is visible for a
   // locked followers/supporters/early_access track too, so the public
   // profile can show it locked-with-a-CTA instead of hiding it outright —
-  // the real gate is entirely in getTrackYoutubeInfo + trackMedia's rules.
+  // for those tiers the real gate is entirely in getTrackYoutubeInfo;
+  // trackMedia's own rule only ever opens up for an already-public track.
   const rules = read('firestore.rules')
   assert.match(rules, /resource\.data\.visibility == 'followers'\n {8}\|\| resource\.data\.visibility == 'supporters'/)
-  assert.match(rules, /match \/trackMedia\/\{trackId\} \{\s*allow read, write: if false;/)
+  assert.match(rules, /match \/trackMedia\/\{trackId\} \{\s*allow read: if isPublicPlayableTrack\(trackId\);\s*allow write: if false;/)
 
   // No hosted audio paths exist any more — the only remaining Storage
   // surface for a track is its owner-writable, publicly-readable artwork.
@@ -3202,4 +3205,28 @@ test('the Supported artists page shows an error instead of spinning forever when
   assert.match(page, /const \[error, setError\] = useState\(false\)/)
   assert.match(page, /return subscribeMySupportHistory\(firebaseUser\.uid, setHistory, \(\) => setError\(true\)\)/)
   assert.match(page, /\{error \? \(\s*<ErrorState title="Something went wrong" description="Couldn't load your support history\. Try refreshing\." \/>/)
+})
+
+test('the public artist API (which the WordPress plugin depends on) can actually return a public track\'s playable link (WordPress plugin testing: a Public-visibility track showed up via the API with an empty tracks array — its youtubeUrl was always missing)', () => {
+  // Root cause: buildPublicArtistApi's raw, unauthenticated Firestore REST fetch of
+  // trackMedia/{trackId} always got PERMISSION_DENIED, since that doc's rule was an
+  // unconditional `allow read: if false` — so every track, public or not, silently failed the
+  // final `tracks.filter((t) => t.youtubeUrl)` step and the API always returned an empty list.
+  const worker = read('worker/share-og.ts')
+  assert.match(worker, /tracks: tracks\.filter\(\(t\) => t\.youtubeUrl\)/)
+
+  // trackMedia now opens up specifically (and only) for a track that's already fully public —
+  // getTrackYoutubeInfo already discloses a public track's video ID to literally anyone, so this
+  // doesn't loosen the actual security boundary, it just lets the same already-open case be read
+  // directly by an unauthenticated caller like the Cloudflare Worker. Every other visibility tier
+  // stays exclusively gated by getTrackYoutubeInfo's own entitlement check.
+  const rules = read('firestore.rules')
+  assert.match(rules, /function isPublicPlayableTrack\(trackId\) \{/)
+  const start = rules.indexOf('function isPublicPlayableTrack(')
+  const body = rules.slice(start, rules.indexOf('\n    }', start))
+  assert.match(body, /track\.visibility == 'public'/)
+  assert.match(body, /track\.get\('artistRoleActive', true\) == true/)
+  assert.match(body, /track\.get\('takenDown', false\) != true/)
+  assert.match(body, /!track\.get\('restrictedCapabilities', \[\]\)\.hasAny\(\['streaming'\]\)/)
+  assert.match(rules, /match \/trackMedia\/\{trackId\} \{\s*allow read: if isPublicPlayableTrack\(trackId\);\s*allow write: if false;/)
 })

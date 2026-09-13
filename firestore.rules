@@ -25,6 +25,23 @@ service cloud.firestore {
       return hasRole('admin');
     }
 
+    // A track's own sibling doc, re-checked directly rather than trusting
+    // whatever the caller claims — used to let a genuinely public track's
+    // trackMedia doc (the YouTube video ID) be read anonymously, since
+    // "public" already means "anyone, signed in or not, can play this" —
+    // the same thing getTrackYoutubeInfo already grants everyone for a
+    // public track. This does not loosen anything for followers/supporters/
+    // dj_only/private tracks, which still go exclusively through
+    // getTrackYoutubeInfo's own entitlement check.
+    function isPublicPlayableTrack(trackId) {
+      let track = get(/databases/$(database)/documents/tracks/$(trackId)).data;
+      return track.visibility == 'public'
+        && track.get('status', 'published') == 'published'
+        && track.get('artistRoleActive', true) == true
+        && track.get('takenDown', false) != true
+        && !track.get('restrictedCapabilities', []).hasAny(['streaming']);
+    }
+
     // "Supporter" means: has ever made a one-off Stripe Connect support
     // payment to this artist — a supportRelationships doc only ever exists
     // because of a real, server-recorded payment (see
@@ -221,12 +238,22 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // trackMedia/{trackId} — the actual YouTube video ID/URL. Never
-    // client-readable or writable at all: getTrackYoutubeInfo (Admin SDK)
-    // is the only path that ever discloses it, and only after re-checking
-    // the same visibility/entitlement ladder as the track doc itself.
+    // trackMedia/{trackId} — the actual YouTube video ID/URL. Not client-
+    // writable at all, and not client-readable either, EXCEPT for a track
+    // that's already fully public — getTrackYoutubeInfo (Admin SDK) already
+    // discloses a public track's video ID to literally anyone, so allowing
+    // that one already-open case through rules too (instead of exclusively
+    // through the callable) is what lets the Cloudflare Worker's public,
+    // unauthenticated artist API — which the WordPress plugin depends on —
+    // actually return a track's playable link (user-reported, WordPress
+    // plugin testing: a Public-visibility track's own public API response
+    // still had no youtubeUrl at all, since this rule blocked it outright
+    // even for a track anyone can already play on the main site).
+    // followers/supporters/dj_only/private stay exclusively gated by
+    // getTrackYoutubeInfo's own re-checked entitlement ladder.
     match /trackMedia/{trackId} {
-      allow read, write: if false;
+      allow read: if isPublicPlayableTrack(trackId);
+      allow write: if false;
     }
 
     match /trackSlugs/{registryId} {
