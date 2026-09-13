@@ -108,85 +108,89 @@ export function MusicPage() {
       ) : (
         <div className="flex flex-col divide-y divide-surface-border rounded-xl border border-surface-border">
           {tracks.map((track) => (
-            <div key={track.trackId} className="flex flex-wrap items-center gap-3 px-4 py-3">
-              <button
-                type="button"
-                onClick={() => (currentTrack?.trackId === track.trackId ? togglePlay() : playTrack(track, tracks))}
-                className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-surface-2 text-ink-0 transition active:opacity-60"
-                aria-label={currentTrack?.trackId === track.trackId && isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
-              >
-                {track.artworkURL ? <img src={track.artworkURL} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
-                <span className="relative flex h-full w-full items-center justify-center bg-black/35">
-                  {currentTrack?.trackId === track.trackId && isPlaying ? (
-                    <Pause className="h-4 w-4 text-white" fill="currentColor" />
-                  ) : (
-                    <Play className="h-4 w-4 translate-x-0.5 text-white" fill="currentColor" />
-                  )}
-                </span>
-              </button>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-ink-0">{track.title}</p>
-                <p className="truncate text-xs text-ink-2">{track.genre}</p>
-              </div>
-              <span className="shrink-0 rounded-full bg-surface-3 px-2.5 py-1 text-xs text-ink-1">
-                {VISIBILITY_LABEL[track.visibility]}
-              </span>
-              {isTrackAcceptingDjRequests(track) ? (
-                <span className="shrink-0 rounded-full bg-dj-500/15 px-2.5 py-1 text-xs text-dj-400">DJ promo</span>
-              ) : null}
-              {isTrackAcceptingDjRequests(track) ? (
+            <div key={track.trackId} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setOutreachTrack(track)}
-                  className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-surface-3 hover:text-ink-0"
-                  title="Promote to opted-in DJs"
+                  onClick={() => (currentTrack?.trackId === track.trackId ? togglePlay() : playTrack(track, tracks))}
+                  className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-surface-2 text-ink-0 transition active:opacity-60"
+                  aria-label={currentTrack?.trackId === track.trackId && isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
                 >
-                  <Megaphone className="h-4 w-4" />
+                  {track.artworkURL ? <img src={track.artworkURL} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
+                  <span className="relative flex h-full w-full items-center justify-center bg-black/35">
+                    {currentTrack?.trackId === track.trackId && isPlaying ? (
+                      <Pause className="h-4 w-4 text-white" fill="currentColor" />
+                    ) : (
+                      <Play className="h-4 w-4 translate-x-0.5 text-white" fill="currentColor" />
+                    )}
+                  </span>
                 </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => setEditTrack(track)}
-                className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-surface-3 hover:text-ink-0"
-                title="Edit track details"
-                aria-label={`Edit ${track.title}`}
-              >
-                <PencilLine className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setAccessSettingsTrack(track)}
-                className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-surface-3 hover:text-ink-0"
-                title="Fan access settings"
-              >
-                <Settings2 className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setDjAccessTrack(track)}
-                className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-surface-3 hover:text-ink-0"
-                title="DJ access"
-              >
-                <Radio className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setDealsTrack(track)}
-                className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-surface-3 hover:text-ink-0"
-                title="DJ deals"
-              >
-                <Handshake className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleDelete(track)}
-                disabled={deletingTrackId === track.trackId}
-                className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-danger-500/10 hover:text-danger-500 disabled:opacity-50"
-                title="Delete track"
-                aria-label={`Delete ${track.title}`}
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-ink-0">{track.title}</p>
+                  <p className="truncate text-xs text-ink-2">{track.genre}</p>
+                </div>
+              </div>
+              <div className="-mx-4 flex items-center gap-3 overflow-x-auto px-4 sm:mx-0 sm:shrink-0 sm:overflow-visible sm:px-0">
+                <span className="shrink-0 rounded-full bg-surface-3 px-2.5 py-1 text-xs text-ink-1">
+                  {VISIBILITY_LABEL[track.visibility]}
+                </span>
+                {isTrackAcceptingDjRequests(track) ? (
+                  <span className="shrink-0 rounded-full bg-dj-500/15 px-2.5 py-1 text-xs text-dj-400">DJ promo</span>
+                ) : null}
+                {isTrackAcceptingDjRequests(track) ? (
+                  <button
+                    type="button"
+                    onClick={() => setOutreachTrack(track)}
+                    className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-surface-3 hover:text-ink-0"
+                    title="Promote to opted-in DJs"
+                  >
+                    <Megaphone className="h-4 w-4" />
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setEditTrack(track)}
+                  className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-surface-3 hover:text-ink-0"
+                  title="Edit track details"
+                  aria-label={`Edit ${track.title}`}
+                >
+                  <PencilLine className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAccessSettingsTrack(track)}
+                  className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-surface-3 hover:text-ink-0"
+                  title="Fan access settings"
+                >
+                  <Settings2 className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDjAccessTrack(track)}
+                  className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-surface-3 hover:text-ink-0"
+                  title="DJ access"
+                >
+                  <Radio className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDealsTrack(track)}
+                  className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-surface-3 hover:text-ink-0"
+                  title="DJ deals"
+                >
+                  <Handshake className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDelete(track)}
+                  disabled={deletingTrackId === track.trackId}
+                  className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-danger-500/10 hover:text-danger-500 disabled:opacity-50"
+                  title="Delete track"
+                  aria-label={`Delete ${track.title}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           ))}
         </div>
