@@ -129,14 +129,14 @@ export function MusicPage() {
                   <p className="truncate text-sm font-medium text-ink-0">{track.title}</p>
                   <p className="truncate text-xs text-ink-2">{track.genre}</p>
                 </div>
-              </div>
-              <div className="-mx-4 flex items-center gap-3 overflow-x-auto px-4 sm:mx-0 sm:shrink-0 sm:overflow-visible sm:px-0">
                 <span className="shrink-0 rounded-full bg-surface-3 px-2.5 py-1 text-xs text-ink-1">
                   {VISIBILITY_LABEL[track.visibility]}
                 </span>
                 {isTrackAcceptingDjRequests(track) ? (
                   <span className="shrink-0 rounded-full bg-dj-500/15 px-2.5 py-1 text-xs text-dj-400">DJ promo</span>
                 ) : null}
+              </div>
+              <div className="-mx-4 flex items-center gap-3 overflow-x-auto px-4 sm:mx-0 sm:shrink-0 sm:overflow-visible sm:px-0">
                 {isTrackAcceptingDjRequests(track) ? (
                   <button
                     type="button"

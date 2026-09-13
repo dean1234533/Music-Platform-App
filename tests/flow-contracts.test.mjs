@@ -3282,14 +3282,27 @@ test('a track row on the Music page no longer overflows past the card edge on mo
   // Root cause: the row packed a thumbnail, title/genre, two badges, and six icon buttons
   // (promote/edit/fan-access/DJ-access/deals/delete) into one non-wrapping flex row — on a
   // narrow phone viewport there was nowhere near enough width, so the trailing icons spilled
-  // past the card's own rounded border instead of staying inside it. A first fix let the row
-  // wrap onto multiple lines, splitting badges/icons apart — user-reported follow-up: "no if
-  // the badges are there just put all tabs on there on line on mobile", i.e. the badges/icons
-  // must all stay together on one (horizontally scrollable) line, not get split by wrapping.
+  // past the card's own rounded border instead of staying inside it. A first fix let the whole
+  // row wrap onto multiple lines, splitting badges/icons apart in whatever order fit — user-
+  // reported follow-up: "no i said move the tabs to its own line not the badges", i.e. the two
+  // status badges belong on the top line with the title, and only the action-icon buttons move
+  // to their own (horizontally scrollable) line below.
   const musicPage = read('src/pages/artist/dashboard/MusicPage.tsx')
   assert.match(musicPage, /className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3"/)
-  assert.match(
-    musicPage,
-    /className="-mx-4 flex items-center gap-3 overflow-x-auto px-4 sm:mx-0 sm:shrink-0 sm:overflow-visible sm:px-0"/,
+
+  // Badges live in the same block as the thumbnail/title, not the scrollable icon row.
+  const topRowStart = musicPage.indexOf('className="flex min-w-0 items-center gap-3"')
+  const iconRowStart = musicPage.indexOf(
+    'className="-mx-4 flex items-center gap-3 overflow-x-auto px-4 sm:mx-0 sm:shrink-0 sm:overflow-visible sm:px-0"',
   )
+  assert.ok(topRowStart !== -1 && iconRowStart !== -1 && topRowStart < iconRowStart)
+  const topRow = musicPage.slice(topRowStart, iconRowStart)
+  assert.match(topRow, /\{VISIBILITY_LABEL\[track\.visibility\]\}/)
+  assert.match(topRow, /DJ promo/)
+
+  // Only the icon buttons live in the scrollable row — no badge text there.
+  const iconRow = musicPage.slice(iconRowStart, musicPage.indexOf('</div>\n            </div>', iconRowStart))
+  assert.doesNotMatch(iconRow, /VISIBILITY_LABEL/)
+  assert.doesNotMatch(iconRow, /DJ promo/)
+  assert.match(iconRow, /<Trash2 className="h-4 w-4" \/>/)
 })
