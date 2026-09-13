@@ -274,10 +274,18 @@ export function LandingPage() {
       </main>
       <footer className="border-t border-white/10">
         <div className="mx-auto grid max-w-[1440px] gap-10 px-5 py-12 sm:grid-cols-2 sm:px-8 lg:grid-cols-[1.4fr_1fr_1fr_1fr] lg:px-12 lg:py-16">
-          <div><BrandMark /><p className="mt-5 max-w-xs text-sm leading-6 text-ink-2">Independent music, direct support, and clearer connections between the people who move culture.</p></div>
+          <div>
+            <BrandMark />
+            <p className="mt-5 max-w-xs text-sm leading-6 text-ink-2">Independent music, direct support, and clearer connections between the people who move culture.</p>
+            <a href="mailto:support@backthevibes.com" className="mt-5 block text-sm text-ink-1 transition hover:text-brand-400">support@backthevibes.com</a>
+            <div className="mt-4 flex items-center gap-4">
+              <a href="https://www.instagram.com/backthevibes" target="_blank" rel="noopener noreferrer" className="text-sm text-ink-2 transition hover:text-brand-400">Instagram</a>
+              <a href="https://www.tiktok.com/@backthevibes" target="_blank" rel="noopener noreferrer" className="text-sm text-ink-2 transition hover:text-brand-400">TikTok</a>
+            </div>
+          </div>
           <FooterGroup title="Platform" links={[['How it works', '/#how-it-works'], ['Pricing', '/#pricing'], ['Blog', '/blog'], ['Sign in', '/sign-in']]} />
           <FooterGroup title="Join" links={[['For listeners', '/sign-up?role=fan'], ['For artists', '/for-artists'], ['For DJs', '/for-djs']]} />
-          <FooterGroup title="Legal" links={[['Terms & conditions', '/terms'], ['Privacy policy', '/privacy']]} />
+          <FooterGroup title="Legal" links={[['Contact', 'mailto:support@backthevibes.com'], ['Terms & conditions', '/terms'], ['Privacy policy', '/privacy']]} />
         </div>
         <div className="mx-auto flex max-w-[1440px] flex-col gap-2 border-t border-white/[0.07] px-5 py-6 text-xs text-ink-3 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-12"><p>© {new Date().getFullYear()} BackTheVibes.</p><p>Independent by design.</p></div>
       </footer>
@@ -287,5 +295,24 @@ export function LandingPage() {
 }
 
 function FooterGroup({ title, links }: { title: string; links: [string, string][] }) {
-  return <div><h2 className="text-xs font-bold uppercase tracking-[0.16em] text-ink-3">{title}</h2><ul className="mt-5 space-y-3">{links.map(([label, to]) => <li key={label}><Link to={to} className="text-sm text-ink-1 transition hover:text-brand-400">{label}</Link></li>)}</ul></div>
+  return (
+    <div>
+      <h2 className="text-xs font-bold uppercase tracking-[0.16em] text-ink-3">{title}</h2>
+      <ul className="mt-5 space-y-3">
+        {links.map(([label, to]) => (
+          <li key={label}>
+            {to.startsWith('mailto:') || to.startsWith('http') ? (
+              <a href={to} className="text-sm text-ink-1 transition hover:text-brand-400">
+                {label}
+              </a>
+            ) : (
+              <Link to={to} className="text-sm text-ink-1 transition hover:text-brand-400">
+                {label}
+              </Link>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
 }

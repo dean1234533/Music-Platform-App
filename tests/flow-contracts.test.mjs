@@ -3385,3 +3385,19 @@ test('the homepage has a visible FAQ section with FAQPage structured data (SEO a
   assert.match(worker, /jsonLd\?: object \| object\[\]/)
   assert.match(worker, /\$\{renderFaqs\(HOME_FAQS\)\}`,\s*jsonLd: \[/)
 })
+
+test('the homepage footer has a visible email, social links, and a working Contact link (SEO audit findings: no email/social links/contact page found)', () => {
+  const landing = read('src/pages/marketing/LandingPage.tsx')
+  assert.match(landing, /href="mailto:support@backthevibes\.com"/)
+  assert.match(landing, /href="https:\/\/www\.instagram\.com\/backthevibes"/)
+  assert.match(landing, /href="https:\/\/www\.tiktok\.com\/@backthevibes"/)
+
+  // /support (the in-app contact form) requires sign-in, so it's a dead end for a signed-out
+  // visitor clicking "Contact" from the homepage — the footer's Contact link goes to the public
+  // support email instead, not the auth-gated route.
+  assert.match(landing, /\['Contact', 'mailto:support@backthevibes\.com'\]/)
+
+  // FooterGroup renders mailto:/external links as plain <a> tags, not React Router's <Link> (which
+  // would otherwise try to treat "mailto:..." as an internal route).
+  assert.match(landing, /to\.startsWith\('mailto:'\) \|\| to\.startsWith\('http'\)/)
+})
