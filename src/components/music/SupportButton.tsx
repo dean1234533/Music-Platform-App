@@ -20,11 +20,18 @@ export function SupportButton({
   artistId,
   size = 'md',
   autoTrigger = false,
+  signedOutDestination = 'sign-in',
 }: {
   artistId?: string
   size?: keyof typeof sizeClasses
   /** Fires the same thing a real click would, once, on mount — used by ?action=support links (e.g. the WordPress plugin's Support button, which only ever links out here). */
   autoTrigger?: boolean
+  /** A signed-out visitor clicking Support straight off a public artist profile is likely brand
+   * new to BackTheVibes, not an existing user who's merely signed out — so that context (and only
+   * that one, not every Support button app-wide) sends them to sign up rather than sign in
+   * (user-reported: "no should be signup... because if you are clicking support from there means
+   * you are not signed up already"). */
+  signedOutDestination?: 'sign-in' | 'sign-up'
 }) {
   const { firebaseUser } = useAuth()
   const navigate = useNavigate()
@@ -36,7 +43,7 @@ export function SupportButton({
   function handleClick() {
     if (!firebaseUser) {
       const returnTo = `${location.pathname}${location.search}`
-      navigate(`/sign-in?returnTo=${encodeURIComponent(returnTo)}`)
+      navigate(`/${signedOutDestination}?returnTo=${encodeURIComponent(returnTo)}`)
       return
     }
     if (!artistId) {

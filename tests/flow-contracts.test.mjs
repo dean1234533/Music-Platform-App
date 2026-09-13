@@ -759,7 +759,7 @@ test('Follow/Support CTAs preserve intent through the full auth funnel (returnTo
   const follow = read('src/components/music/FollowButton.tsx')
   assert.match(follow, /const PENDING_FOLLOW_KEY = 'pendingFollowArtistId'/)
   assert.match(follow, /sessionStorage\.setItem\(PENDING_FOLLOW_KEY, artistId\)/)
-  assert.match(follow, /navigate\(`\/sign-in\?returnTo=\$\{encodeURIComponent\(returnTo\)\}`, \{ state: \{ from: location \} \}\)/)
+  assert.match(follow, /navigate\(`\/\$\{signedOutDestination\}\?returnTo=\$\{encodeURIComponent\(returnTo\)\}`, \{ state: \{ from: location \} \}\)/)
 
   assert.match(read('src/pages/auth/SignInPage.tsx'), /isSafeReturnPath\(returnToParam\)/)
   assert.match(read('src/pages/auth/SignUpPage.tsx'), /isSafeReturnPath/)
@@ -775,7 +775,7 @@ test('Follow/Support CTAs preserve intent through the full auth funnel (returnTo
   // link survives the sign-in round trip too.
   const support = read('src/components/music/SupportButton.tsx')
   assert.match(support, /const returnTo = `\$\{location\.pathname\}\$\{location\.search\}`/)
-  assert.match(support, /navigate\(`\/sign-in\?returnTo=\$\{encodeURIComponent\(returnTo\)\}`\)/)
+  assert.match(support, /navigate\(`\/\$\{signedOutDestination\}\?returnTo=\$\{encodeURIComponent\(returnTo\)\}`\)/)
   assert.match(support, /setShowModal\(true\)/)
 })
 
@@ -3240,8 +3240,8 @@ test('the WordPress plugin\'s Follow/Support buttons actually follow/support ins
   // that page ever read those query params, so a visitor just landed on an ordinary profile and
   // had to find and click Follow/Support themselves a second time.
   const page = read('src/pages/artist/ArtistPublicProfilePage.tsx')
-  assert.match(page, /<FollowButton artistId=\{artist\.artistId\} autoTrigger=\{searchParams\.get\('action'\) === 'follow'\} \/>/)
-  assert.match(page, /<SupportButton artistId=\{artist\.artistId\} autoTrigger=\{searchParams\.get\('action'\) === 'support'\} \/>/)
+  assert.match(page, /<FollowButton[\s\S]*?autoTrigger=\{searchParams\.get\('action'\) === 'follow'\}/)
+  assert.match(page, /<SupportButton[\s\S]*?autoTrigger=\{searchParams\.get\('action'\) === 'support'\}/)
 
   const follow = read('src/components/music/FollowButton.tsx')
   assert.match(follow, /autoTrigger\?: boolean/)
@@ -3258,4 +3258,22 @@ test('the WordPress plugin\'s Follow/Support buttons actually follow/support ins
   // Previously only window.location.pathname (no search params at all), so a signed-out
   // visitor's ?action=support was silently dropped on the sign-in redirect and never resumed.
   assert.match(support, /const returnTo = `\$\{location\.pathname\}\$\{location\.search\}`/)
+})
+
+test('a signed-out visitor clicking Follow/Support on a public artist profile goes to sign UP, not sign in (user-reported: "no should be signup... because if you are clicking support from there means you are not signed up already")', () => {
+  // Scoped narrowly, not app-wide: a signedOutDestination prop (default \'sign-in\', unchanged
+  // for every other caller) that ArtistPublicProfilePage alone overrides to \'sign-up\' — an
+  // existing signed-out user clicking Follow from their own browsing elsewhere in the app still
+  // goes to sign-in as before.
+  const follow = read('src/components/music/FollowButton.tsx')
+  assert.match(follow, /signedOutDestination = 'sign-in',/)
+  assert.match(follow, /navigate\(`\/\$\{signedOutDestination\}\?returnTo=\$\{encodeURIComponent\(returnTo\)\}`, \{ state: \{ from: location \} \}\)/)
+
+  const support = read('src/components/music/SupportButton.tsx')
+  assert.match(support, /signedOutDestination = 'sign-in',/)
+  assert.match(support, /navigate\(`\/\$\{signedOutDestination\}\?returnTo=\$\{encodeURIComponent\(returnTo\)\}`\)/)
+
+  const page = read('src/pages/artist/ArtistPublicProfilePage.tsx')
+  assert.match(page, /<FollowButton[\s\S]*?signedOutDestination="sign-up"/)
+  assert.match(page, /<SupportButton[\s\S]*?signedOutDestination="sign-up"/)
 })

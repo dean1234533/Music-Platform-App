@@ -12,11 +12,18 @@ export function FollowButton({
   artistId,
   size = 'md',
   autoTrigger = false,
+  signedOutDestination = 'sign-in',
 }: {
   artistId: string
   size?: 'sm' | 'md' | 'lg'
   /** Fires the same thing a real click would, once, on mount — used by ?action=follow links (e.g. the WordPress plugin's Follow button, which only ever links out to this page rather than performing the action itself). */
   autoTrigger?: boolean
+  /** A signed-out visitor clicking Follow straight off a public artist profile is likely brand
+   * new to BackTheVibes, not an existing user who's merely signed out — so that context (and only
+   * that one, not every Follow button app-wide) sends them to sign up rather than sign in
+   * (user-reported: "no should be signup... because if you are clicking support from there means
+   * you are not signed up already"). */
+  signedOutDestination?: 'sign-in' | 'sign-up'
 }) {
   const { firebaseUser } = useAuth()
   const navigate = useNavigate()
@@ -64,7 +71,7 @@ export function FollowButton({
     if (!firebaseUser) {
       sessionStorage.setItem(PENDING_FOLLOW_KEY, artistId)
       const returnTo = `${location.pathname}${location.search}`
-      navigate(`/sign-in?returnTo=${encodeURIComponent(returnTo)}`, { state: { from: location } })
+      navigate(`/${signedOutDestination}?returnTo=${encodeURIComponent(returnTo)}`, { state: { from: location } })
       return
     }
     setPending(true)
