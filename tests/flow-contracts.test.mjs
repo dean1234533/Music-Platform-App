@@ -3190,3 +3190,16 @@ test('a fan can actually see their own support history (missing composite index)
   )
   assert.ok(hasFanTypeCreatedAtIndex, 'expected a transactions index on (fanId, type, createdAt desc)')
 })
+
+test('the Supported artists page shows an error instead of spinning forever when its listener fails (user-reported: "the my supporter and the supporter page is stuck in a loading state")', () => {
+  // Root cause: subscribeMySupportHistory was called with no onError callback, so the missing-
+  // index failure fixed above (or any other listener error) left `history`/`rows` stuck at
+  // null forever with nothing to break the loading state — the same "loading vs. broken"
+  // collapse already fixed on Overview/Growth, just with an onSnapshot error this time instead
+  // of a missing profile document.
+  const page = read('src/pages/fan/SupportedPage.tsx')
+  assert.match(page, /import \{ EmptyState, ErrorState, LoadingState \} from '@\/components\/common\/StateViews'/)
+  assert.match(page, /const \[error, setError\] = useState\(false\)/)
+  assert.match(page, /return subscribeMySupportHistory\(firebaseUser\.uid, setHistory, \(\) => setError\(true\)\)/)
+  assert.match(page, /\{error \? \(\s*<ErrorState title="Something went wrong" description="Couldn't load your support history\. Try refreshing\." \/>/)
+})

@@ -4,7 +4,7 @@ import { Heart } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { subscribeMySupportHistory } from '@/services/supportService'
 import { getArtistProfile } from '@/services/artistService'
-import { EmptyState, LoadingState } from '@/components/common/StateViews'
+import { EmptyState, ErrorState, LoadingState } from '@/components/common/StateViews'
 import { formatCurrency } from '@/utils/format'
 import type { ArtistProfile } from '@/types/artist'
 import type { TransactionDoc } from '@/types/finance'
@@ -14,10 +14,12 @@ export function SupportedPage() {
   const { firebaseUser } = useAuth()
   const [history, setHistory] = useState<TransactionDoc[] | null>(null)
   const [rows, setRows] = useState<{ artist: ArtistProfile; totalMinor: number }[] | null>(null)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
     if (!firebaseUser) return
-    return subscribeMySupportHistory(firebaseUser.uid, setHistory)
+    setError(false)
+    return subscribeMySupportHistory(firebaseUser.uid, setHistory, () => setError(true))
   }, [firebaseUser])
 
   useEffect(() => {
@@ -45,7 +47,9 @@ export function SupportedPage() {
         </p>
       </div>
 
-      {rows === null ? (
+      {error ? (
+        <ErrorState title="Something went wrong" description="Couldn't load your support history. Try refreshing." />
+      ) : rows === null ? (
         <LoadingState />
       ) : rows.length === 0 ? (
         <EmptyState
