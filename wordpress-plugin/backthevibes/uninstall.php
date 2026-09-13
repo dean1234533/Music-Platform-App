@@ -15,7 +15,11 @@ delete_option( 'backthevibes_default_slug' );
 
 global $wpdb;
 // Best-effort cleanup of this plugin's own transients; safe to skip if it
-// ever fails; the transients also self-expire regardless.
+// ever fails; the transients also self-expire regardless. A direct query is
+// unavoidable here — there is no core WP API to delete transients by a name
+// prefix (only by exact key), and caching is meaningless for a query that
+// runs exactly once while the site is being torn down.
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 $wpdb->query(
 	$wpdb->prepare(
 		"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
