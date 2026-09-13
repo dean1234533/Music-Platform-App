@@ -3327,3 +3327,17 @@ test('a track row on the Music page no longer overflows past the card edge on mo
   assert.doesNotMatch(iconRow, /DJ promo/)
   assert.match(iconRow, /<Trash2 className="h-4 w-4" \/>/)
 })
+
+test('the homepage no longer emits a duplicate Organization schema (SEO audit finding: "Duplicate schema type(s) found: Organization")', () => {
+  // index.html was the shared SPA shell, statically baked with its own Organization JSON-LD —
+  // but LandingPage.tsx (the homepage) already injects its own Organization schema dynamically
+  // via useSeo(), correctly managed and cleaned up on navigation. A real visit to the homepage
+  // therefore had two separate Organization <script type="application/ld+json"> blocks at once.
+  // Removed the static one; useSeo()'s dynamic one (with a url field the static one even lacked)
+  // is the single source of truth now.
+  const html = read('index.html')
+  assert.doesNotMatch(html, /application\/ld\+json/)
+
+  const landing = read('src/pages/marketing/LandingPage.tsx')
+  assert.match(landing, /'@type': 'Organization'/)
+})
