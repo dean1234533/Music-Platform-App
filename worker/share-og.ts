@@ -9,7 +9,7 @@
  */
 
 import { BLOG_POSTS } from '../src/content/blog.ts'
-import { DJ_FAQS, ARTIST_FAQS } from '../src/content/faqs.ts'
+import { DJ_FAQS, ARTIST_FAQS, HOME_FAQS } from '../src/content/faqs.ts'
 import { TOOLS, getToolBySlug } from '../src/content/tools.ts'
 
 export interface Env {
@@ -150,7 +150,7 @@ ${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script
  * bots) needs actual readable content here, not just meta tags plus a
  * meta-refresh to a URL it likely won't re-fetch.
  */
-function renderContentHtml(opts: { title: string; description: string; url: string; bodyHtml: string; jsonLd?: object }): string {
+function renderContentHtml(opts: { title: string; description: string; url: string; bodyHtml: string; jsonLd?: object | object[] }): string {
   const { title, description, url, bodyHtml, jsonLd } = opts
   const safeTitle = escapeHtml(title)
   const safeDescription = escapeHtml(description)
@@ -399,13 +399,24 @@ export default {
               'Support the artists you actually listen to. Discover independent music, support artists directly, and give DJs a better way to find what comes next.',
             url,
             bodyHtml:
-              '<p>BackTheVibes connects independent musicians, listeners, and DJs/businesses directly. Music plays through the official YouTube player. Fans discover artists and support them with a one-off payment straight to the artist. DJs and businesses propose collaborations and licence tracks directly from the artist who made them, with a real e-signed agreement. Artists publish their music and keep control of their own terms.</p><ul><li><a href="/for-artists">For artists</a></li><li><a href="/for-djs">For DJs</a></li><li><a href="/pricing">Pricing</a></li><li><a href="/blog">Blog</a></li></ul>',
-            jsonLd: {
-              '@context': 'https://schema.org',
-              '@type': 'Organization',
-              name: 'BackTheVibes',
-              url: requestUrl.origin,
-            },
+              `<p>BackTheVibes connects independent musicians, listeners, and DJs/businesses directly. Music plays through the official YouTube player. Fans discover artists and support them with a one-off payment straight to the artist. DJs and businesses propose collaborations and licence tracks directly from the artist who made them, with a real e-signed agreement. Artists publish their music and keep control of their own terms.</p><ul><li><a href="/for-artists">For artists</a></li><li><a href="/for-djs">For DJs</a></li><li><a href="/pricing">Pricing</a></li><li><a href="/blog">Blog</a></li></ul>${renderFaqs(HOME_FAQS)}`,
+            jsonLd: [
+              {
+                '@context': 'https://schema.org',
+                '@type': 'Organization',
+                name: 'BackTheVibes',
+                url: requestUrl.origin,
+              },
+              {
+                '@context': 'https://schema.org',
+                '@type': 'FAQPage',
+                mainEntity: HOME_FAQS.map(([question, answer]) => ({
+                  '@type': 'Question',
+                  name: question,
+                  acceptedAnswer: { '@type': 'Answer', text: answer },
+                })),
+              },
+            ],
           }),
         )
       }

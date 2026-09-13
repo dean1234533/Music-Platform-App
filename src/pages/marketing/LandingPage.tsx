@@ -6,6 +6,7 @@ import { MusicGlyph } from '@/components/common/MusicGlyph'
 import { listActiveSubscriptionPlansForRole } from '@/services/platformSettingsService'
 import { formatCurrency } from '@/utils/format'
 import { useSeo } from '@/lib/seo'
+import { HOME_FAQS } from '@/content/faqs'
 import type { SubscriptionPlan } from '@/types/platformSettings'
 
 const roles = [
@@ -41,6 +42,15 @@ export function LandingPage() {
         '@type': 'WebSite',
         name: 'BackTheVibes',
         url: typeof window !== 'undefined' ? window.location.origin : '',
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: HOME_FAQS.map(([question, answer]) => ({
+          '@type': 'Question',
+          name: question,
+          acceptedAnswer: { '@type': 'Answer', text: answer },
+        })),
       },
     ],
   })
@@ -239,6 +249,18 @@ export function LandingPage() {
           <p className="mt-4 text-center">
             <Link to="/pricing" className="text-sm font-medium text-brand-400 transition hover:text-brand-300">See all pricing →</Link>
           </p>
+        </section>
+
+        <section className="mx-auto max-w-3xl px-5 pb-20 sm:px-8 lg:px-12 lg:pb-28">
+          <h2 className="text-2xl font-medium tracking-[-0.03em]">Frequently asked</h2>
+          <div className="mt-6 divide-y divide-white/[0.08] border-y border-white/[0.08]">
+            {HOME_FAQS.map(([question, answer]) => (
+              <div key={question} className="py-6">
+                <h3 className="text-base font-medium text-ink-0">{question}</h3>
+                <p className="mt-2 text-sm leading-6 text-ink-2">{answer}</p>
+              </div>
+            ))}
+          </div>
         </section>
 
         <section className="px-5 pb-24 sm:px-8 lg:px-12 lg:pb-32">

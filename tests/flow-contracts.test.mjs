@@ -3365,3 +3365,23 @@ test('Microsoft Clarity only ever loads after the visitor accepts the cookie con
   assert.match(headers, /script-src[^;]*https:\/\/\*\.clarity\.ms/)
   assert.match(headers, /connect-src[^;]*https:\/\/\*\.clarity\.ms/)
 })
+
+test('the homepage has a visible FAQ section with FAQPage structured data (SEO audit findings: "No FAQ section found" and "No FAQPage schema found")', () => {
+  const faqs = read('src/content/faqs.ts')
+  assert.match(faqs, /export const HOME_FAQS: \[string, string\]\[\] = \[/)
+
+  const landing = read('src/pages/marketing/LandingPage.tsx')
+  assert.match(landing, /import \{ HOME_FAQS \} from '@\/content\/faqs'/)
+  assert.match(landing, /'@type': 'FAQPage'/)
+  assert.match(landing, /mainEntity: HOME_FAQS\.map\(\(\[question, answer\]\) => \(\{/)
+  assert.match(landing, /<h2 className="text-2xl font-medium tracking-\[-0\.03em\]">Frequently asked<\/h2>/)
+  assert.match(landing, /\{HOME_FAQS\.map\(\(\[question, answer\]\) => \(/)
+
+  // The crawler-only pre-rendered homepage mirrors the same FAQ content and schema, not just the
+  // React page — renderContentHtml's jsonLd now accepts an array so Organization + FAQPage can
+  // both ship on the one crawler response, matching how the React page's useSeo() already does.
+  const worker = read('worker/share-og.ts')
+  assert.match(worker, /import \{ DJ_FAQS, ARTIST_FAQS, HOME_FAQS \} from '\.\.\/src\/content\/faqs\.ts'/)
+  assert.match(worker, /jsonLd\?: object \| object\[\]/)
+  assert.match(worker, /\$\{renderFaqs\(HOME_FAQS\)\}`,\s*jsonLd: \[/)
+})

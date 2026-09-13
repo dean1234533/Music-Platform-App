@@ -12,6 +12,13 @@ export const DJ_FAQS: [string, string][] = [
   ['What if an artist doesn\'t respond?', 'Requests that go unanswered eventually expire so your crate doesn\'t fill up with stale pending requests — you can always follow up directly through the built-in messaging.'],
 ]
 
+export const HOME_FAQS: [string, string][] = [
+  ['Is BackTheVibes free?', 'Yes for listeners and DJs — creating an account, following artists, and browsing tracks costs nothing. Artists publish for a flat £29.99/year (14-day free trial), not a percentage of what they earn.'],
+  ['How do artists get paid?', 'Directly. A fan\'s one-off support payment and a DJ\'s licence fee both go straight to the artist\'s own connected Stripe account — BackTheVibes takes a platform fee, shown before payment, and never sits between the artist and their money.'],
+  ['Where does the music actually play from?', 'Every track plays through the official YouTube embedded player, using a YouTube link the artist provides. BackTheVibes never hosts, downloads, or extracts audio itself.'],
+  ['How does DJ licensing work?', 'A DJ requests access to a track, the artist sets (or agrees) the terms — permitted use, territory, duration, price — and once both sides accept, a dated agreement is generated for e-signature. No informal DMs, no ambiguity about what\'s allowed.'],
+]
+
 export const ARTIST_FAQS: [string, string][] = [
   ['What does it cost to publish?', 'A flat £29.99 a year for an artist profile — not a percentage of what you earn, and not a recurring cut of every stream. New artists get a 14-day free trial before the first charge.'],
   ['Is there a free trial?', 'Yes — a 14-day free trial on Artist Membership, available once per artist. You can publish and use everything during the trial; cancel any time before it ends and you won\'t be charged.'],
