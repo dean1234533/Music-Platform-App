@@ -200,6 +200,12 @@ export const createTrack = onCall(async (request) => {
     youtubeVideoId,
     youtubeUrl: `https://www.youtube.com/watch?v=${youtubeVideoId}`,
   })
+  // Incremented in the same atomic batch as the track write itself, rather than relying on a
+  // separate onDocumentCreated trigger — a trigger delivery gap left this permanently at 0 for
+  // at least one account with a real, live track (user-reported: "i have uploaded a track but
+  // the allowance still says 0 of 10", confirmed still 0 even in a fresh private-window session
+  // after the earlier live-badge display fix).
+  batch.update(db.collection('artistProfiles').doc(uid), { trackCount: FieldValue.increment(1) })
   await batch.commit()
   return { ok: true, trackId }
 })
@@ -247,8 +253,11 @@ export const deleteTrack = onCall(async (request) => {
     deleteQuery(db.collection('trackLikes').where('trackId', '==', trackId)),
     deleteQuery(db.collection('djDeals').where('trackId', '==', trackId)),
   ])
-  await db.collection('trackMedia').doc(trackId).delete()
-  await ref.delete()
+  const deleteBatch = db.batch()
+  deleteBatch.delete(db.collection('trackMedia').doc(trackId))
+  deleteBatch.delete(ref)
+  deleteBatch.update(db.collection('artistProfiles').doc(track.artistId), { trackCount: FieldValue.increment(-1) })
+  await deleteBatch.commit()
   return { ok: true }
 })
 

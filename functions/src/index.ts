@@ -37,7 +37,6 @@ export { submitSupportMessage, resolveSupportMessage } from './support.js'
 export { adminUpsertSubscriptionPlan, adminUpdatePlatformSettings } from './admin/settings.js'
 
 // Free creator workflows and fan supporter subscriptions.
-export { onTrackCreate, onTrackDelete } from './tracks/triggers.js'
 export { adminSeedSubscriptionPlans } from './admin/seedPlans.js'
 export { sendBulkDjOutreach } from './messaging/bulkOutreach.js'
 

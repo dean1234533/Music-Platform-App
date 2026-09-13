@@ -3044,11 +3044,9 @@ test('Stripe Connect onboarding/dashboard-link failures surface the real cause i
 })
 
 test('the upload page\'s track allowance badge stays accurate after a successful upload instead of showing the pre-upload count forever (user-reported: "i have uploaded a track but the allowance still says 0 of 10")', () => {
-  // Root cause: storedTrackCount was set once via a one-shot getArtistProfile() fetch on mount
-  // and never updated again on this page — trackCount itself was incrementing correctly server-
-  // side (onTrackCreate's trigger), the displayed badge just never learned about it without a
-  // full page remount. Switched to the same live subscribeArtistProfile() pattern already used
-  // by OverviewPage/GrowthPage for the same field.
+  // First fix: storedTrackCount was set once via a one-shot getArtistProfile() fetch on mount
+  // and never updated again on this page. Switched to the same live subscribeArtistProfile()
+  // pattern already used by OverviewPage/GrowthPage for the same field.
   const page = read('src/pages/artist/dashboard/UploadTrackPage.tsx')
   assert.match(page, /import \{ getArtistProfile, subscribeArtistProfile \} from '@\/services\/artistService'/)
   assert.match(
@@ -3060,10 +3058,19 @@ test('the upload page\'s track allowance badge stays accurate after a successful
   // last rendered — so it must still be imported and used there, not removed outright.
   assert.match(page, /const artistProfile = await getArtistProfile\(firebaseUser\.uid\)/)
 
-  // trackCount itself really is maintained server-side unconditionally for every track — the
-  // Firestore trigger, not something createTrack itself has to remember to do.
-  const triggers = read('functions/src/tracks/triggers.ts')
-  assert.match(triggers, /await db\.collection\('artistProfiles'\)\.doc\(artistId\)\.update\(\{ trackCount: FieldValue\.increment\(1\) \}\)/)
+  // Second fix, after the badge display fix alone didn't resolve it (confirmed still 0 even in
+  // a fresh private-window session, ruling out any client-side caching): trackCount was actually
+  // never incrementing server-side at all — it depended on a separate onDocumentCreated trigger
+  // whose delivery had a real gap for at least one account with a genuinely live track. Moved the
+  // increment into createTrack's own atomic batch write instead of trusting a second, independent
+  // write to happen later, and the matching decrement into deleteTrack's batch — removing the
+  // trigger's dependency entirely rather than trying to explain why it wasn't firing.
+  const tracksFn = read('functions/src/tracks.ts')
+  assert.match(tracksFn, /batch\.update\(db\.collection\('artistProfiles'\)\.doc\(uid\), \{ trackCount: FieldValue\.increment\(1\) \}\)/)
+  assert.match(tracksFn, /deleteBatch\.update\(db\.collection\('artistProfiles'\)\.doc\(track\.artistId\), \{ trackCount: FieldValue\.increment\(-1\) \}\)/)
+
+  const indexFn = read('functions/src/index.ts')
+  assert.doesNotMatch(indexFn, /tracks\/triggers\.js/)
 })
 
 test('an artist (or DJ) account can no longer like tracks or build playlists — those are fan-only, mirroring the existing hasRole(\'dj\') gate on crates (user-reported: "as a artist i am. able to click platlist and like a song when it is playing")', () => {
