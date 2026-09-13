@@ -5,8 +5,14 @@ import { Input, Label } from '@/components/common/Input'
 import { Button } from '@/components/common/Button'
 import { requestPasswordReset } from '@/services/authService'
 import { friendlyAuthError } from '@/utils/authErrors'
+import { useSeo } from '@/lib/seo'
 
 export function ForgotPasswordPage() {
+  useSeo({
+    title: 'Reset Your Password',
+    description: 'Request a password reset email for your BackTheVibes account.',
+    path: '/forgot-password',
+  })
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [error, setError] = useState<string | null>(null)

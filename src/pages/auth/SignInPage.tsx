@@ -8,6 +8,7 @@ import { friendlyAuthError } from '@/utils/authErrors'
 import { ensureUserDocument, getUserProfile } from '@/services/userService'
 import { isSafeReturnPath } from '@/utils/returnTo'
 import { workspaceHomeForRoles } from '@/lib/workspaceRoute'
+import { useSeo } from '@/lib/seo'
 import type { User } from 'firebase/auth'
 
 const SUSPENDED_MESSAGE = 'This account has been suspended. Contact support if you believe this is a mistake.'
@@ -27,6 +28,11 @@ async function dashboardAfterSignIn(user: User): Promise<string> {
 }
 
 export function SignInPage() {
+  useSeo({
+    title: 'Sign In',
+    description: 'Sign in to BackTheVibes to listen, follow and support artists, or manage your artist or DJ profile.',
+    path: '/sign-in',
+  })
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { BrandMark } from '@/components/common/BrandMark'
+import { useSeo } from '@/lib/seo'
 
 const sections: [string, string][] = [
   [
@@ -38,6 +39,11 @@ const sections: [string, string][] = [
 ]
 
 export function CopyrightPolicyPage() {
+  useSeo({
+    title: 'Copyright Policy',
+    description: 'How BackTheVibes handles copyright claims on linked YouTube tracks — filing a claim, the review process, temporary restrictions, payment holds, and counter-notices.',
+    path: '/copyright',
+  })
   return (
     <div className="min-h-svh bg-surface-0 text-ink-0">
       <header className="sticky top-0 z-20 border-b border-white/[0.07] bg-surface-0/80 backdrop-blur-xl">

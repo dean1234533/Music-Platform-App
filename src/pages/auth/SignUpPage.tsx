@@ -8,8 +8,14 @@ import { signUpWithEmail } from '@/services/authService'
 import { friendlyAuthError } from '@/utils/authErrors'
 import { checkPassword, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 import { isSafeReturnPath } from '@/utils/returnTo'
+import { useSeo } from '@/lib/seo'
 
 export function SignUpPage() {
+  useSeo({
+    title: 'Sign Up',
+    description: 'Create a free BackTheVibes account to discover independent music, support artists directly, or publish your own tracks and DJ licensing terms.',
+    path: '/sign-up',
+  })
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const requestedRole = ['fan', 'artist', 'dj'].includes(searchParams.get('role') ?? '')

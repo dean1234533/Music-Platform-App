@@ -3461,3 +3461,29 @@ test('homepage footer and inline links have a real touch target instead of bare 
   assert.match(landing, /className="inline-block px-2 py-1 text-sm text-ink-2/)
   assert.match(landing, /See all pricing/)
 })
+
+test('sign-in, sign-up, forgot-password, terms, privacy, and copyright each get their own title/description/canonical instead of sharing the SPA shell default (SEO audit finding: "6 pages share the same title tag" / "same meta description" / "No canonical tag found")', () => {
+  const legal = read('src/pages/marketing/LegalPage.tsx')
+  assert.match(legal, /import \{ useSeo \} from '@\/lib\/seo'/)
+  assert.match(legal, /title: 'Terms & Conditions'/)
+  assert.match(legal, /path: '\/terms'/)
+  assert.match(legal, /title: 'Privacy Policy'/)
+  assert.match(legal, /path: '\/privacy'/)
+
+  const copyright = read('src/pages/legal/CopyrightPolicyPage.tsx')
+  assert.match(copyright, /import \{ useSeo \} from '@\/lib\/seo'/)
+  assert.match(copyright, /title: 'Copyright Policy'/)
+  assert.match(copyright, /path: '\/copyright'/)
+
+  const signIn = read('src/pages/auth/SignInPage.tsx')
+  assert.match(signIn, /import \{ useSeo \} from '@\/lib\/seo'/)
+  assert.match(signIn, /path: '\/sign-in'/)
+
+  const signUp = read('src/pages/auth/SignUpPage.tsx')
+  assert.match(signUp, /import \{ useSeo \} from '@\/lib\/seo'/)
+  assert.match(signUp, /path: '\/sign-up'/)
+
+  const forgot = read('src/pages/auth/ForgotPasswordPage.tsx')
+  assert.match(forgot, /import \{ useSeo \} from '@\/lib\/seo'/)
+  assert.match(forgot, /path: '\/forgot-password'/)
+})

@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { hasAcceptedLegal, recordLegalAcceptance } from '@/services/legalService'
 import { getDataRetentionSettings } from '@/services/platformSettingsService'
 import { DEFAULT_DATA_RETENTION, type DataRetentionSettings } from '@/types/platformSettings'
+import { useSeo } from '@/lib/seo'
 
 const DOC_VERSION = '2026-09-12'
 
@@ -54,6 +55,19 @@ export function LegalPage({ type }: { type: 'terms' | 'privacy' }) {
   const isTerms = type === 'terms'
   const sections = isTerms ? terms : privacy
   const docType = isTerms ? 'terms' : 'privacy'
+  useSeo(
+    isTerms
+      ? {
+          title: 'Terms & Conditions',
+          description: 'The terms that govern using BackTheVibes — Artist Membership, fan support payments, YouTube playback, and collaboration/licensing proposals between artists and DJs.',
+          path: '/terms',
+        }
+      : {
+          title: 'Privacy Policy',
+          description: 'How BackTheVibes collects, uses, and retains your data, including what Stripe, Firebase, and YouTube each process on our behalf, and how to request account deletion or a data export.',
+          path: '/privacy',
+        },
+  )
   const { firebaseUser } = useAuth()
   const [accepted, setAccepted] = useState(false)
   const [accepting, setAccepting] = useState(false)
