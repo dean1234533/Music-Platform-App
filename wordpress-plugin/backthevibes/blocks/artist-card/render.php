@@ -26,6 +26,5 @@ $backthevibes_card_args = array(
 	'show_buttons' => ! empty( $attributes['showButtons'] ),
 	'show_tracks'  => ! isset( $attributes['showTracks'] ) || $attributes['showTracks'],
 	'track_limit'  => ! empty( $attributes['trackLimit'] ) ? absint( $attributes['trackLimit'] ) : 6,
-	'collapsible'  => ! isset( $attributes['collapsible'] ) || $attributes['collapsible'],
 );
 echo BackTheVibes_Render::artist_card( $backthevibes_artist, $backthevibes_card_args ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside.

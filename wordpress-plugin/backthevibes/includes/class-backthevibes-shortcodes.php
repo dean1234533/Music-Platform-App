@@ -42,7 +42,6 @@ class BackTheVibes_Shortcodes {
 				'show_buttons' => 'yes',
 				'tracks'       => 'yes',
 				'track_limit'  => 6,
-				'collapsible'  => 'yes',
 			),
 			$atts,
 			'backthevibes_artist'
@@ -58,7 +57,6 @@ class BackTheVibes_Shortcodes {
 				'show_buttons' => 'yes' === $atts['show_buttons'],
 				'show_tracks'  => 'yes' === $atts['tracks'],
 				'track_limit'  => (int) $atts['track_limit'],
-				'collapsible'  => 'yes' === $atts['collapsible'],
 			)
 		);
 	}

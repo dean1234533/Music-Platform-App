@@ -51,67 +51,6 @@
 	padding: 18px 18px 0;
 }
 
-.backthevibes-card-toggle {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 8px;
-	width: 100%;
-	padding: 4px 8px 0 18px;
-	margin: 0;
-	border: 0;
-	background: none;
-	font: inherit;
-	color: inherit;
-	text-align: left;
-	cursor: pointer;
-	border-radius: 14px;
-	transition: background-color 0.15s ease;
-}
-
-.backthevibes-card-toggle:hover {
-	background-color: rgba(0, 0, 0, 0.03);
-}
-
-.backthevibes-card-toggle .backthevibes-artist-header {
-	padding: 14px 0;
-	flex: 1;
-	min-width: 0;
-}
-
-.backthevibes-toggle-icon {
-	flex-shrink: 0;
-	width: 32px;
-	height: 32px;
-	border-radius: 999px;
-	background: rgba(0, 0, 0, 0.04);
-	position: relative;
-	transition: background-color 0.15s ease;
-}
-
-.backthevibes-toggle-icon::before {
-	content: '';
-	position: absolute;
-	top: 50%;
-	left: 50%;
-	width: 8px;
-	height: 8px;
-	margin: -6px 0 0 -5px;
-	border-right: 2px solid currentColor;
-	border-bottom: 2px solid currentColor;
-	opacity: 0.55;
-	transform: rotate(45deg);
-	transition: transform 0.2s ease;
-}
-
-.backthevibes-card-toggle[aria-expanded="true"] .backthevibes-toggle-icon::before {
-	transform: rotate(-135deg);
-}
-
-.backthevibes-collapsed .backthevibes-card-body {
-	display: none;
-}
-
 .backthevibes-avatar {
 	width: 60px;
 	height: 60px;
@@ -312,30 +251,27 @@
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	gap: 7px;
+	gap: 12px;
 	width: 100%;
 	aspect-ratio: 16 / 9;
 	border-radius: 12px;
-	background: #111;
+	background: radial-gradient(120% 140% at 50% -10%, #22261a 0%, #14150f 55%, #0a0a08 100%);
 	color: #fff;
 	text-align: center;
-	padding: 14px;
-	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+	padding: 16px;
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
 }
 
 .backthevibes-clip-ended-label {
-	font-size: 0.8em;
-	opacity: 0.7;
+	font-size: 0.88em;
+	font-weight: 600;
+	letter-spacing: 0.01em;
+	color: rgba(255, 255, 255, 0.72);
 }
 
-.backthevibes-clip-ended-link {
-	color: var(--btv-brand);
-	font-weight: 700;
-	text-decoration: none;
-}
-
-.backthevibes-clip-ended-link:hover {
-	text-decoration: underline;
+.backthevibes-clip-ended-link.backthevibes-btn {
+	padding: 8px 18px;
+	font-size: 0.85em;
 }
 
 .backthevibes-track-title {

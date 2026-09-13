@@ -19,14 +19,12 @@ application, and it does not host, download, cache, or proxy any music.
 
 `[backthevibes_artist]` is the main widget — one combined card with your
 profile (image, bio, Follow/Support buttons) and a row of your public
-tracks together, not two separate things to place on the page. It starts
-collapsed to a compact avatar/name button by default — click it to reveal
-the full card in place — or set `collapsible="no"` to always show it
-expanded. Each track plays a 30-second clip through the official YouTube
-embedded player, loaded only after a visitor deliberately presses play,
-then swaps itself for a link to hear the full track on BackTheVibes — a
-teaser, not a full player. Follow and Support buttons link to your real
-BackTheVibes profile and, once there, actually complete the Follow/Support
+tracks together, not two separate things to place on the page. Each track
+plays a 30-second clip through the official YouTube embedded player,
+loaded only after a visitor deliberately presses play, then swaps itself
+for a link to hear the full track on BackTheVibes — a teaser, not a full
+player. Follow and Support buttons link to your real BackTheVibes
+profile and, once there, actually complete the Follow/Support
 action — this plugin never collects credentials or payment details itself.
 
 = What it adds =

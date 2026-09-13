@@ -10,12 +10,6 @@
  * to hear the full track on BackTheVibes — this widget is a teaser (user
  * feedback: a full track playing inline made the combined artist+music
  * card confusing; a short clip that points back to the real site doesn't).
- *
- * Also handles the collapsed artist card's expand/collapse toggle (user
- * feedback: "have a button that you click that shows the profile card of
- * the artist then you can listhen to the short track from there and
- * support + follow") — everything is already rendered server-side, this
- * just shows/hides it, no extra network request.
  */
 ( function () {
 	'use strict';
@@ -52,42 +46,25 @@
 			ended.className = 'backthevibes-clip-ended';
 			var label = document.createElement( 'span' );
 			label.className = 'backthevibes-clip-ended-label';
-			label.textContent = 'Clip ended';
+			label.textContent = 'That was a 30-second clip';
 			ended.appendChild( label );
 			if ( trackUrl ) {
 				var link = document.createElement( 'a' );
-				link.className = 'backthevibes-clip-ended-link';
+				link.className = 'backthevibes-btn backthevibes-btn-follow backthevibes-clip-ended-link';
 				link.href = trackUrl;
 				link.target = '_blank';
 				link.rel = 'noopener noreferrer';
-				link.textContent = 'Hear the full track on BackTheVibes →';
+				link.textContent = 'Hear the full track';
 				ended.appendChild( link );
 			}
 			container.replaceChild( ended, iframe );
 		}, CLIP_SECONDS * 1000 );
 	}
 
-	function toggleCard( button ) {
-		var card = button.closest( '.backthevibes-artist-card' );
-		if ( ! card ) {
-			return;
-		}
-		var expanded = card.classList.toggle( 'backthevibes-collapsed' ) === false;
-		button.setAttribute( 'aria-expanded', expanded ? 'true' : 'false' );
-	}
-
 	document.addEventListener( 'click', function ( event ) {
-		if ( ! event.target.closest ) {
-			return;
-		}
-		var playButton = event.target.closest( '.backthevibes-video-trigger' );
-		if ( playButton ) {
-			playTrack( playButton );
-			return;
-		}
-		var toggleButton = event.target.closest( '.backthevibes-card-toggle' );
-		if ( toggleButton ) {
-			toggleCard( toggleButton );
+		var button = event.target.closest ? event.target.closest( '.backthevibes-video-trigger' ) : null;
+		if ( button ) {
+			playTrack( button );
 		}
 	} );
 } )();
