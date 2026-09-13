@@ -3449,3 +3449,15 @@ test('Storage/Functions stay out of the eager homepage bundle (SEO audit finding
   assert.match(trackService, /await import\('firebase\/functions'\)/)
   assert.match(trackService, /await import\('firebase\/storage'\)/)
 })
+
+test('homepage footer and inline links have a real touch target instead of bare text (SEO audit finding: "11 of 23 interactive element(s) measured under 24x24px on screen")', () => {
+  const landing = read('src/pages/marketing/LandingPage.tsx')
+  // FooterGroup (Platform/Join/Legal — 10 links) previously rendered as bare text-sm <a>/<Link>
+  // tags with no padding, so their tap area was just the ~20px line-height of small text.
+  assert.match(landing, /className="inline-block py-1\.5 text-sm text-ink-1 transition hover:text-brand-400"/)
+  // The footer email, Instagram/TikTok, and "See all pricing" links had the same bare-text problem.
+  assert.match(landing, /mailto:support@backthevibes\.com"[^>]*className="mt-5 inline-block py-1 /)
+  assert.match(landing, /Instagram<\/a>/)
+  assert.match(landing, /className="inline-block px-2 py-1 text-sm text-ink-2/)
+  assert.match(landing, /See all pricing/)
+})

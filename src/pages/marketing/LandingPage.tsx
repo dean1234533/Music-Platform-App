@@ -247,7 +247,7 @@ export function LandingPage() {
             </div>
           </div>
           <p className="mt-4 text-center">
-            <Link to="/pricing" className="text-sm font-medium text-brand-400 transition hover:text-brand-300">See all pricing →</Link>
+            <Link to="/pricing" className="inline-block py-1 text-sm font-medium text-brand-400 transition hover:text-brand-300">See all pricing →</Link>
           </p>
         </section>
 
@@ -277,10 +277,10 @@ export function LandingPage() {
           <div>
             <BrandMark />
             <p className="mt-5 max-w-xs text-sm leading-6 text-ink-2">Independent music, direct support, and clearer connections between the people who move culture.</p>
-            <a href="mailto:support@backthevibes.com" className="mt-5 block text-sm text-ink-1 transition hover:text-brand-400">support@backthevibes.com</a>
-            <div className="mt-4 flex items-center gap-4">
-              <a href="https://www.instagram.com/backthevibes" target="_blank" rel="noopener noreferrer" className="text-sm text-ink-2 transition hover:text-brand-400">Instagram</a>
-              <a href="https://www.tiktok.com/@backthevibes" target="_blank" rel="noopener noreferrer" className="text-sm text-ink-2 transition hover:text-brand-400">TikTok</a>
+            <a href="mailto:support@backthevibes.com" className="mt-5 inline-block py-1 text-sm text-ink-1 transition hover:text-brand-400">support@backthevibes.com</a>
+            <div className="mt-3 flex items-center gap-2">
+              <a href="https://www.instagram.com/backthevibes" target="_blank" rel="noopener noreferrer" className="inline-block px-2 py-1 text-sm text-ink-2 transition hover:text-brand-400">Instagram</a>
+              <a href="https://www.tiktok.com/@backthevibes" target="_blank" rel="noopener noreferrer" className="inline-block px-2 py-1 text-sm text-ink-2 transition hover:text-brand-400">TikTok</a>
             </div>
           </div>
           <FooterGroup title="Platform" links={[['How it works', '/#how-it-works'], ['Pricing', '/#pricing'], ['Blog', '/blog'], ['Sign in', '/sign-in']]} />
@@ -298,15 +298,15 @@ function FooterGroup({ title, links }: { title: string; links: [string, string][
   return (
     <div>
       <h2 className="text-xs font-bold uppercase tracking-[0.16em] text-ink-3">{title}</h2>
-      <ul className="mt-5 space-y-3">
+      <ul className="mt-3 space-y-1">
         {links.map(([label, to]) => (
           <li key={label}>
             {to.startsWith('mailto:') || to.startsWith('http') ? (
-              <a href={to} className="text-sm text-ink-1 transition hover:text-brand-400">
+              <a href={to} className="inline-block py-1.5 text-sm text-ink-1 transition hover:text-brand-400">
                 {label}
               </a>
             ) : (
-              <Link to={to} className="text-sm text-ink-1 transition hover:text-brand-400">
+              <Link to={to} className="inline-block py-1.5 text-sm text-ink-1 transition hover:text-brand-400">
                 {label}
               </Link>
             )}
