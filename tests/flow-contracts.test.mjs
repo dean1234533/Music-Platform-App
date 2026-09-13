@@ -3341,3 +3341,23 @@ test('the homepage no longer emits a duplicate Organization schema (SEO audit fi
   const landing = read('src/pages/marketing/LandingPage.tsx')
   assert.match(landing, /'@type': 'Organization'/)
 })
+
+test('Microsoft Clarity only ever loads after the visitor accepts the cookie consent banner (SEO audit finding: no cookie consent banner present, ahead of adding Clarity analytics)', () => {
+  const clarity = read('src/lib/clarity.ts')
+  assert.match(clarity, /const CLARITY_PROJECT_ID = 'yhsltm5baj'/)
+  assert.match(clarity, /script\.src = `https:\/\/www\.clarity\.ms\/tag\/\$\{CLARITY_PROJECT_ID\}`/)
+
+  const banner = read('src/components/common/CookieConsentBanner.tsx')
+  // Clarity is only ever called from inside the accept path (mount-for-a-returning-acceptor, or
+  // the Accept button) — never unconditionally on every visit.
+  assert.match(banner, /if \(existing === 'accepted'\) loadClarity\(\)/)
+  assert.match(banner, /if \(next === 'accepted'\) loadClarity\(\)/)
+  assert.doesNotMatch(banner, /useEffect\(\(\) => \{\s*loadClarity\(\)/)
+
+  const app = read('src/App.tsx')
+  assert.match(app, /<CookieConsentBanner \/>/)
+
+  const headers = read('public/_headers')
+  assert.match(headers, /script-src[^;]*https:\/\/www\.clarity\.ms/)
+  assert.match(headers, /connect-src[^;]*https:\/\/\*\.clarity\.ms/)
+})

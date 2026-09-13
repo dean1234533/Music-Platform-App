@@ -8,6 +8,7 @@ import { ProtectedRoute, RequireOnboarding } from '@/components/auth/ProtectedRo
 import { RoleRoute } from '@/components/auth/RoleRoute'
 import { InstallBanner } from '@/components/pwa/InstallBanner'
 import { PwaLaunchScreen } from '@/components/pwa/PwaLaunchScreen'
+import { CookieConsentBanner } from '@/components/common/CookieConsentBanner'
 import { LoadingState } from '@/components/common/StateViews'
 import { isStandaloneDisplayMode } from '@/lib/installPrompt'
 import { workspaceHomeForRoles } from '@/lib/workspaceRoute'
@@ -125,6 +126,7 @@ function App() {
           <PlayerProvider>
             <InstallBanner />
             <PwaLaunchScreen />
+            <CookieConsentBanner />
             <Suspense fallback={<LoadingState label="Loading…" />}>
             <Routes>
             <Route path="/" element={<PublicHomeRoute />} />
