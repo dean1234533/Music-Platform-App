@@ -21,8 +21,8 @@ class BackTheVibes_Settings {
 
 	public function add_settings_page(): void {
 		add_options_page(
-			__( 'BackTheVibes', 'backthevibes' ),
-			__( 'BackTheVibes', 'backthevibes' ),
+			__( 'BackTheVibes', 'backthevibes-artist' ),
+			__( 'BackTheVibes', 'backthevibes-artist' ),
 			'manage_options',
 			'backthevibes',
 			array( $this, 'render_settings_page' )
@@ -51,15 +51,15 @@ class BackTheVibes_Settings {
 		}
 		?>
 		<div class="wrap">
-			<h1><?php esc_html_e( 'BackTheVibes', 'backthevibes' ); ?></h1>
+			<h1><?php esc_html_e( 'BackTheVibes', 'backthevibes-artist' ); ?></h1>
 			<p>
-				<?php esc_html_e( 'Set the artist slug this site embeds by default. Find your slug in the URL of your BackTheVibes profile — e.g. backthevibes.com/artist/your-slug.', 'backthevibes' ); ?>
+				<?php esc_html_e( 'Set the artist slug this site embeds by default. Find your slug in the URL of your BackTheVibes profile — e.g. backthevibes.com/artist/your-slug.', 'backthevibes-artist' ); ?>
 			</p>
 			<form action="options.php" method="post">
 				<?php settings_fields( 'backthevibes_settings' ); ?>
 				<table class="form-table" role="presentation">
 					<tr>
-						<th scope="row"><label for="backthevibes_default_slug"><?php esc_html_e( 'Default artist slug', 'backthevibes' ); ?></label></th>
+						<th scope="row"><label for="backthevibes_default_slug"><?php esc_html_e( 'Default artist slug', 'backthevibes-artist' ); ?></label></th>
 						<td>
 							<input
 								type="text"
@@ -70,7 +70,7 @@ class BackTheVibes_Settings {
 								placeholder="your-artist-slug"
 							/>
 							<p class="description">
-								<?php esc_html_e( 'Used when a shortcode or block does not specify its own artist slug.', 'backthevibes' ); ?>
+								<?php esc_html_e( 'Used when a shortcode or block does not specify its own artist slug.', 'backthevibes-artist' ); ?>
 							</p>
 						</td>
 					</tr>
@@ -78,11 +78,11 @@ class BackTheVibes_Settings {
 				<?php submit_button(); ?>
 			</form>
 			<hr />
-			<h2><?php esc_html_e( 'Usage', 'backthevibes' ); ?></h2>
-			<p><code>[backthevibes_artist]</code> &mdash; <?php esc_html_e( 'the main widget: your profile card plus a row of 30-second track clips, together. Add tracks="no" to hide the track row, or track_limit="N" to change how many show.', 'backthevibes' ); ?></p>
-			<p><code>[backthevibes_music]</code> &mdash; <?php esc_html_e( 'just the track-clips row on its own, without the profile card.', 'backthevibes' ); ?></p>
-			<p><code>[backthevibes_support]</code> &mdash; <?php esc_html_e( 'just a standalone Support button.', 'backthevibes' ); ?></p>
-			<p><?php esc_html_e( 'Each shortcode also accepts an artist="your-slug" attribute to override the default above. Matching blocks are available in the block editor under "BackTheVibes".', 'backthevibes' ); ?></p>
+			<h2><?php esc_html_e( 'Usage', 'backthevibes-artist' ); ?></h2>
+			<p><code>[backthevibes_artist]</code> &mdash; <?php esc_html_e( 'the main widget: your profile card plus a row of 30-second track clips, together. Add tracks="no" to hide the track row, or track_limit="N" to change how many show.', 'backthevibes-artist' ); ?></p>
+			<p><code>[backthevibes_music]</code> &mdash; <?php esc_html_e( 'just the track-clips row on its own, without the profile card.', 'backthevibes-artist' ); ?></p>
+			<p><code>[backthevibes_support]</code> &mdash; <?php esc_html_e( 'just a standalone Support button.', 'backthevibes-artist' ); ?></p>
+			<p><?php esc_html_e( 'Each shortcode also accepts an artist="your-slug" attribute to override the default above. Matching blocks are available in the block editor under "BackTheVibes".', 'backthevibes-artist' ); ?></p>
 		</div>
 		<?php
 	}

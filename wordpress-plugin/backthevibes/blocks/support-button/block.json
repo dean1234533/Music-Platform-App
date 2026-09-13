@@ -7,7 +7,7 @@
 	"icon": "heart",
 	"description": "A button linking straight to supporting your artist on BackTheVibes.",
 	"keywords": [ "backthevibes", "support", "donate" ],
-	"textdomain": "backthevibes",
+	"textdomain": "backthevibes-artist",
 	"attributes": {
 		"artist": { "type": "string", "default": "" },
 		"label": { "type": "string", "default": "" }

@@ -22,9 +22,9 @@
 
 	function artistField( attributes, setAttributes ) {
 		return el( TextControl, {
-			label: __( 'Artist slug (blank = site default)', 'backthevibes' ),
+			label: __( 'Artist slug (blank = site default)', 'backthevibes-artist' ),
 			value: attributes.artist,
-			placeholder: __( 'your-artist-slug', 'backthevibes' ),
+			placeholder: __( 'your-artist-slug', 'backthevibes-artist' ),
 			onChange: function ( value ) {
 				setAttributes( { artist: value } );
 			},
@@ -43,24 +43,24 @@
 					{},
 					el(
 						PanelBody,
-						{ title: __( 'BackTheVibes settings', 'backthevibes' ) },
+						{ title: __( 'BackTheVibes settings', 'backthevibes-artist' ) },
 						artistField( attributes, setAttributes ),
 						el( ToggleControl, {
-							label: __( 'Show bio', 'backthevibes' ),
+							label: __( 'Show bio', 'backthevibes-artist' ),
 							checked: attributes.showBio,
 							onChange: function ( value ) {
 								setAttributes( { showBio: value } );
 							},
 						} ),
 						el( ToggleControl, {
-							label: __( 'Show Follow/Support buttons', 'backthevibes' ),
+							label: __( 'Show Follow/Support buttons', 'backthevibes-artist' ),
 							checked: attributes.showButtons,
 							onChange: function ( value ) {
 								setAttributes( { showButtons: value } );
 							},
 						} ),
 						el( ToggleControl, {
-							label: __( 'Show track clips', 'backthevibes' ),
+							label: __( 'Show track clips', 'backthevibes-artist' ),
 							checked: attributes.showTracks,
 							onChange: function ( value ) {
 								setAttributes( { showTracks: value } );
@@ -68,7 +68,7 @@
 						} ),
 						attributes.showTracks
 							? el( RangeControl, {
-									label: __( 'Number of tracks', 'backthevibes' ),
+									label: __( 'Number of tracks', 'backthevibes-artist' ),
 									value: attributes.trackLimit,
 									min: 1,
 									max: 12,
@@ -99,10 +99,10 @@
 					{},
 					el(
 						PanelBody,
-						{ title: __( 'BackTheVibes settings', 'backthevibes' ) },
+						{ title: __( 'BackTheVibes settings', 'backthevibes-artist' ) },
 						artistField( attributes, setAttributes ),
 						el( TextControl, {
-							label: __( 'Button label (blank = "Support {name}")', 'backthevibes' ),
+							label: __( 'Button label (blank = "Support {name}")', 'backthevibes-artist' ),
 							value: attributes.label,
 							onChange: function ( value ) {
 								setAttributes( { label: value } );
@@ -130,10 +130,10 @@
 					{},
 					el(
 						PanelBody,
-						{ title: __( 'BackTheVibes settings', 'backthevibes' ) },
+						{ title: __( 'BackTheVibes settings', 'backthevibes-artist' ) },
 						artistField( attributes, setAttributes ),
 						el( RangeControl, {
-							label: __( 'Number of tracks', 'backthevibes' ),
+							label: __( 'Number of tracks', 'backthevibes-artist' ),
 							value: attributes.limit,
 							min: 1,
 							max: 12,

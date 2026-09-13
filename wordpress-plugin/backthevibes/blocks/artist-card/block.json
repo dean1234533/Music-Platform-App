@@ -7,7 +7,7 @@
 	"icon": "album",
 	"description": "Your BackTheVibes artist profile, with Follow/Support buttons and a row of track clips.",
 	"keywords": [ "backthevibes", "artist", "music" ],
-	"textdomain": "backthevibes",
+	"textdomain": "backthevibes-artist",
 	"attributes": {
 		"artist": { "type": "string", "default": "" },
 		"showBio": { "type": "boolean", "default": true },

@@ -20,7 +20,7 @@ class BackTheVibes_Render {
 	 */
 	public static function unavailable_notice(): string {
 		return '<p class="backthevibes-embed backthevibes-unavailable">' .
-			esc_html__( 'This BackTheVibes artist could not be loaded right now.', 'backthevibes' ) .
+			esc_html__( 'This BackTheVibes artist could not be loaded right now.', 'backthevibes-artist' ) .
 			'</p>';
 	}
 
@@ -79,10 +79,10 @@ class BackTheVibes_Render {
 			<?php if ( $show_cta ) : ?>
 				<div class="backthevibes-actions">
 					<a class="backthevibes-btn backthevibes-btn-follow" href="<?php echo esc_url( $artist['followUrl'] ); ?>" target="_blank" rel="noopener noreferrer">
-						<?php esc_html_e( 'Follow', 'backthevibes' ); ?>
+						<?php esc_html_e( 'Follow', 'backthevibes-artist' ); ?>
 					</a>
 					<a class="backthevibes-btn backthevibes-btn-support" href="<?php echo esc_url( $artist['supportUrl'] ); ?>" target="_blank" rel="noopener noreferrer">
-						<?php esc_html_e( 'Support', 'backthevibes' ); ?>
+						<?php esc_html_e( 'Support', 'backthevibes-artist' ); ?>
 					</a>
 				</div>
 			<?php endif; ?>
@@ -105,7 +105,7 @@ class BackTheVibes_Render {
 		wp_enqueue_style( 'backthevibes-embed' );
 		$label = ! empty( $args['label'] ) ? sanitize_text_field( $args['label'] ) : sprintf(
 			/* translators: %s: artist name */
-			__( 'Support %s', 'backthevibes' ),
+			__( 'Support %s', 'backthevibes-artist' ),
 			$artist['name']
 		);
 		return sprintf(
@@ -126,7 +126,7 @@ class BackTheVibes_Render {
 		$limit  = ! empty( $args['limit'] ) ? (int) $args['limit'] : 6;
 		$markup = self::tracks_markup( $artist, $limit );
 		if ( '' === $markup ) {
-			return '<p class="backthevibes-embed backthevibes-empty">' . esc_html__( 'No public tracks yet.', 'backthevibes' ) . '</p>';
+			return '<p class="backthevibes-embed backthevibes-empty">' . esc_html__( 'No public tracks yet.', 'backthevibes-artist' ) . '</p>';
 		}
 		return '<div class="backthevibes-embed">' . $markup . self::powered_by( $artist['profileUrl'] ) . '</div>';
 	}
@@ -173,11 +173,11 @@ class BackTheVibes_Render {
 						class="backthevibes-video-trigger"
 						data-video-id="<?php echo esc_attr( $video_id ); ?>"
 						data-track-url="<?php echo esc_url( $track_url ); ?>"
-						aria-label="<?php echo esc_attr( sprintf( /* translators: %s: track title */ __( 'Play a clip of %s', 'backthevibes' ), $track['title'] ) ); ?>"
+						aria-label="<?php echo esc_attr( sprintf( /* translators: %s: track title */ __( 'Play a clip of %s', 'backthevibes-artist' ), $track['title'] ) ); ?>"
 					>
 						<img src="<?php echo esc_url( $track['artworkUrl'] ? $track['artworkUrl'] : 'https://i.ytimg.com/vi/' . rawurlencode( $video_id ) . '/hqdefault.jpg' ); ?>" alt="" loading="lazy" />
 						<span class="backthevibes-play-icon" aria-hidden="true"></span>
-						<span class="backthevibes-clip-badge"><?php esc_html_e( '0:30 clip', 'backthevibes' ); ?></span>
+						<span class="backthevibes-clip-badge"><?php esc_html_e( '0:30 clip', 'backthevibes-artist' ); ?></span>
 					</button>
 					<a class="backthevibes-track-title" href="<?php echo esc_url( $track_url ); ?>" target="_blank" rel="noopener noreferrer">
 						<?php echo esc_html( $track['title'] ); ?>
@@ -192,7 +192,7 @@ class BackTheVibes_Render {
 	private static function powered_by( string $profile_url ): string {
 		return sprintf(
 			'<p class="backthevibes-powered-by">%1$s <a href="%2$s" target="_blank" rel="noopener noreferrer">BackTheVibes</a></p>',
-			esc_html__( 'Powered by', 'backthevibes' ),
+			esc_html__( 'Powered by', 'backthevibes-artist' ),
 			esc_url( $profile_url ? $profile_url : 'https://backthevibes.com' )
 		);
 	}

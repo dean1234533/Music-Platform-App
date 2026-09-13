@@ -9,7 +9,7 @@
  * Author URI: https://backthevibes.com
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: backthevibes
+ * Text Domain: backthevibes-artist
  *
  * This plugin is a lightweight integration layer only. It never hosts,
  * downloads, caches, or proxies music — every track link opens the artist's

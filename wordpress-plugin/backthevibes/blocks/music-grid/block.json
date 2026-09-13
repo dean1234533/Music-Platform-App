@@ -7,7 +7,7 @@
 	"icon": "playlist-audio",
 	"description": "A grid of your public tracks, playable through the official YouTube player.",
 	"keywords": [ "backthevibes", "music", "youtube" ],
-	"textdomain": "backthevibes",
+	"textdomain": "backthevibes-artist",
 	"attributes": {
 		"artist": { "type": "string", "default": "" },
 		"limit": { "type": "number", "default": 6 }
