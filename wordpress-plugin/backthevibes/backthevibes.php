@@ -56,16 +56,11 @@ final class BackTheVibes_Plugin {
 	}
 
 	private function __construct() {
-		add_action( 'plugins_loaded', array( $this, 'load_textdomain' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'register_assets' ) );
 
 		new BackTheVibes_Settings();
 		new BackTheVibes_Shortcodes();
 		new BackTheVibes_Block();
-	}
-
-	public function load_textdomain(): void {
-		load_plugin_textdomain( 'backthevibes', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 	}
 
 	/**
