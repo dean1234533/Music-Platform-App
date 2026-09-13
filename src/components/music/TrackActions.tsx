@@ -30,12 +30,12 @@ export function TrackActions({ track, labels = false }: { track: TrackDoc; label
       navigate('/sign-in')
       return
     }
-    if (!hasRole('fan')) {
-      notify('Liking tracks and building playlists is a fan account feature.', 'info')
-      return
-    }
     action()
   }
+
+  // Liking/playlists are fan-only (mirrors crates being dj-only) — hide the controls
+  // entirely for a signed-in artist/dj account instead of showing a dead-end button.
+  if (firebaseUser && !hasRole('fan')) return null
 
   async function toggleLike() {
     if (!firebaseUser || pending) return

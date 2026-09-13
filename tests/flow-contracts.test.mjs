@@ -3074,7 +3074,10 @@ test('an artist (or DJ) account can no longer like tracks or build playlists —
   const playlistsBlock = rules.slice(rules.indexOf('match /playlists/'))
   assert.match(playlistsBlock, /allow create: if isSignedIn\(\) && request\.resource\.data\.ownerId == request\.auth\.uid && hasRole\('fan'\)/)
 
+  // Blocking the click with a toast still left the Like/playlist buttons visibly sitting in the
+  // persistent player for an artist/dj account, which read as "still there" — the controls must
+  // be hidden outright for a signed-in non-fan account, not just made a dead-end when clicked.
   const actions = read('src/components/music/TrackActions.tsx')
   assert.match(actions, /const \{ firebaseUser, hasRole \} = useAuth\(\)/)
-  assert.match(actions, /if \(!hasRole\('fan'\)\) \{/)
+  assert.match(actions, /if \(firebaseUser && !hasRole\('fan'\)\) return null/)
 })
