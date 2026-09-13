@@ -1,5 +1,5 @@
 === BackTheVibes Artist ===
-Contributors: backthevibes
+Contributors: bookrightly
 Tags: music, artist, embed, youtube, block
 Requires at least: 6.0
 Tested up to: 7.1
