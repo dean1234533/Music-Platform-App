@@ -24,7 +24,11 @@
   --color-ink-0: #f6f7f4;
   --color-ink-1: #c8cdd0;
   --color-ink-2: #858d94;
-  --color-ink-3: #596169;
+  /* Brightened from #596169 (2.7–3.2:1, failed WCAG AA's 4.5:1 for normal text on every surface
+     tone this app uses it against) — #7e8994 clears 4.5:1 even on the lightest surface (surface-3)
+     while staying visibly a step darker than ink-2 (SEO/accessibility audit: "9 element(s) with
+     insufficient contrast, as rendered in Chrome"). */
+  --color-ink-3: #7e8994;
 
   --color-brand-400: #d9ff65;
   --color-brand-500: #c8f33f;

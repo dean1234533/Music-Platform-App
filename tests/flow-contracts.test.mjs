@@ -3487,3 +3487,22 @@ test('sign-in, sign-up, forgot-password, terms, privacy, and copyright each get 
   assert.match(forgot, /import \{ useSeo \} from '@\/lib\/seo'/)
   assert.match(forgot, /path: '\/forgot-password'/)
 })
+
+test('the ink-3 text color token clears WCAG AA contrast on every surface tone (SEO audit finding: "9 element(s) with insufficient contrast, as rendered in Chrome")', () => {
+  const css = read('src/index.css')
+  assert.doesNotMatch(css, /--color-ink-3: #596169/, 'ink-3 must not regress to its old sub-4.5:1 value')
+  assert.match(css, /--color-ink-3: #7e8994/)
+
+  // Contrast ratio against the lightest surface tone this token is ever used on (surface-3,
+  // #181d24) — the worst case, since a lighter background narrows the gap the most.
+  function relLum(hex) {
+    const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    const f = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+    const [rl, gl, bl] = [r, g, b].map(f)
+    return 0.2126 * rl + 0.7152 * gl + 0.0722 * bl
+  }
+  const l1 = relLum('7e8994')
+  const l2 = relLum('181d24')
+  const ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)
+  assert.ok(ratio >= 4.5, `ink-3 on surface-3 must clear WCAG AA's 4.5:1, got ${ratio.toFixed(2)}:1`)
+})
