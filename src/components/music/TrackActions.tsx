@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Heart, ListPlus } from 'lucide-react'
 import { clsx } from 'clsx'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { likeTrack, subscribeIsLiked, unlikeTrack } from '@/services/likeService'
@@ -11,7 +11,6 @@ import type { TrackDoc } from '@/types/track'
 export function TrackActions({ track, labels = false }: { track: TrackDoc; labels?: boolean }) {
   const { firebaseUser, hasRole } = useAuth()
   const { notify } = useToast()
-  const navigate = useNavigate()
   const location = useLocation()
   const [liked, setLiked] = useState(false)
   const [pending, setPending] = useState(false)
@@ -25,25 +24,17 @@ export function TrackActions({ track, labels = false }: { track: TrackDoc; label
     return subscribeIsLiked(firebaseUser.uid, track.trackId, setLiked)
   }, [firebaseUser, track.trackId])
 
-  function requireAccount(action: () => void) {
-    if (!firebaseUser) {
-      notify('Sign in to save music and build playlists.', 'info')
-      navigate('/sign-in')
-      return
-    }
-    action()
-  }
-
   // Liking/playlists are fan-only (mirrors crates being dj-only) — hide the controls
-  // entirely for a signed-in artist/dj account instead of showing a dead-end button.
-  // A role check alone isn't enough: admin accounts are exempt from the one-role-per-
-  // account rule and can genuinely hold fan+artist+dj together, so also hide while the
-  // persistent player is docked inside an artist/dj/admin management workspace — that's
-  // the "as an artist" context the report was actually about, not the account's full
-  // role set (user-reported, after the role-only gate landed but the buttons stayed
-  // visible: "the like/playlist bit is still showing when i play a track as an artist").
+  // entirely instead of showing a dead-end button. This covers three cases: a signed-out
+  // visitor (no account at all — user-reported on a public artist profile page: "you can
+  // at the track to your playlist but it is just a clip plus pointless as you have not
+  // even got a account"), a signed-in artist/dj account, and an admin account currently
+  // browsing its own artist/dj/admin management workspace — admin accounts are exempt
+  // from the one-role-per-account rule and can genuinely hold fan+artist+dj together, so
+  // a role check alone doesn't hide these while "acting as an artist" (user-reported:
+  // "the like/playlist bit is still showing when i play a track as an artist").
   const inManagementWorkspace = /^\/(dashboard\/artist|dj|admin)(\/|$)/.test(location.pathname)
-  if (firebaseUser && (!hasRole('fan') || inManagementWorkspace)) return null
+  if (!firebaseUser || !hasRole('fan') || inManagementWorkspace) return null
 
   async function toggleLike() {
     if (!firebaseUser || pending) return
@@ -72,7 +63,7 @@ export function TrackActions({ track, labels = false }: { track: TrackDoc; label
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => requireAccount(() => void toggleLike())}
+          onClick={() => void toggleLike()}
           disabled={pending}
           className={clsx(baseClass, liked && 'border-danger-500/25 text-danger-500')}
           aria-label={liked ? 'Remove from library' : 'Save to library'}
@@ -83,7 +74,7 @@ export function TrackActions({ track, labels = false }: { track: TrackDoc; label
         </button>
         <button
           type="button"
-          onClick={() => requireAccount(() => setShowPlaylistPicker(true))}
+          onClick={() => setShowPlaylistPicker(true)}
           className={baseClass}
           aria-label="Add to playlist"
           title="Add to playlist"

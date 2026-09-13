@@ -3093,7 +3093,19 @@ test('an artist (or DJ) account can no longer like tracks or build playlists —
   // artist"). The controls must also hide whenever the persistent player is docked inside an
   // artist/dj/admin management workspace, regardless of what else the account's roles include.
   assert.match(actions, /const inManagementWorkspace = \/\^\\\/\(dashboard\\\/artist\|dj\|admin\)\(\\\/\|\$\)\/\.test\(location\.pathname\)/)
-  assert.match(actions, /if \(firebaseUser && \(!hasRole\('fan'\) \|\| inManagementWorkspace\)\) return null/)
+  assert.match(actions, /if \(!firebaseUser \|\| !hasRole\('fan'\) \|\| inManagementWorkspace\) return null/)
+})
+
+test('a signed-out visitor on a public artist profile page no longer sees Like/Add-to-playlist buttons that only dead-end at sign-in (user-reported: "on the profile link you can at the track to your playlist but it is just a clip plus pointless as you have not even got a account. you can also like the track")', () => {
+  const actions = read('src/components/music/TrackActions.tsx')
+  // The hide condition now covers signed-out visitors too, not just signed-in non-fan accounts —
+  // previously it only fired when firebaseUser was truthy, so an anonymous visitor always fell
+  // through to the visible, clickable buttons (which just redirected to sign-in on click).
+  assert.match(actions, /if \(!firebaseUser \|\| !hasRole\('fan'\) \|\| inManagementWorkspace\) return null/)
+  // The old requireAccount() sign-in-redirect wrapper is gone — by the time these buttons render,
+  // firebaseUser is already guaranteed, so the click handlers call their actions directly.
+  assert.doesNotMatch(actions, /function requireAccount/)
+  assert.doesNotMatch(actions, /useNavigate/)
 })
 
 test('a track actually plays from a public page, not just from inside a dashboard (user-reported: "the track wont plan from the link profile page")', () => {
