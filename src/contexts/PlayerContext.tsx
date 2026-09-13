@@ -66,9 +66,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [currentTrack])
 
   useEffect(() => {
-    setPlaybackActive(isPlaying)
+    // Also counts as "active" while a track is still loading/access-checking, not only once
+    // it reaches PLAYING — otherwise a service worker update landing in that brief window
+    // reloads the page out from under the very click that just started it (user-reported: a
+    // track "not playing" turned out to be the reload racing the click, most visible on a
+    // public profile page where every play attempt has to round-trip an access check first).
+    setPlaybackActive(isPlaying || isLoading)
     return () => setPlaybackActive(false)
-  }, [isPlaying])
+  }, [isPlaying, isLoading])
 
   const stopProgressPolling = useCallback(() => {
     if (progressIntervalRef.current !== null) {

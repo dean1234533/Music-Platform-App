@@ -1943,11 +1943,15 @@ test('a new service worker taking control no longer force-reloads the page out f
   assert.match(activity, /export function setPlaybackActive\(value: boolean\): void \{/)
   assert.match(activity, /export function isPlaybackActive\(\): boolean \{/)
 
-  // PlayerContext is the only writer — kept accurate to real HTMLAudioElement
-  // playback state (isPlaying), not just "a track is loaded".
+  // PlayerContext is the only writer. Originally tied to isPlaying alone, which left a real gap:
+  // a reload landing while a track was still loading/access-checking (not yet PLAYING) sailed
+  // straight through the guard and reloaded the page mid-attempt — most visible on a public
+  // profile page, where every play attempt round-trips getTrackYoutubeInfo first (user-reported,
+  // after that gap was hit by a deploy landing during a real click: "now the tracks are not
+  // playing for the profile link"). Counting isLoading as active too closes that gap.
   const player = read('src/contexts/PlayerContext.tsx')
   assert.match(player, /import \{ setPlaybackActive \} from '@\/lib\/playbackActivity'/)
-  assert.match(player, /setPlaybackActive\(isPlaying\)\s*\n\s*return \(\) => setPlaybackActive\(false\)\s*\n\s*\}, \[isPlaying\]\)/)
+  assert.match(player, /setPlaybackActive\(isPlaying \|\| isLoading\)\s*\n\s*return \(\) => setPlaybackActive\(false\)\s*\n\s*\}, \[isPlaying, isLoading\]\)/)
 })
 
 test('DJ discovery surfaces a track open for DJ promotion regardless of its fan-facing visibility tier (user-reported: "the artist has a DJ promo but the DJ can not see it") — a followers/supporters/early_access track promoted to DJs is no longer silently excluded before isTrackAcceptingDjRequests ever runs', () => {
