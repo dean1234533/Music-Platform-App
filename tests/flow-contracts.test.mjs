@@ -3091,11 +3091,32 @@ test('the upload page\'s track allowance badge stays accurate after a successful
   // write to happen later, and the matching decrement into deleteTrack's batch — removing the
   // trigger's dependency entirely rather than trying to explain why it wasn't firing.
   const tracksFn = read('functions/src/tracks.ts')
-  assert.match(tracksFn, /batch\.update\(db\.collection\('artistProfiles'\)\.doc\(uid\), \{ trackCount: FieldValue\.increment\(1\) \}\)/)
-  assert.match(tracksFn, /deleteBatch\.update\(db\.collection\('artistProfiles'\)\.doc\(track\.artistId\), \{ trackCount: FieldValue\.increment\(-1\) \}\)/)
+  assert.match(tracksFn, /batch\.update\(db\.collection\('artistProfiles'\)\.doc\(uid\), \{ trackCount: currentTrackCount \+ 1 \}\)/)
+  assert.match(
+    tracksFn,
+    /deleteBatch\.update\(artistRef, \{ trackCount: Math\.max\(0, currentTrackCount - 1\) \}\)/,
+  )
 
   const indexFn = read('functions/src/index.ts')
   assert.doesNotMatch(indexFn, /tracks\/triggers\.js/)
+})
+
+test('trackCount never goes negative and self-heals a stale value instead of compounding it (user-reported: "i deleted all tracks now the stored track allowance says -2 of 10")', () => {
+  // Root cause: FieldValue.increment(1)/(-1) blindly adjusted whatever was already stored,
+  // including a stale/negative value left over from the earlier broken-trigger era — deleting
+  // real tracks against an already-wrong baseline (the trigger had been stuck at 0 despite real
+  // tracks existing) walked the count further negative instead of correcting it. Both createTrack
+  // and deleteTrack now clamp against the actually-read current count instead of blindly
+  // incrementing/decrementing, so the very next create/delete corrects toward the real value.
+  const tracksFn = read('functions/src/tracks.ts')
+  assert.match(
+    tracksFn,
+    /const currentTrackCount = Math\.max\(0, \(artistProfileSnap\.data\(\)\?\.trackCount as number \| undefined\) \?\? 0\)/,
+  )
+  assert.match(
+    tracksFn,
+    /const currentTrackCount = Math\.max\(0, \(\(await artistRef\.get\(\)\)\.data\(\)\?\.trackCount as number \| undefined\) \?\? 0\)/,
+  )
 })
 
 test('an artist (or DJ) account can no longer like tracks or build playlists — those are fan-only, mirroring the existing hasRole(\'dj\') gate on crates (user-reported: "as a artist i am. able to click platlist and like a song when it is playing")', () => {

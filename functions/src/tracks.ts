@@ -228,8 +228,12 @@ export const createTrack = onCall(async (request) => {
   // separate onDocumentCreated trigger — a trigger delivery gap left this permanently at 0 for
   // at least one account with a real, live track (user-reported: "i have uploaded a track but
   // the allowance still says 0 of 10", confirmed still 0 even in a fresh private-window session
-  // after the earlier live-badge display fix).
-  batch.update(db.collection('artistProfiles').doc(uid), { trackCount: FieldValue.increment(1) })
+  // after the earlier live-badge display fix). Set from the already-read count rather than
+  // FieldValue.increment(1) so a stale/negative value left over from that earlier broken trigger
+  // (user-reported: "i deleted all tracks now the stored track allowance says -2 of 10") self-
+  // heals on the very next upload instead of compounding forever.
+  const currentTrackCount = Math.max(0, (artistProfileSnap.data()?.trackCount as number | undefined) ?? 0)
+  batch.update(db.collection('artistProfiles').doc(uid), { trackCount: currentTrackCount + 1 })
   await batch.commit()
   return { ok: true, trackId }
 })
@@ -277,10 +281,15 @@ export const deleteTrack = onCall(async (request) => {
     deleteQuery(db.collection('trackLikes').where('trackId', '==', trackId)),
     deleteQuery(db.collection('djDeals').where('trackId', '==', trackId)),
   ])
+  const artistRef = db.collection('artistProfiles').doc(track.artistId)
+  // Clamped rather than FieldValue.increment(-1) so a stale/negative count left over from the
+  // old broken trigger (user-reported: "i deleted all tracks now the stored track allowance
+  // says -2 of 10") can't compound further — it self-heals toward 0 instead.
+  const currentTrackCount = Math.max(0, ((await artistRef.get()).data()?.trackCount as number | undefined) ?? 0)
   const deleteBatch = db.batch()
   deleteBatch.delete(db.collection('trackMedia').doc(trackId))
   deleteBatch.delete(ref)
-  deleteBatch.update(db.collection('artistProfiles').doc(track.artistId), { trackCount: FieldValue.increment(-1) })
+  deleteBatch.update(artistRef, { trackCount: Math.max(0, currentTrackCount - 1) })
   await deleteBatch.commit()
   return { ok: true }
 })
