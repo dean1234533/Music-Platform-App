@@ -9,22 +9,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$slug = ! empty( $attributes['artist'] ) ? sanitize_title( $attributes['artist'] ) : BackTheVibes_Settings::get_default_slug();
-if ( '' === $slug ) {
+$backthevibes_slug = ! empty( $attributes['artist'] ) ? sanitize_title( $attributes['artist'] ) : BackTheVibes_Settings::get_default_slug();
+if ( '' === $backthevibes_slug ) {
 	echo BackTheVibes_Render::unavailable_notice(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside.
 	return;
 }
 
-$artist = BackTheVibes_API::get_artist( $slug );
-if ( ! $artist ) {
+$backthevibes_artist = BackTheVibes_API::get_artist( $backthevibes_slug );
+if ( ! $backthevibes_artist ) {
 	echo BackTheVibes_Render::unavailable_notice(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside.
 	return;
 }
 
-echo BackTheVibes_Render::artist_card( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside.
-	$artist,
-	array(
-		'show_bio'     => ! empty( $attributes['showBio'] ),
-		'show_buttons' => ! empty( $attributes['showButtons'] ),
-	)
+$backthevibes_card_args = array(
+	'show_bio'     => ! empty( $attributes['showBio'] ),
+	'show_buttons' => ! empty( $attributes['showButtons'] ),
 );
+echo BackTheVibes_Render::artist_card( $backthevibes_artist, $backthevibes_card_args ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside.

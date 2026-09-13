@@ -3,16 +3,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$slug = ! empty( $attributes['artist'] ) ? sanitize_title( $attributes['artist'] ) : BackTheVibes_Settings::get_default_slug();
-if ( '' === $slug ) {
+$backthevibes_slug = ! empty( $attributes['artist'] ) ? sanitize_title( $attributes['artist'] ) : BackTheVibes_Settings::get_default_slug();
+if ( '' === $backthevibes_slug ) {
 	echo BackTheVibes_Render::unavailable_notice(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside.
 	return;
 }
 
-$artist = BackTheVibes_API::get_artist( $slug );
-if ( ! $artist ) {
+$backthevibes_artist = BackTheVibes_API::get_artist( $backthevibes_slug );
+if ( ! $backthevibes_artist ) {
 	echo BackTheVibes_Render::unavailable_notice(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside.
 	return;
 }
 
-echo BackTheVibes_Render::support_button( $artist, array( 'label' => $attributes['label'] ?? '' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside.
+echo BackTheVibes_Render::support_button( $backthevibes_artist, array( 'label' => $attributes['label'] ?? '' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside.
