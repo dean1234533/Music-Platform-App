@@ -24,5 +24,7 @@ if ( ! $backthevibes_artist ) {
 $backthevibes_card_args = array(
 	'show_bio'     => ! empty( $attributes['showBio'] ),
 	'show_buttons' => ! empty( $attributes['showButtons'] ),
+	'show_tracks'  => ! isset( $attributes['showTracks'] ) || $attributes['showTracks'],
+	'track_limit'  => ! empty( $attributes['trackLimit'] ) ? absint( $attributes['trackLimit'] ) : 6,
 );
 echo BackTheVibes_Render::artist_card( $backthevibes_artist, $backthevibes_card_args ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside.

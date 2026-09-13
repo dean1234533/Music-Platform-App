@@ -58,7 +58,25 @@
 							onChange: function ( value ) {
 								setAttributes( { showButtons: value } );
 							},
-						} )
+						} ),
+						el( ToggleControl, {
+							label: __( 'Show track clips', 'backthevibes' ),
+							checked: attributes.showTracks,
+							onChange: function ( value ) {
+								setAttributes( { showTracks: value } );
+							},
+						} ),
+						attributes.showTracks
+							? el( RangeControl, {
+									label: __( 'Number of tracks', 'backthevibes' ),
+									value: attributes.trackLimit,
+									min: 1,
+									max: 12,
+									onChange: function ( value ) {
+										setAttributes( { trackLimit: value } );
+									},
+							  } )
+							: null
 					)
 				),
 				el( ServerSideRender, { block: 'backthevibes/artist-card', attributes: attributes } )

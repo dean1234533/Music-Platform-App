@@ -40,6 +40,8 @@ class BackTheVibes_Shortcodes {
 				'artist'       => '',
 				'show_bio'     => 'yes',
 				'show_buttons' => 'yes',
+				'tracks'       => 'yes',
+				'track_limit'  => 6,
 			),
 			$atts,
 			'backthevibes_artist'
@@ -53,6 +55,8 @@ class BackTheVibes_Shortcodes {
 			array(
 				'show_bio'     => 'yes' === $atts['show_bio'],
 				'show_buttons' => 'yes' === $atts['show_buttons'],
+				'show_tracks'  => 'yes' === $atts['tracks'],
+				'track_limit'  => (int) $atts['track_limit'],
 			)
 		);
 	}

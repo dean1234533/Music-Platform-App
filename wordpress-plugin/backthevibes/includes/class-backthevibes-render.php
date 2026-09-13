@@ -25,17 +25,24 @@ class BackTheVibes_Render {
 	}
 
 	/**
-	 * [backthevibes_artist] — profile image, name, bio, social links, and
-	 * Follow/Support buttons that link out to the artist's real
-	 * BackTheVibes profile (all account/payment actions happen there,
-	 * signed in — this plugin never collects credentials or payment
-	 * details itself).
+	 * [backthevibes_artist] — profile image, name, bio, social links,
+	 * Follow/Support buttons, and (by default) a row of short track clips —
+	 * one combined card instead of needing a separate [backthevibes_music]
+	 * alongside it (user feedback: "wouldnt it make more sense to have a
+	 * profile card one that shows clops of your tracks instead of the full
+	 * track" — the "instead of the full track" half is handled by
+	 * tracks_markup()'s own clip cutoff, see backthevibes.js). Follow/
+	 * Support always link out to the artist's real BackTheVibes profile —
+	 * all account/payment actions happen there, this plugin never collects
+	 * credentials or payment details itself.
 	 */
 	public static function artist_card( array $artist, array $args = array() ): string {
 		wp_enqueue_style( 'backthevibes-embed' );
 
-		$show_bio  = ! empty( $args['show_bio'] );
-		$show_cta  = ! isset( $args['show_buttons'] ) || $args['show_buttons'];
+		$show_bio    = ! empty( $args['show_bio'] );
+		$show_cta    = ! isset( $args['show_buttons'] ) || $args['show_buttons'];
+		$show_tracks = ! isset( $args['show_tracks'] ) || $args['show_tracks'];
+		$track_limit = ! empty( $args['track_limit'] ) ? (int) $args['track_limit'] : 6;
 
 		ob_start();
 		?>
@@ -69,6 +76,9 @@ class BackTheVibes_Render {
 					</a>
 				</div>
 			<?php endif; ?>
+			<?php if ( $show_tracks ) : ?>
+				<?php echo self::tracks_markup( $artist, $track_limit ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside. ?>
+			<?php endif; ?>
 			<?php echo self::powered_by( $artist['profileUrl'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside. ?>
 		</div>
 		<?php
@@ -97,12 +107,37 @@ class BackTheVibes_Render {
 	}
 
 	/**
-	 * [backthevibes_music] — a grid of the artist's public tracks, each
-	 * playable through the real, official YouTube embed (click-to-load, so
-	 * nothing is requested from YouTube until a visitor presses play).
-	 * Never a download link, never an audio file served by this plugin.
+	 * [backthevibes_music] — a grid of the artist's public tracks, standalone
+	 * (with its own "Powered by" footer). See tracks_markup() for the
+	 * actual grid — this is just that plus the footer, matching the other
+	 * two standalone shortcodes' shape.
 	 */
 	public static function music_grid( array $artist, array $args = array() ): string {
+		$limit  = ! empty( $args['limit'] ) ? (int) $args['limit'] : 6;
+		$markup = self::tracks_markup( $artist, $limit );
+		if ( '' === $markup ) {
+			return '<p class="backthevibes-embed backthevibes-empty">' . esc_html__( 'No public tracks yet.', 'backthevibes' ) . '</p>';
+		}
+		return '<div class="backthevibes-embed">' . $markup . self::powered_by( $artist['profileUrl'] ) . '</div>';
+	}
+
+	/**
+	 * The actual track grid, shared by [backthevibes_music] on its own and
+	 * by artist_card()'s combined card. Each track plays a CLIP_SECONDS clip
+	 * through the real, official YouTube embed (click-to-load — nothing is
+	 * requested from YouTube until a visitor presses play), then swaps in a
+	 * link to hear the full track on BackTheVibes — this plugin is a
+	 * teaser, not a place to hear a whole discography end to end, matching
+	 * user feedback that a full track playing inline made the widget
+	 * confusing. Never a download link, never an audio file served here.
+	 */
+	private static function tracks_markup( array $artist, int $limit ): string {
+		$limit  = max( 1, min( 12, $limit ) );
+		$tracks = array_slice( $artist['tracks'], 0, $limit );
+		if ( empty( $tracks ) ) {
+			return '';
+		}
+
 		wp_enqueue_style( 'backthevibes-embed' );
 		wp_enqueue_script(
 			'backthevibes-embed',
@@ -112,39 +147,34 @@ class BackTheVibes_Render {
 			true
 		);
 
-		$limit  = ! empty( $args['limit'] ) ? max( 1, min( 12, (int) $args['limit'] ) ) : 6;
-		$tracks = array_slice( $artist['tracks'], 0, $limit );
-
-		if ( empty( $tracks ) ) {
-			return '<p class="backthevibes-embed backthevibes-empty">' . esc_html__( 'No public tracks yet.', 'backthevibes' ) . '</p>';
-		}
-
 		ob_start();
 		?>
-		<div class="backthevibes-embed backthevibes-music-grid">
+		<div class="backthevibes-music-grid">
 			<?php foreach ( $tracks as $track ) :
 				$video_id = BackTheVibes_API::extract_video_id( $track['youtubeUrl'] );
 				if ( ! $video_id ) {
 					continue;
 				}
+				$track_url = $track['url'] ? $track['url'] : $artist['profileUrl'];
 				?>
 				<div class="backthevibes-track">
 					<button
 						type="button"
 						class="backthevibes-video-trigger"
 						data-video-id="<?php echo esc_attr( $video_id ); ?>"
-						aria-label="<?php echo esc_attr( sprintf( /* translators: %s: track title */ __( 'Play %s on YouTube', 'backthevibes' ), $track['title'] ) ); ?>"
+						data-track-url="<?php echo esc_url( $track_url ); ?>"
+						aria-label="<?php echo esc_attr( sprintf( /* translators: %s: track title */ __( 'Play a clip of %s', 'backthevibes' ), $track['title'] ) ); ?>"
 					>
 						<img src="<?php echo esc_url( $track['artworkUrl'] ? $track['artworkUrl'] : 'https://i.ytimg.com/vi/' . rawurlencode( $video_id ) . '/hqdefault.jpg' ); ?>" alt="" loading="lazy" />
 						<span class="backthevibes-play-icon" aria-hidden="true"></span>
+						<span class="backthevibes-clip-badge"><?php esc_html_e( '0:20 clip', 'backthevibes' ); ?></span>
 					</button>
-					<a class="backthevibes-track-title" href="<?php echo esc_url( $track['url'] ? $track['url'] : $artist['profileUrl'] ); ?>" target="_blank" rel="noopener noreferrer">
+					<a class="backthevibes-track-title" href="<?php echo esc_url( $track_url ); ?>" target="_blank" rel="noopener noreferrer">
 						<?php echo esc_html( $track['title'] ); ?>
 					</a>
 				</div>
 			<?php endforeach; ?>
 		</div>
-		<?php echo self::powered_by( $artist['profileUrl'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside. ?>
 		<?php
 		return trim( (string) ob_get_clean() );
 	}

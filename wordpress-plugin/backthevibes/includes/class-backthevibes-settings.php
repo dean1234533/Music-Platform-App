@@ -79,9 +79,9 @@ class BackTheVibes_Settings {
 			</form>
 			<hr />
 			<h2><?php esc_html_e( 'Usage', 'backthevibes' ); ?></h2>
-			<p><code>[backthevibes_artist]</code> &mdash; <?php esc_html_e( 'artist profile card with Follow/Support buttons.', 'backthevibes' ); ?></p>
-			<p><code>[backthevibes_support]</code> &mdash; <?php esc_html_e( 'a single Support button.', 'backthevibes' ); ?></p>
-			<p><code>[backthevibes_music]</code> &mdash; <?php esc_html_e( 'a grid of public tracks, playable via the official YouTube player.', 'backthevibes' ); ?></p>
+			<p><code>[backthevibes_artist]</code> &mdash; <?php esc_html_e( 'the main widget: your profile card plus a row of 20-second track clips, together. Add tracks="no" to hide the track row, or track_limit="N" to change how many show.', 'backthevibes' ); ?></p>
+			<p><code>[backthevibes_music]</code> &mdash; <?php esc_html_e( 'just the track-clips row on its own, without the profile card.', 'backthevibes' ); ?></p>
+			<p><code>[backthevibes_support]</code> &mdash; <?php esc_html_e( 'just a standalone Support button.', 'backthevibes' ); ?></p>
 			<p><?php esc_html_e( 'Each shortcode also accepts an artist="your-slug" attribute to override the default above. Matching blocks are available in the block editor under "BackTheVibes".', 'backthevibes' ); ?></p>
 		</div>
 		<?php

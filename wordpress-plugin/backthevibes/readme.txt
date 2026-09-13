@@ -17,18 +17,22 @@ collaboration platform. This plugin is a lightweight integration layer for
 your own WordPress site — it does not replace the main BackTheVibes
 application, and it does not host, download, cache, or proxy any music.
 
-Every track link plays through the official YouTube embedded player,
-loaded only after a visitor deliberately presses play. Follow and Support
-buttons link to your real BackTheVibes profile, where the actual
-account/payment action happens — this plugin never collects credentials or
-payment details itself.
+`[backthevibes_artist]` is the main widget — one combined card with your
+profile (image, bio, Follow/Support buttons) and a row of your public
+tracks together, not two separate things to place on the page. Each track
+plays a 20-second clip through the official YouTube embedded player,
+loaded only after a visitor deliberately presses play, then swaps itself
+for a link to hear the full track on BackTheVibes — a teaser, not a full
+player. Follow and Support buttons link to your real BackTheVibes profile
+and, once there, actually complete the Follow/Support action — this
+plugin never collects credentials or payment details itself.
 
 = What it adds =
 
-* An artist profile card (image, name, bio, social links, Follow/Support buttons)
-* A standalone Support button
-* A grid of your public tracks, playable via the official YouTube embed
-* Matching Gutenberg blocks and shortcodes: `[backthevibes_artist]`, `[backthevibes_support]`, `[backthevibes_music]`
+* `[backthevibes_artist]` — the combined card: profile + Follow/Support + a row of 20-second track clips (tracks/buttons/bio can each be turned off)
+* `[backthevibes_music]` — just the track-clips row on its own
+* `[backthevibes_support]` — just a standalone Support button
+* Matching Gutenberg blocks for all three, under "BackTheVibes" in the block inserter
 
 = What it never does =
 
@@ -57,4 +61,6 @@ No. The plugin only reads your public profile data through BackTheVibes' public 
 == Changelog ==
 
 = 1.0.0 =
-* Initial release.
+* Initial release. `[backthevibes_artist]` combines the profile card and a
+  20-second-clip track row into one widget by default (`tracks="no"` to
+  turn the row off, `track_limit="N"` to change how many show).

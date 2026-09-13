@@ -176,12 +176,51 @@
 	z-index: 1;
 }
 
+.backthevibes-clip-badge {
+	position: absolute;
+	right: 6px;
+	bottom: 6px;
+	padding: 2px 7px;
+	border-radius: 999px;
+	background: rgba(0, 0, 0, 0.65);
+	color: #fff;
+	font-size: 0.72em;
+	font-weight: 600;
+	letter-spacing: 0.01em;
+}
+
 .backthevibes-video-frame {
 	width: 100%;
 	aspect-ratio: 16 / 9;
 	border: 0;
 	border-radius: 10px;
 	display: block;
+}
+
+.backthevibes-clip-ended {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	width: 100%;
+	aspect-ratio: 16 / 9;
+	border-radius: 10px;
+	background: #000;
+	color: #fff;
+	text-align: center;
+	padding: 12px;
+}
+
+.backthevibes-clip-ended-label {
+	font-size: 0.8em;
+	opacity: 0.75;
+}
+
+.backthevibes-clip-ended-link {
+	color: #fff;
+	font-weight: 600;
+	text-decoration: underline;
 }
 
 .backthevibes-track-title {
