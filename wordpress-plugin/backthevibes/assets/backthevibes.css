@@ -1,11 +1,20 @@
 /*
- * Sensible defaults only — scoped under .backthevibes-embed and using
- * relative units so this doesn't fight a host theme's own typography/colour
- * choices any more than necessary. BackTheVibes brand accent (a warm
- * yellow-green) is used sparingly, on the Support button only.
+ * Scoped under .backthevibes-embed and using relative units so this doesn't
+ * fight a host theme's own typography/colour choices any more than
+ * necessary — but the accent colours below are BackTheVibes' own brand
+ * palette (matching backthevibes.com itself: a warm yellow-green primary,
+ * emerald for Support), not a generic placeholder, so the card reads as a
+ * real BackTheVibes surface wherever it's embedded.
  */
 
 .backthevibes-embed {
+	--btv-brand: #c8f33f;
+	--btv-brand-ink: #0b0d05;
+	--btv-support: #10b981;
+	--btv-support-hover: #34d399;
+	--btv-border: rgba(0, 0, 0, 0.08);
+	--btv-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(0, 0, 0, 0.08);
+
 	box-sizing: border-box;
 	font-family: inherit;
 	color: inherit;
@@ -17,14 +26,20 @@
 }
 
 .backthevibes-artist-card {
-	border: 1px solid rgba(0, 0, 0, 0.12);
-	border-radius: 16px;
+	border: 1px solid var(--btv-border);
+	border-radius: 20px;
 	overflow: hidden;
-	background: rgba(0, 0, 0, 0.02);
+	background: #fff;
+	box-shadow: var(--btv-shadow);
+	transition: box-shadow 0.2s ease;
+}
+
+.backthevibes-artist-card:hover {
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05), 0 16px 40px rgba(0, 0, 0, 0.11);
 }
 
 .backthevibes-cover {
-	height: 120px;
+	height: 128px;
 	background-size: cover;
 	background-position: center;
 }
@@ -32,8 +47,8 @@
 .backthevibes-artist-header {
 	display: flex;
 	align-items: center;
-	gap: 12px;
-	padding: 16px 16px 0;
+	gap: 14px;
+	padding: 18px 18px 0;
 }
 
 .backthevibes-card-toggle {
@@ -42,7 +57,7 @@
 	justify-content: space-between;
 	gap: 8px;
 	width: 100%;
-	padding: 4px 16px 0;
+	padding: 4px 8px 0 18px;
 	margin: 0;
 	border: 0;
 	background: none;
@@ -50,26 +65,46 @@
 	color: inherit;
 	text-align: left;
 	cursor: pointer;
+	border-radius: 14px;
+	transition: background-color 0.15s ease;
+}
+
+.backthevibes-card-toggle:hover {
+	background-color: rgba(0, 0, 0, 0.03);
 }
 
 .backthevibes-card-toggle .backthevibes-artist-header {
-	padding: 12px 0;
+	padding: 14px 0;
 	flex: 1;
 	min-width: 0;
 }
 
 .backthevibes-toggle-icon {
 	flex-shrink: 0;
-	width: 10px;
-	height: 10px;
-	border-right: 2px solid currentColor;
-	border-bottom: 2px solid currentColor;
-	opacity: 0.6;
-	transform: rotate(45deg);
-	transition: transform 0.15s ease;
+	width: 32px;
+	height: 32px;
+	border-radius: 999px;
+	background: rgba(0, 0, 0, 0.04);
+	position: relative;
+	transition: background-color 0.15s ease;
 }
 
-.backthevibes-card-toggle[aria-expanded="true"] .backthevibes-toggle-icon {
+.backthevibes-toggle-icon::before {
+	content: '';
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 8px;
+	height: 8px;
+	margin: -6px 0 0 -5px;
+	border-right: 2px solid currentColor;
+	border-bottom: 2px solid currentColor;
+	opacity: 0.55;
+	transform: rotate(45deg);
+	transition: transform 0.2s ease;
+}
+
+.backthevibes-card-toggle[aria-expanded="true"] .backthevibes-toggle-icon::before {
 	transform: rotate(-135deg);
 }
 
@@ -78,22 +113,25 @@
 }
 
 .backthevibes-avatar {
-	width: 56px;
-	height: 56px;
+	width: 60px;
+	height: 60px;
 	border-radius: 999px;
 	object-fit: cover;
 	flex-shrink: 0;
+	box-shadow: 0 0 0 3px #fff, 0 0 0 4px var(--btv-border);
 }
 
 .backthevibes-artist-meta {
 	display: flex;
 	flex-direction: column;
+	gap: 2px;
 	min-width: 0;
 }
 
 .backthevibes-artist-name {
-	font-size: 1.1em;
-	font-weight: 600;
+	font-size: 1.15em;
+	font-weight: 700;
+	letter-spacing: -0.01em;
 	text-decoration: none;
 	color: inherit;
 }
@@ -103,21 +141,21 @@
 }
 
 .backthevibes-location {
-	font-size: 0.85em;
-	opacity: 0.7;
+	font-size: 0.82em;
+	opacity: 0.6;
 }
 
 .backthevibes-bio {
-	padding: 12px 16px 0;
-	font-size: 0.9em;
-	line-height: 1.5;
-	opacity: 0.85;
+	padding: 14px 18px 0;
+	font-size: 0.92em;
+	line-height: 1.55;
+	opacity: 0.8;
 }
 
 .backthevibes-actions {
 	display: flex;
-	gap: 8px;
-	padding: 16px;
+	gap: 10px;
+	padding: 18px;
 	flex-wrap: wrap;
 }
 
@@ -125,31 +163,46 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	padding: 8px 16px;
+	padding: 10px 20px;
 	border-radius: 999px;
 	font-size: 0.9em;
-	font-weight: 600;
+	font-weight: 700;
+	letter-spacing: -0.005em;
 	text-decoration: none;
-	transition: opacity 0.15s ease;
+	transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
 
 .backthevibes-btn:hover {
-	opacity: 0.85;
 	text-decoration: none;
+	transform: translateY(-1px);
+}
+
+.backthevibes-btn:active {
+	transform: translateY(0);
 }
 
 .backthevibes-btn-follow {
-	background: rgba(0, 0, 0, 0.08);
-	color: inherit;
+	background: var(--btv-brand);
+	color: var(--btv-brand-ink);
+	box-shadow: 0 6px 18px rgba(200, 243, 63, 0.35);
+}
+
+.backthevibes-btn-follow:hover {
+	background: #d9ff65;
 }
 
 .backthevibes-btn-support {
-	background: #e0407a;
+	background: var(--btv-support);
 	color: #fff;
+	box-shadow: 0 6px 18px rgba(16, 185, 129, 0.3);
+}
+
+.backthevibes-btn-support:hover {
+	background: var(--btv-support-hover);
 }
 
 .backthevibes-btn-large {
-	padding: 12px 24px;
+	padding: 14px 28px;
 	font-size: 1em;
 }
 
@@ -161,13 +214,13 @@
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
 	gap: 16px;
-	padding: 12px 16px 0;
+	padding: 14px 18px 0;
 }
 
 .backthevibes-track {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: 7px;
 }
 
 .backthevibes-video-trigger {
@@ -177,10 +230,11 @@
 	aspect-ratio: 16 / 9;
 	padding: 0;
 	border: 0;
-	border-radius: 10px;
+	border-radius: 12px;
 	overflow: hidden;
 	cursor: pointer;
 	background: #000;
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
 }
 
 .backthevibes-video-trigger img {
@@ -188,6 +242,11 @@
 	height: 100%;
 	object-fit: cover;
 	display: block;
+	transition: transform 0.25s ease;
+}
+
+.backthevibes-video-trigger:hover img {
+	transform: scale(1.06);
 }
 
 .backthevibes-play-icon {
@@ -196,15 +255,22 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	background: linear-gradient(rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.45));
 }
 
 .backthevibes-play-icon::after {
 	content: '';
-	width: 44px;
-	height: 44px;
+	width: 46px;
+	height: 46px;
 	border-radius: 999px;
-	background: rgba(255, 0, 0, 0.85);
+	background: var(--btv-brand);
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
 	display: block;
+	transition: transform 0.15s ease;
+}
+
+.backthevibes-video-trigger:hover .backthevibes-play-icon::after {
+	transform: scale(1.08);
 }
 
 .backthevibes-play-icon::before {
@@ -213,21 +279,22 @@
 	width: 0;
 	height: 0;
 	border-style: solid;
-	border-width: 8px 0 8px 14px;
-	border-color: transparent transparent transparent #fff;
+	border-width: 9px 0 9px 15px;
+	border-color: transparent transparent transparent var(--btv-brand-ink);
 	z-index: 1;
 }
 
 .backthevibes-clip-badge {
 	position: absolute;
-	right: 6px;
-	bottom: 6px;
-	padding: 2px 7px;
+	right: 7px;
+	bottom: 7px;
+	padding: 3px 8px;
 	border-radius: 999px;
 	background: rgba(0, 0, 0, 0.65);
+	backdrop-filter: blur(2px);
 	color: #fff;
-	font-size: 0.72em;
-	font-weight: 600;
+	font-size: 0.7em;
+	font-weight: 700;
 	letter-spacing: 0.01em;
 }
 
@@ -235,8 +302,9 @@
 	width: 100%;
 	aspect-ratio: 16 / 9;
 	border: 0;
-	border-radius: 10px;
+	border-radius: 12px;
 	display: block;
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
 }
 
 .backthevibes-clip-ended {
@@ -244,30 +312,35 @@
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	gap: 6px;
+	gap: 7px;
 	width: 100%;
 	aspect-ratio: 16 / 9;
-	border-radius: 10px;
-	background: #000;
+	border-radius: 12px;
+	background: #111;
 	color: #fff;
 	text-align: center;
-	padding: 12px;
+	padding: 14px;
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
 }
 
 .backthevibes-clip-ended-label {
 	font-size: 0.8em;
-	opacity: 0.75;
+	opacity: 0.7;
 }
 
 .backthevibes-clip-ended-link {
-	color: #fff;
-	font-weight: 600;
+	color: var(--btv-brand);
+	font-weight: 700;
+	text-decoration: none;
+}
+
+.backthevibes-clip-ended-link:hover {
 	text-decoration: underline;
 }
 
 .backthevibes-track-title {
 	font-size: 0.85em;
-	font-weight: 500;
+	font-weight: 600;
 	text-decoration: none;
 	color: inherit;
 	overflow: hidden;
@@ -280,23 +353,24 @@
 }
 
 .backthevibes-powered-by {
-	margin: 8px 16px 16px;
-	font-size: 0.75em;
-	opacity: 0.6;
+	margin: 10px 18px 18px;
+	font-size: 0.74em;
+	letter-spacing: 0.01em;
+	opacity: 0.55;
 }
 
 .backthevibes-music-grid + .backthevibes-powered-by {
-	margin: 12px 16px 16px;
+	margin: 14px 18px 18px;
 }
 
 .backthevibes-powered-by a {
 	color: inherit;
-	font-weight: 600;
+	font-weight: 700;
 }
 
 .backthevibes-unavailable,
 .backthevibes-empty {
 	font-size: 0.9em;
-	opacity: 0.7;
+	opacity: 0.6;
 	font-style: italic;
 }
