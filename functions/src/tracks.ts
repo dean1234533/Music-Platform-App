@@ -83,6 +83,25 @@ async function canAccessTrackYoutubeLink(uid: string | null, track: FirebaseFire
   return false
 }
 
+// Mirrors src/constants/mediaConfig.ts's PREVIEW_DEFAULT_DURATION_SEC — there is no shared
+// import between the two build targets, so this stays hand-kept-in-sync.
+const PREVIEW_SECONDS = 45
+
+/**
+ * A locked track isn't an all-or-nothing wall: followers/supporters/early_access are the
+ * "unlock by engaging" tiers, and a visitor who hasn't yet was always meant to get a short
+ * taste rather than nothing at all (this predates the YouTube migration — see
+ * PREVIEW_DEFAULT_DURATION_SEC in the old hosted-audio pipeline). dj_only stays a hard wall —
+ * that tier is gated by an actual paid/signed licence, not by following/supporting — and so
+ * does private (genuinely unpublished) and any moderation/legal block.
+ */
+async function canPreviewTrackYoutubeLink(track: FirebaseFirestore.DocumentData): Promise<boolean> {
+  if (track.takenDown === true || (track.restrictedCapabilities ?? []).includes('streaming')) return false
+  if (!isPublished(track)) return false
+  if (!(await artistRoleActive(track.artistId))) return false
+  return ['followers', 'supporters', 'early_access'].includes(track.visibility)
+}
+
 /**
  * Returns the validated YouTube video ID only after checking current track
  * visibility and moderation state — this is the one place the app ever
@@ -98,7 +117,8 @@ export const getTrackYoutubeInfo = onCall(async (request) => {
   if (!snap.exists) throw new HttpsError('not-found', 'Track does not exist.')
   const track = snap.data()!
   const uid = request.auth?.uid ?? null
-  if (!(await canAccessTrackYoutubeLink(uid, track))) {
+  const fullAccess = await canAccessTrackYoutubeLink(uid, track)
+  if (!fullAccess && !(await canPreviewTrackYoutubeLink(track))) {
     throw new HttpsError('permission-denied', 'You do not have access to this track.')
   }
   const mediaSnap = await db.collection('trackMedia').doc(trackId).get()
@@ -106,7 +126,11 @@ export const getTrackYoutubeInfo = onCall(async (request) => {
   if (typeof youtubeVideoId !== 'string' || !isValidYoutubeVideoId(youtubeVideoId)) {
     throw new HttpsError('failed-precondition', 'This track has no valid YouTube link.')
   }
-  return { youtubeVideoId, youtubeUrl: `https://www.youtube.com/watch?v=${youtubeVideoId}` }
+  return {
+    youtubeVideoId,
+    youtubeUrl: `https://www.youtube.com/watch?v=${youtubeVideoId}`,
+    ...(fullAccess ? {} : { previewOnly: true, previewSeconds: PREVIEW_SECONDS }),
+  }
 })
 
 /**

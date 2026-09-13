@@ -45,6 +45,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const playerRef = useRef<YT.Player | null>(null)
   const progressIntervalRef = useRef<number | null>(null)
+  const previewCapSecRef = useRef<number | null>(null)
   const previousUserIdRef = useRef<string | null>(null)
   const queueRef = useRef<TrackDoc[]>([])
   const currentTrackRef = useRef<TrackDoc | null>(null)
@@ -97,6 +98,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setProgressSec(0)
     setDurationSec(0)
     setAccessGranted(false)
+    previewCapSecRef.current = null
   }, [destroyPlayer])
 
   useEffect(() => {
@@ -118,9 +120,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       // getTrackYoutubeInfo is the only place the app ever discloses a
       // track's YouTube link to a viewer who isn't its owner/admin — the
       // same public/followers/supporters/dj_only/private ladder that used
-      // to gate hosted audio now gates whether we reveal the video ID.
-      const { youtubeVideoId } = await getTrackYoutubeInfo(track)
-      setAccessGranted(true)
+      // to gate hosted audio now gates whether we reveal the video ID. A
+      // locked-but-previewable track (followers/supporters/early_access)
+      // still hands back the video ID, flagged previewOnly, so the visitor
+      // gets a real short taste instead of nothing at all (user-reported:
+      // "even thogh it is set to followers, on profile 30 sec or so
+      // preveiw everyone should be able to listen").
+      const { youtubeVideoId, previewOnly, previewSeconds } = await getTrackYoutubeInfo(track)
+      setAccessGranted(!previewOnly)
+      previewCapSecRef.current = previewOnly && previewSeconds ? previewSeconds : null
       const container = containerRef.current
       if (!container) throw new Error('Player is not ready yet.')
 
@@ -148,7 +156,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 setDurationSec(event.target.getDuration() || 0)
                 stopProgressPolling()
                 progressIntervalRef.current = window.setInterval(() => {
-                  setProgressSec(playerRef.current?.getCurrentTime() ?? 0)
+                  const current = playerRef.current?.getCurrentTime() ?? 0
+                  setProgressSec(current)
+                  const cap = previewCapSecRef.current
+                  if (cap !== null && current >= cap) {
+                    playerRef.current?.pauseVideo()
+                    stopProgressPolling()
+                    notify('Preview ended — follow the artist to hear the full track.', 'info')
+                  }
                 }, 500)
               } else if (event.data === YT.PlayerState.PAUSED) {
                 setIsPlaying(false)

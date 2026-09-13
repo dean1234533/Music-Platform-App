@@ -271,8 +271,13 @@ export async function updateTrackDjAccess(
  * player call goes through this so a future visibility tightening is
  * enforced without depending on every read site checking it itself.
  */
-export async function getTrackYoutubeInfo(track: TrackDoc): Promise<{ youtubeVideoId: string; youtubeUrl: string }> {
-  const fn = httpsCallable<{ trackId: string }, { youtubeVideoId: string; youtubeUrl: string }>(functions, 'getTrackYoutubeInfo')
+export async function getTrackYoutubeInfo(
+  track: TrackDoc,
+): Promise<{ youtubeVideoId: string; youtubeUrl: string; previewOnly?: boolean; previewSeconds?: number }> {
+  const fn = httpsCallable<
+    { trackId: string },
+    { youtubeVideoId: string; youtubeUrl: string; previewOnly?: boolean; previewSeconds?: number }
+  >(functions, 'getTrackYoutubeInfo')
   return (await fn({ trackId: track.trackId })).data
 }
 

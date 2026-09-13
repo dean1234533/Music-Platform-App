@@ -1019,12 +1019,10 @@ test('signed-in users can send a support message, an admin gets notified and can
   assert.match(read('functions/src/index.ts'), /export \{ submitSupportMessage, resolveSupportMessage \} from '\.\/support\.js'/)
 })
 
-test('music access ladder: playback is the official YouTube embed for everyone, but the video ID stays strictly gated (YouTube-based track migration: there is no more separate preview tier — a track is either revealed or locked)', () => {
+test('music access ladder: playback is the official YouTube embed for everyone, but the video ID stays strictly gated except for a short preview on the "unlock by engaging" tiers (user-reported, after a bare block-with-no-preview shipped: "even thogh it is set to followers, on profile 30 sec or so preveiw everyone should be able to listen")', () => {
   const fn = read('functions/src/tracks.ts')
 
-  // The one entitlement check gates whether the video ID is ever disclosed
-  // at all — there is no more permissive "preview" layer, since a YouTube
-  // embed either plays the whole thing or it doesn't play at all.
+  // Full access still runs through the one entitlement ladder.
   assert.match(fn, /async function canAccessTrackYoutubeLink\(uid: string \| null, track: FirebaseFirestore\.DocumentData\): Promise<boolean> \{/)
 
   // "Supporter" means: has ever made a one-off Stripe Connect support
@@ -1034,12 +1032,25 @@ test('music access ladder: playback is the official YouTube embed for everyone, 
   assert.match(fn, /async function isActiveSupporter\(uid: string, artistId: string\): Promise<boolean> \{/)
   assert.match(fn, /return relSnap\.exists/)
 
-  // getTrackYoutubeInfo is the one place the video ID is ever handed back,
-  // and only after that same entitlement check passes — the actual ID lives
-  // in trackMedia/{trackId}, never on the publicly-readable track doc.
+  // A viewer without full access still gets a real, short preview on the tiers meant to be
+  // unlocked by following/supporting — dj_only (licence-gated) and private (unpublished) stay
+  // a hard wall, and takenDown/restrictedCapabilities/an inactive artist block preview too.
+  assert.match(fn, /async function canPreviewTrackYoutubeLink\(track: FirebaseFirestore\.DocumentData\): Promise<boolean> \{/)
+  assert.match(fn, /return \['followers', 'supporters', 'early_access'\]\.includes\(track\.visibility\)/)
+  const previewStart = fn.indexOf('async function canPreviewTrackYoutubeLink(')
+  const previewBody = fn.slice(previewStart, fn.indexOf('\n}', previewStart))
+  assert.match(previewBody, /if \(track\.takenDown === true \|\| \(track\.restrictedCapabilities \?\? \[\]\)\.includes\('streaming'\)\) return false/)
+  assert.match(previewBody, /if \(!\(await artistRoleActive\(track\.artistId\)\)\) return false/)
+
+  // getTrackYoutubeInfo is the one place the video ID is ever handed back — full access reveals
+  // it outright, a preview-eligible track reveals it flagged previewOnly with a capped duration,
+  // and everything else (dj_only/private/moderation-blocked) still throws. The actual ID lives
+  // in trackMedia/{trackId}, never on the publicly-readable track doc, either way.
   assert.match(fn, /export const getTrackYoutubeInfo = onCall\(async \(request\) => \{/)
-  assert.match(fn, /if \(!\(await canAccessTrackYoutubeLink\(uid, track\)\)\) \{/)
+  assert.match(fn, /const fullAccess = await canAccessTrackYoutubeLink\(uid, track\)/)
+  assert.match(fn, /if \(!fullAccess && !\(await canPreviewTrackYoutubeLink\(track\)\)\) \{/)
   assert.match(fn, /const mediaSnap = await db\.collection\('trackMedia'\)\.doc\(trackId\)\.get\(\)/)
+  assert.match(fn, /\.\.\.\(fullAccess \? \{\} : \{ previewOnly: true, previewSeconds: PREVIEW_SECONDS \}\)/)
 
   // Analytics stay honest: one counter for "this entitled viewer opened the
   // YouTube link" — never a claimed YouTube view count, never client-writable.
@@ -1047,9 +1058,13 @@ test('music access ladder: playback is the official YouTube embed for everyone, 
   assert.match(fn, /await ref\.update\(\{ playCount: FieldValue\.increment\(1\) \}\)/)
 
   // The player must actually ask the server before ever loading a video —
-  // never decide client-side who is "probably" entitled.
+  // never decide client-side who is "probably" entitled — and enforces the
+  // preview's own cap once granted rather than trusting playback to stop on its own.
   const player = read('src/contexts/PlayerContext.tsx')
-  assert.match(player, /const \{ youtubeVideoId \} = await getTrackYoutubeInfo\(track\)/)
+  assert.match(player, /const \{ youtubeVideoId, previewOnly, previewSeconds \} = await getTrackYoutubeInfo\(track\)/)
+  assert.match(player, /setAccessGranted\(!previewOnly\)/)
+  assert.match(player, /previewCapSecRef\.current = previewOnly && previewSeconds \? previewSeconds : null/)
+  assert.match(player, /if \(cap !== null && current >= cap\) \{\s*playerRef\.current\?\.pauseVideo\(\)/)
   assert.match(player, /void recordTrackPlay\(track\.trackId\)/)
 
   // Firestore rules: track metadata (never the video ID) is visible for a
@@ -1222,7 +1237,7 @@ test('music access ALLOW/DENY matrix — every row of the spec, traced to the co
   // and nothing more — there is no master audio anywhere in this app any
   // more (the YouTube-based track migration removed hosted audio entirely).
   assert.doesNotMatch(storage, /artists\/\{artistId\}\/originals\//)
-  assert.match(tracksFn, /return \{ youtubeVideoId, youtubeUrl: `https:\/\/www\.youtube\.com\/watch\?v=\$\{youtubeVideoId\}` \}/)
+  assert.match(tracksFn, /youtubeUrl: `https:\/\/www\.youtube\.com\/watch\?v=\$\{youtubeVideoId\}`,/)
 
   // 11/12. Master/stem exchange for an agreed DJ deal happens outside
   // BackTheVibes entirely — downloadLicensedTrack always explains that
