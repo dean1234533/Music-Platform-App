@@ -3358,6 +3358,10 @@ test('Microsoft Clarity only ever loads after the visitor accepts the cookie con
   assert.match(app, /<CookieConsentBanner \/>/)
 
   const headers = read('public/_headers')
-  assert.match(headers, /script-src[^;]*https:\/\/www\.clarity\.ms/)
+  // A wildcard, not just www.clarity.ms — the tag script at www.clarity.ms loads a second-stage
+  // script from a DIFFERENT subdomain (scripts.clarity.ms), which a narrower CSP silently blocked
+  // (user-reported: "clarity is not picking anything up" — confirmed live via a CSP console error
+  // for https://scripts.clarity.ms/.../clarity.js, even though the first tag script loaded fine).
+  assert.match(headers, /script-src[^;]*https:\/\/\*\.clarity\.ms/)
   assert.match(headers, /connect-src[^;]*https:\/\/\*\.clarity\.ms/)
 })
