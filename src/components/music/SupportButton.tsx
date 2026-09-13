@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Heart } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { SupportModal } from '@/components/music/SupportModal'
@@ -16,15 +16,27 @@ const sizeClasses = {
  * straight to Stripe Checkout for a direct payment to this artist — there
  * is no subscription or platform-wide plan to pick.
  */
-export function SupportButton({ artistId, size = 'md' }: { artistId?: string; size?: keyof typeof sizeClasses }) {
+export function SupportButton({
+  artistId,
+  size = 'md',
+  autoTrigger = false,
+}: {
+  artistId?: string
+  size?: keyof typeof sizeClasses
+  /** Fires the same thing a real click would, once, on mount — used by ?action=support links (e.g. the WordPress plugin's Support button, which only ever links out here). */
+  autoTrigger?: boolean
+}) {
   const { firebaseUser } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const artist = useArtistSummary(artistId ?? null)
   const [showModal, setShowModal] = useState(false)
+  const autoTriggeredRef = useRef(false)
 
   function handleClick() {
     if (!firebaseUser) {
-      navigate(`/sign-in?returnTo=${encodeURIComponent(window.location.pathname)}`)
+      const returnTo = `${location.pathname}${location.search}`
+      navigate(`/sign-in?returnTo=${encodeURIComponent(returnTo)}`)
       return
     }
     if (!artistId) {
@@ -33,6 +45,17 @@ export function SupportButton({ artistId, size = 'md' }: { artistId?: string; si
     }
     setShowModal(true)
   }
+
+  // ?action=support (e.g. the WordPress plugin's Support button, which only ever links out here
+  // — it never opens the payment flow itself) — fires the click exactly once. A signed-out
+  // visitor's returnTo above preserves this same query param, so it fires again naturally after
+  // sign-in rather than needing a separate pending-resume mechanism.
+  useEffect(() => {
+    if (!autoTrigger || autoTriggeredRef.current || showModal) return
+    autoTriggeredRef.current = true
+    handleClick()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoTrigger])
 
   return (
     <>

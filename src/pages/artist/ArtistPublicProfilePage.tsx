@@ -344,8 +344,10 @@ export function ArtistPublicProfilePage() {
               <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-brand-400">Direct support</p>
               <p className="mt-3 text-sm leading-6 text-ink-1">Support goes beyond a play. Help independent music keep moving.</p>
               <div className="mt-5 flex flex-wrap gap-2">
-                <FollowButton artistId={artist.artistId} />
-                {!firebaseUser || !hasRole('dj') || hasRole('fan') ? <SupportButton artistId={artist.artistId} /> : null}
+                <FollowButton artistId={artist.artistId} autoTrigger={searchParams.get('action') === 'follow'} />
+                {!firebaseUser || !hasRole('dj') || hasRole('fan') ? (
+                  <SupportButton artistId={artist.artistId} autoTrigger={searchParams.get('action') === 'support'} />
+                ) : null}
                 <ShareButton
                   url={artistShareUrl(artist.slug)}
                   title={artist.name}

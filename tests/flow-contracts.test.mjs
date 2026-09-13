@@ -770,9 +770,12 @@ test('Follow/Support CTAs preserve intent through the full auth funnel (returnTo
 
   // SupportButton now opens the amount-picker modal directly (a one-off Stripe Connect
   // payment to the specific artist) rather than routing through a subscription page —
-  // it still preserves intent through the auth funnel by returning to the current page.
+  // it still preserves intent through the auth funnel by returning to the current page,
+  // search params included (not just the bare path) so a WordPress-plugin ?action=support
+  // link survives the sign-in round trip too.
   const support = read('src/components/music/SupportButton.tsx')
-  assert.match(support, /navigate\(`\/sign-in\?returnTo=\$\{encodeURIComponent\(window\.location\.pathname\)\}`\)/)
+  assert.match(support, /const returnTo = `\$\{location\.pathname\}\$\{location\.search\}`/)
+  assert.match(support, /navigate\(`\/sign-in\?returnTo=\$\{encodeURIComponent\(returnTo\)\}`\)/)
   assert.match(support, /setShowModal\(true\)/)
 })
 
@@ -3229,4 +3232,30 @@ test('the public artist API (which the WordPress plugin depends on) can actually
   assert.match(body, /track\.get\('takenDown', false\) != true/)
   assert.match(body, /!track\.get\('restrictedCapabilities', \[\]\)\.hasAny\(\['streaming'\]\)/)
   assert.match(rules, /match \/trackMedia\/\{trackId\} \{\s*allow read: if isPublicPlayableTrack\(trackId\);\s*allow write: if false;/)
+})
+
+test('the WordPress plugin\'s Follow/Support buttons actually follow/support instead of just landing on a plain profile page (user-reported: "it all works but i cant folow or suppot")', () => {
+  // The plugin's followUrl/supportUrl only ever link out to ?action=follow / ?action=support on
+  // the real profile page (by design — it never performs the action itself), but nothing on
+  // that page ever read those query params, so a visitor just landed on an ordinary profile and
+  // had to find and click Follow/Support themselves a second time.
+  const page = read('src/pages/artist/ArtistPublicProfilePage.tsx')
+  assert.match(page, /<FollowButton artistId=\{artist\.artistId\} autoTrigger=\{searchParams\.get\('action'\) === 'follow'\} \/>/)
+  assert.match(page, /<SupportButton artistId=\{artist\.artistId\} autoTrigger=\{searchParams\.get\('action'\) === 'support'\} \/>/)
+
+  const follow = read('src/components/music/FollowButton.tsx')
+  assert.match(follow, /autoTrigger\?: boolean/)
+  // Guarded against double-firing with the existing sign-in-detour resume mechanism — a signed-
+  // out visitor's autoTrigger click sets the same PENDING_FOLLOW_KEY and redirects through
+  // sign-in exactly like a real click would, so the two mechanisms must never both complete the
+  // follow for the same round trip.
+  assert.match(follow, /if \(!autoTrigger \|\| autoTriggeredRef\.current \|\| isFollowing\) return/)
+  assert.match(follow, /if \(sessionStorage\.getItem\(PENDING_FOLLOW_KEY\) === artistId\) return/)
+
+  const support = read('src/components/music/SupportButton.tsx')
+  assert.match(support, /autoTrigger\?: boolean/)
+  assert.match(support, /if \(!autoTrigger \|\| autoTriggeredRef\.current \|\| showModal\) return/)
+  // Previously only window.location.pathname (no search params at all), so a signed-out
+  // visitor's ?action=support was silently dropped on the sign-in redirect and never resumed.
+  assert.match(support, /const returnTo = `\$\{location\.pathname\}\$\{location\.search\}`/)
 })

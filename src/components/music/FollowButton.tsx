@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { UserPlus, UserCheck } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { followArtist, subscribeIsFollowing, unfollowArtist } from '@/services/followService'
@@ -8,13 +8,23 @@ import { useToast } from '@/contexts/ToastContext'
 
 const PENDING_FOLLOW_KEY = 'pendingFollowArtistId'
 
-export function FollowButton({ artistId, size = 'md' }: { artistId: string; size?: 'sm' | 'md' | 'lg' }) {
+export function FollowButton({
+  artistId,
+  size = 'md',
+  autoTrigger = false,
+}: {
+  artistId: string
+  size?: 'sm' | 'md' | 'lg'
+  /** Fires the same thing a real click would, once, on mount — used by ?action=follow links (e.g. the WordPress plugin's Follow button, which only ever links out to this page rather than performing the action itself). */
+  autoTrigger?: boolean
+}) {
   const { firebaseUser } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const { notify } = useToast()
   const [isFollowing, setIsFollowing] = useState(false)
   const [pending, setPending] = useState(false)
+  const autoTriggeredRef = useRef(false)
 
   useEffect(() => {
     if (!firebaseUser) {
@@ -37,6 +47,18 @@ export function FollowButton({ artistId, size = 'md' }: { artistId: string; size
       })
       .catch(() => notify('Could not update Following. Please try again.', 'error'))
   }, [firebaseUser, artistId, notify])
+
+  // ?action=follow (e.g. the WordPress plugin's Follow button, which only ever links out here —
+  // it never performs the follow itself) — fires the click exactly once. Skipped when a pending
+  // resume is already queued for this artist so the two mechanisms never both fire for the same
+  // sign-in round trip.
+  useEffect(() => {
+    if (!autoTrigger || autoTriggeredRef.current || isFollowing) return
+    if (sessionStorage.getItem(PENDING_FOLLOW_KEY) === artistId) return
+    autoTriggeredRef.current = true
+    void handleClick()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoTrigger, isFollowing, artistId])
 
   async function handleClick() {
     if (!firebaseUser) {
