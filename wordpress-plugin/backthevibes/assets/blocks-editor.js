@@ -46,6 +46,13 @@
 						{ title: __( 'BackTheVibes settings', 'backthevibes' ) },
 						artistField( attributes, setAttributes ),
 						el( ToggleControl, {
+							label: __( 'Start collapsed (click to expand)', 'backthevibes' ),
+							checked: attributes.collapsible,
+							onChange: function ( value ) {
+								setAttributes( { collapsible: value } );
+							},
+						} ),
+						el( ToggleControl, {
 							label: __( 'Show bio', 'backthevibes' ),
 							checked: attributes.showBio,
 							onChange: function ( value ) {

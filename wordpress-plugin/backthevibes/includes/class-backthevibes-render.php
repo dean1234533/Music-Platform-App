@@ -31,55 +31,92 @@ class BackTheVibes_Render {
 	 * alongside it (user feedback: "wouldnt it make more sense to have a
 	 * profile card one that shows clops of your tracks instead of the full
 	 * track" — the "instead of the full track" half is handled by
-	 * tracks_markup()'s own clip cutoff, see backthevibes.js). Follow/
-	 * Support always link out to the artist's real BackTheVibes profile —
-	 * all account/payment actions happen there, this plugin never collects
-	 * credentials or payment details itself.
+	 * tracks_markup()'s own clip cutoff, see backthevibes.js).
+	 *
+	 * Collapsed by default (user feedback: "have a button that you click
+	 * that shows the profile card of the artist then you can listhen to the
+	 * short track from there and support + follow") — a compact avatar/name
+	 * button that expands in place to the full card on click, no page
+	 * navigation, no network request (the whole card already rendered, only
+	 * hidden via CSS — see the .backthevibes-collapsed rule and the toggle
+	 * handler in backthevibes.js).
+	 *
+	 * Follow/Support always link out to the artist's real BackTheVibes
+	 * profile — all account/payment actions happen there, this plugin
+	 * never collects credentials or payment details itself.
 	 */
 	public static function artist_card( array $artist, array $args = array() ): string {
 		wp_enqueue_style( 'backthevibes-embed' );
+		wp_enqueue_script(
+			'backthevibes-embed',
+			BACKTHEVIBES_PLUGIN_URL . 'assets/backthevibes.js',
+			array(),
+			BACKTHEVIBES_VERSION,
+			true
+		);
 
-		$show_bio    = ! empty( $args['show_bio'] );
-		$show_cta    = ! isset( $args['show_buttons'] ) || $args['show_buttons'];
-		$show_tracks = ! isset( $args['show_tracks'] ) || $args['show_tracks'];
-		$track_limit = ! empty( $args['track_limit'] ) ? (int) $args['track_limit'] : 6;
+		$show_bio     = ! empty( $args['show_bio'] );
+		$show_cta     = ! isset( $args['show_buttons'] ) || $args['show_buttons'];
+		$show_tracks  = ! isset( $args['show_tracks'] ) || $args['show_tracks'];
+		$track_limit  = ! empty( $args['track_limit'] ) ? (int) $args['track_limit'] : 6;
+		$collapsible  = ! isset( $args['collapsible'] ) || $args['collapsible'];
+		$card_classes = 'backthevibes-embed backthevibes-artist-card' . ( $collapsible ? ' backthevibes-collapsed' : '' );
 
 		ob_start();
 		?>
-		<div class="backthevibes-embed backthevibes-artist-card">
+		<div class="<?php echo esc_attr( $card_classes ); ?>">
 			<?php if ( $artist['coverUrl'] ) : ?>
 				<div class="backthevibes-cover" style="background-image:url('<?php echo esc_url( $artist['coverUrl'] ); ?>')"></div>
 			<?php endif; ?>
-			<div class="backthevibes-artist-header">
-				<?php if ( $artist['imageUrl'] ) : ?>
-					<img class="backthevibes-avatar" src="<?php echo esc_url( $artist['imageUrl'] ); ?>" alt="<?php echo esc_attr( $artist['name'] ); ?>" loading="lazy" width="72" height="72" />
-				<?php endif; ?>
-				<div class="backthevibes-artist-meta">
-					<a class="backthevibes-artist-name" href="<?php echo esc_url( $artist['profileUrl'] ); ?>" target="_blank" rel="noopener noreferrer">
-						<?php echo esc_html( $artist['name'] ); ?>
-					</a>
-					<?php if ( $artist['location'] ) : ?>
-						<span class="backthevibes-location"><?php echo esc_html( $artist['location'] ); ?></span>
+			<?php if ( $collapsible ) : ?>
+				<button type="button" class="backthevibes-card-toggle" aria-expanded="false">
+					<span class="backthevibes-artist-header">
+						<?php if ( $artist['imageUrl'] ) : ?>
+							<img class="backthevibes-avatar" src="<?php echo esc_url( $artist['imageUrl'] ); ?>" alt="" loading="lazy" width="72" height="72" />
+						<?php endif; ?>
+						<span class="backthevibes-artist-meta">
+							<span class="backthevibes-artist-name"><?php echo esc_html( $artist['name'] ); ?></span>
+							<?php if ( $artist['location'] ) : ?>
+								<span class="backthevibes-location"><?php echo esc_html( $artist['location'] ); ?></span>
+							<?php endif; ?>
+						</span>
+					</span>
+					<span class="backthevibes-toggle-icon" aria-hidden="true"></span>
+				</button>
+			<?php else : ?>
+				<div class="backthevibes-artist-header">
+					<?php if ( $artist['imageUrl'] ) : ?>
+						<img class="backthevibes-avatar" src="<?php echo esc_url( $artist['imageUrl'] ); ?>" alt="<?php echo esc_attr( $artist['name'] ); ?>" loading="lazy" width="72" height="72" />
 					<?php endif; ?>
+					<div class="backthevibes-artist-meta">
+						<a class="backthevibes-artist-name" href="<?php echo esc_url( $artist['profileUrl'] ); ?>" target="_blank" rel="noopener noreferrer">
+							<?php echo esc_html( $artist['name'] ); ?>
+						</a>
+						<?php if ( $artist['location'] ) : ?>
+							<span class="backthevibes-location"><?php echo esc_html( $artist['location'] ); ?></span>
+						<?php endif; ?>
+					</div>
 				</div>
+			<?php endif; ?>
+			<div class="backthevibes-card-body">
+				<?php if ( $show_bio && $artist['bio'] ) : ?>
+					<p class="backthevibes-bio"><?php echo esc_html( $artist['bio'] ); ?></p>
+				<?php endif; ?>
+				<?php if ( $show_cta ) : ?>
+					<div class="backthevibes-actions">
+						<a class="backthevibes-btn backthevibes-btn-follow" href="<?php echo esc_url( $artist['followUrl'] ); ?>" target="_blank" rel="noopener noreferrer">
+							<?php esc_html_e( 'Follow', 'backthevibes' ); ?>
+						</a>
+						<a class="backthevibes-btn backthevibes-btn-support" href="<?php echo esc_url( $artist['supportUrl'] ); ?>" target="_blank" rel="noopener noreferrer">
+							<?php esc_html_e( 'Support', 'backthevibes' ); ?>
+						</a>
+					</div>
+				<?php endif; ?>
+				<?php if ( $show_tracks ) : ?>
+					<?php echo self::tracks_markup( $artist, $track_limit ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside. ?>
+				<?php endif; ?>
+				<?php echo self::powered_by( $artist['profileUrl'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside. ?>
 			</div>
-			<?php if ( $show_bio && $artist['bio'] ) : ?>
-				<p class="backthevibes-bio"><?php echo esc_html( $artist['bio'] ); ?></p>
-			<?php endif; ?>
-			<?php if ( $show_cta ) : ?>
-				<div class="backthevibes-actions">
-					<a class="backthevibes-btn backthevibes-btn-follow" href="<?php echo esc_url( $artist['followUrl'] ); ?>" target="_blank" rel="noopener noreferrer">
-						<?php esc_html_e( 'Follow', 'backthevibes' ); ?>
-					</a>
-					<a class="backthevibes-btn backthevibes-btn-support" href="<?php echo esc_url( $artist['supportUrl'] ); ?>" target="_blank" rel="noopener noreferrer">
-						<?php esc_html_e( 'Support', 'backthevibes' ); ?>
-					</a>
-				</div>
-			<?php endif; ?>
-			<?php if ( $show_tracks ) : ?>
-				<?php echo self::tracks_markup( $artist, $track_limit ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside. ?>
-			<?php endif; ?>
-			<?php echo self::powered_by( $artist['profileUrl'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside. ?>
 		</div>
 		<?php
 		return trim( (string) ob_get_clean() );
@@ -167,7 +204,7 @@ class BackTheVibes_Render {
 					>
 						<img src="<?php echo esc_url( $track['artworkUrl'] ? $track['artworkUrl'] : 'https://i.ytimg.com/vi/' . rawurlencode( $video_id ) . '/hqdefault.jpg' ); ?>" alt="" loading="lazy" />
 						<span class="backthevibes-play-icon" aria-hidden="true"></span>
-						<span class="backthevibes-clip-badge"><?php esc_html_e( '0:20 clip', 'backthevibes' ); ?></span>
+						<span class="backthevibes-clip-badge"><?php esc_html_e( '0:30 clip', 'backthevibes' ); ?></span>
 					</button>
 					<a class="backthevibes-track-title" href="<?php echo esc_url( $track_url ); ?>" target="_blank" rel="noopener noreferrer">
 						<?php echo esc_html( $track['title'] ); ?>

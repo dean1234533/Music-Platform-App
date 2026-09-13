@@ -10,11 +10,17 @@
  * to hear the full track on BackTheVibes — this widget is a teaser (user
  * feedback: a full track playing inline made the combined artist+music
  * card confusing; a short clip that points back to the real site doesn't).
+ *
+ * Also handles the collapsed artist card's expand/collapse toggle (user
+ * feedback: "have a button that you click that shows the profile card of
+ * the artist then you can listhen to the short track from there and
+ * support + follow") — everything is already rendered server-side, this
+ * just shows/hides it, no extra network request.
  */
 ( function () {
 	'use strict';
 
-	var CLIP_SECONDS = 20;
+	var CLIP_SECONDS = 30;
 
 	function playTrack( button ) {
 		var videoId = button.getAttribute( 'data-video-id' );
@@ -61,10 +67,27 @@
 		}, CLIP_SECONDS * 1000 );
 	}
 
+	function toggleCard( button ) {
+		var card = button.closest( '.backthevibes-artist-card' );
+		if ( ! card ) {
+			return;
+		}
+		var expanded = card.classList.toggle( 'backthevibes-collapsed' ) === false;
+		button.setAttribute( 'aria-expanded', expanded ? 'true' : 'false' );
+	}
+
 	document.addEventListener( 'click', function ( event ) {
-		var button = event.target.closest ? event.target.closest( '.backthevibes-video-trigger' ) : null;
-		if ( button ) {
-			playTrack( button );
+		if ( ! event.target.closest ) {
+			return;
+		}
+		var playButton = event.target.closest( '.backthevibes-video-trigger' );
+		if ( playButton ) {
+			playTrack( playButton );
+			return;
+		}
+		var toggleButton = event.target.closest( '.backthevibes-card-toggle' );
+		if ( toggleButton ) {
+			toggleCard( toggleButton );
 		}
 	} );
 } )();

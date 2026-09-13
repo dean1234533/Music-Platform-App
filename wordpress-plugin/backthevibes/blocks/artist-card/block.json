@@ -13,7 +13,8 @@
 		"showBio": { "type": "boolean", "default": true },
 		"showButtons": { "type": "boolean", "default": true },
 		"showTracks": { "type": "boolean", "default": true },
-		"trackLimit": { "type": "number", "default": 6 }
+		"trackLimit": { "type": "number", "default": 6 },
+		"collapsible": { "type": "boolean", "default": true }
 	},
 	"supports": { "html": false, "align": [ "wide" ] },
 	"editorScript": "backthevibes-blocks-editor",
