@@ -12,7 +12,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class BackTheVibes_Settings {
 
-	const OPTION_KEY = 'backthevibes_default_slug';
+	const OPTION_KEY        = 'backthevibes_default_slug';
+	const CREDIT_OPTION_KEY = 'backthevibes_show_credit';
 
 	public function __construct() {
 		add_action( 'admin_menu', array( $this, 'add_settings_page' ) );
@@ -39,10 +40,26 @@ class BackTheVibes_Settings {
 				'default'           => '',
 			)
 		);
+		// Off by default — a "Powered by BackTheVibes" credit link is only ever shown on the
+		// front end after the site admin deliberately opts in here (WordPress.org Plugin
+		// Directory guideline 10: no unattributed/non-opt-in credit links on user-facing output).
+		register_setting(
+			'backthevibes_settings',
+			self::CREDIT_OPTION_KEY,
+			array(
+				'type'              => 'boolean',
+				'sanitize_callback' => 'rest_sanitize_boolean',
+				'default'           => false,
+			)
+		);
 	}
 
 	public static function get_default_slug(): string {
 		return (string) get_option( self::OPTION_KEY, '' );
+	}
+
+	public static function show_credit(): bool {
+		return (bool) get_option( self::CREDIT_OPTION_KEY, false );
 	}
 
 	public function render_settings_page(): void {
@@ -71,6 +88,24 @@ class BackTheVibes_Settings {
 							/>
 							<p class="description">
 								<?php esc_html_e( 'Used when a shortcode or block does not specify its own artist slug.', 'backthevibes-artist' ); ?>
+							</p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Show "Powered by BackTheVibes" credit', 'backthevibes-artist' ); ?></th>
+						<td>
+							<label for="backthevibes_show_credit">
+								<input
+									type="checkbox"
+									id="backthevibes_show_credit"
+									name="<?php echo esc_attr( self::CREDIT_OPTION_KEY ); ?>"
+									value="1"
+									<?php checked( self::show_credit() ); ?>
+								/>
+								<?php esc_html_e( 'Show a small "Powered by BackTheVibes" credit link under each embed.', 'backthevibes-artist' ); ?>
+							</label>
+							<p class="description">
+								<?php esc_html_e( 'Off by default. Turning this on is entirely optional and only affects your own site.', 'backthevibes-artist' ); ?>
 							</p>
 						</td>
 					</tr>

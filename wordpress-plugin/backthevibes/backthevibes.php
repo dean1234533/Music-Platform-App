@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BackTheVibes Artist
  * Description: Embed your BackTheVibes artist profile, music links, and Follow/Support buttons on your own WordPress site. Displays only public profile data — never hosts, downloads, or proxies audio.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: BackTheVibes
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Disallow direct access.
 }
 
-define( 'BACKTHEVIBES_VERSION', '1.0.0' );
+define( 'BACKTHEVIBES_VERSION', '1.0.1' );
 define( 'BACKTHEVIBES_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'BACKTHEVIBES_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 

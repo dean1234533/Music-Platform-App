@@ -189,7 +189,16 @@ class BackTheVibes_Render {
 		return trim( (string) ob_get_clean() );
 	}
 
+	/**
+	 * Off by default — only rendered once the site admin explicitly opts in via
+	 * Settings -> BackTheVibes (WordPress.org Plugin Directory guideline 10: no
+	 * attribution/credit links on user-facing output without intentional admin
+	 * opt-in).
+	 */
 	private static function powered_by( string $profile_url ): string {
+		if ( ! BackTheVibes_Settings::show_credit() ) {
+			return '';
+		}
 		return sprintf(
 			'<p class="backthevibes-powered-by">%1$s <a href="%2$s" target="_blank" rel="noopener noreferrer">BackTheVibes</a></p>',
 			esc_html__( 'Powered by', 'backthevibes-artist' ),

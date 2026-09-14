@@ -1,10 +1,10 @@
 === BackTheVibes Artist ===
-Contributors: bookrightly
+Contributors: deantb
 Tags: music, artist, embed, youtube, block
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,16 @@ action — this plugin never collects credentials or payment details itself.
 * Never collects payment details on your site
 * Only ever calls BackTheVibes' own public, read-only artist API
 
+== External services ==
+
+This plugin connects to the BackTheVibes public artist API to display an artist's profile, bio, images, and public track list on your WordPress site.
+
+It sends only the artist slug you configure (in Settings → BackTheVibes, or a shortcode/block attribute) as part of the request URL — no visitor data, no personal information, and no BackTheVibes account credentials are ever sent. A request is made whenever a page containing a BackTheVibes shortcode or block is loaded.
+
+This service is provided by BackTheVibes: [Terms & Conditions](https://backthevibes.com/terms), [Privacy Policy](https://backthevibes.com/privacy).
+
+Track playback (when a visitor presses play on a clip) loads YouTube's own official embedded player, subject to YouTube's Terms of Service and Google's Privacy Policy. Nothing is requested from YouTube until a visitor deliberately presses play.
+
 == Installation ==
 
 1. Upload the `backthevibes` folder to `/wp-content/plugins/`, or install the zip via Plugins → Add New → Upload Plugin.
@@ -59,6 +69,12 @@ No. Every track is a link to your own official YouTube upload, played through Yo
 No. The plugin only reads your public profile data through BackTheVibes' public API. Signing in, following, and supporting all happen on backthevibes.com.
 
 == Changelog ==
+
+= 1.0.1 =
+* The "Powered by BackTheVibes" credit link is now off by default and only
+  shown once a site admin opts in from Settings → BackTheVibes.
+* Documented the plugin's use of the BackTheVibes public API as an external
+  service.
 
 = 1.0.0 =
 * Initial release. `[backthevibes_artist]` combines the profile card and a
