@@ -1,4 +1,14 @@
+import { HttpsError } from 'firebase-functions/v2/https'
 import { db } from './admin.js'
+
+/**
+ * 'stripe' — normal operation (legacy default, kept for existing deployments).
+ * 'paused' — Stripe has cut off payment service; the checkout-initiating callables reject
+ * with a clear 'unavailable' error instead of hitting a dead Stripe key, and the frontend
+ * shows an honest "temporarily unavailable" message instead of attempting checkout.
+ * 'ryft' — the replacement provider, once its integration lands.
+ */
+export type PaymentsProvider = 'stripe' | 'paused' | 'ryft'
 
 export interface PlatformSettings {
   /** BackTheVibes' cut of every one-off fan support payment, enforced server-side only — see functions/src/support/checkout.ts. */
@@ -7,6 +17,8 @@ export interface PlatformSettings {
   artistAllocationPercent: number
   /** BackTheVibes' cut of a DJ/business licence payment — same Stripe Connect destination-charge mechanism. */
   djServiceFeePercent: number
+  /** Falls back to 'stripe' until an admin configures this — see PaymentsProvider. */
+  paymentsProvider: PaymentsProvider
 }
 
 export interface DataRetentionSettings {
@@ -62,7 +74,10 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   platformFeePercent: 20,
   artistAllocationPercent: 80,
   djServiceFeePercent: 10,
+  paymentsProvider: 'stripe',
 }
+
+const VALID_PAYMENTS_PROVIDERS: PaymentsProvider[] = ['stripe', 'paused', 'ryft']
 
 /** Single source of truth for every revenue split. Falls back to DEFAULT_PLATFORM_SETTINGS until an admin configures real values. */
 export async function getPlatformSettings(): Promise<PlatformSettings> {
@@ -73,15 +88,33 @@ export async function getPlatformSettings(): Promise<PlatformSettings> {
     platformFeePercent: data.platformFeePercent,
     artistAllocationPercent: data.artistAllocationPercent,
     djServiceFeePercent: data.djServiceFeePercent,
+    // Never configured (existing deployments predate this field) falls back to 'stripe', not
+    // an invalid-config error — unlike the fee percentages below, this field's absence is
+    // expected and safe to default rather than treat as a stray/partial write.
+    paymentsProvider: VALID_PAYMENTS_PROVIDERS.includes(data.paymentsProvider) ? data.paymentsProvider : 'stripe',
   }
   // A doc that exists but is only partially filled in (an admin mid-edit, or a stray write)
   // still fails loudly rather than silently mixing saved and default values — the fallback
   // above is only for "never configured at all".
-  if (Object.values(settings).some((value) => typeof value !== 'number' || !Number.isFinite(value))) {
+  const { paymentsProvider, ...percentages } = settings
+  if (Object.values(percentages).some((value) => typeof value !== 'number' || !Number.isFinite(value))) {
     throw new Error('platformSettings/default contains missing or invalid payment settings.')
   }
   if (settings.platformFeePercent + settings.artistAllocationPercent !== 100) {
     throw new Error('Fan revenue platform and artist percentages must total 100.')
   }
-  return settings as PlatformSettings
+  return { ...(percentages as Omit<PlatformSettings, 'paymentsProvider'>), paymentsProvider }
+}
+
+/**
+ * Shared guard for every checkout-initiating callable (createCheckoutSession,
+ * createSupportCheckoutSession, createLicencePaymentSession) — called first, before any
+ * provider SDK is touched, so a 'paused' admin flag (Stripe cut off, Ryft not live yet)
+ * fails fast and honestly instead of erroring deep inside a dead Stripe API call.
+ */
+export async function requirePaymentsAvailable(): Promise<void> {
+  const { paymentsProvider } = await getPlatformSettings()
+  if (paymentsProvider === 'paused') {
+    throw new HttpsError('unavailable', 'Payments are temporarily unavailable while we switch providers. Please try again soon.')
+  }
 }

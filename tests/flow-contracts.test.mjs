@@ -2434,7 +2434,7 @@ test('platform revenue-split settings auto-configure with placeholder defaults i
   const types = read('src/types/platformSettings.ts')
   assert.match(types, /export const DEFAULT_PLATFORM_FEES: Pick</)
   const adminPage = read('src/pages/admin/AdminSettingsPage.tsx')
-  assert.match(adminPage, /import \{ DEFAULT_DATA_RETENTION, DEFAULT_PLATFORM_FEES, type DataRetentionSettings, type SubscriptionPlan \} from '@\/types\/platformSettings'/)
+  assert.match(adminPage, /DEFAULT_DATA_RETENTION,\s*\n\s*DEFAULT_PLATFORM_FEES,\s*\n\s*type DataRetentionSettings,/)
   assert.match(adminPage, /platformFeePercent: String\(settings\?\.platformFeePercent \?\? DEFAULT_PLATFORM_FEES\.platformFeePercent\)/)
 })
 
@@ -3505,4 +3505,40 @@ test('the ink-3 text color token clears WCAG AA contrast on every surface tone (
   const l2 = relLum('181d24')
   const ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)
   assert.ok(ratio >= 4.5, `ink-3 on surface-3 must clear WCAG AA's 4.5:1, got ${ratio.toFixed(2)}:1`)
+})
+
+test('payments can be gracefully paused while switching providers away from Stripe (Stripe restricted-business cutoff: "we\'re still unable to support your business as it falls under one of our restricted business categories") — checkout entry points show an honest message instead of erroring, and the checkout-initiating callables reject server-side too', () => {
+  const settings = read('functions/src/platformSettings.ts')
+  assert.match(settings, /export type PaymentsProvider = 'stripe' \| 'paused' \| 'ryft'/)
+  assert.match(settings, /paymentsProvider: 'stripe',/)
+  assert.match(settings, /export async function requirePaymentsAvailable\(\): Promise<void> \{/)
+  assert.match(settings, /if \(paymentsProvider === 'paused'\) \{/)
+
+  const adminSettingsFn = read('functions/src/admin/settings.ts')
+  assert.match(adminSettingsFn, /const VALID_PAYMENTS_PROVIDERS = \['stripe', 'paused', 'ryft'\]/)
+  assert.match(adminSettingsFn, /update\.paymentsProvider = paymentsProvider/)
+
+  // All three checkout-initiating callables call the shared guard before touching Stripe.
+  for (const file of ['functions/src/stripe/checkout.ts', 'functions/src/support/checkout.ts', 'functions/src/stripe/licencePayment.ts']) {
+    const fn = read(file)
+    assert.match(fn, /requirePaymentsAvailable/, `${file} must guard on requirePaymentsAvailable()`)
+  }
+
+  // Frontend entry points check the same flag and show an honest message instead of erroring.
+  const supportModal = read('src/components/music/SupportModal.tsx')
+  assert.match(supportModal, /paymentsProvider === 'paused'/)
+  assert.match(supportModal, /Support payments are temporarily unavailable/)
+
+  const artistSettings = read('src/pages/artist/dashboard/ArtistSettingsPage.tsx')
+  assert.match(artistSettings, /paymentsProvider === 'paused'/)
+  assert.match(artistSettings, /New Artist Memberships are temporarily unavailable/)
+
+  const contractPage = read('src/pages/agreements/ContractPage.tsx')
+  assert.match(contractPage, /paymentsProvider === 'paused'/)
+  assert.match(contractPage, /payment is temporarily unavailable/)
+
+  // The admin control to flip the flag.
+  const adminPage = read('src/pages/admin/AdminSettingsPage.tsx')
+  assert.match(adminPage, /handleSavePaymentsProvider/)
+  assert.match(adminPage, /<option value="paused">/)
 })

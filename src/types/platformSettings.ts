@@ -23,6 +23,15 @@ export interface SubscriptionPlan {
   updatedAt: Timestamp | null
 }
 
+/**
+ * 'stripe' — normal operation (legacy default, kept for existing deployments).
+ * 'paused' — Stripe has cut off payment service; checkout entry points show an honest
+ * "temporarily unavailable" message instead of erroring, and the checkout-initiating
+ * callables reject server-side too. See functions/src/platformSettings.ts.
+ * 'ryft' — the replacement provider, once its integration lands.
+ */
+export type PaymentsProvider = 'stripe' | 'paused' | 'ryft'
+
 export interface PlatformSettings {
   /** BackTheVibes' cut of every one-off fan support payment — see functions/src/support/checkout.ts. */
   platformFeePercent: number
@@ -31,6 +40,8 @@ export interface PlatformSettings {
   djServiceFeePercent: number
   /** Falls back to 'followers' until an admin configures this. */
   defaultTrackVisibility?: TrackVisibility
+  /** Falls back to 'stripe' until an admin configures this — see PaymentsProvider. */
+  paymentsProvider?: PaymentsProvider
 }
 
 export interface DataRetentionSettings {

@@ -12,7 +12,13 @@ import { getDataRetentionSettings, getPlatformSettings } from '@/services/platfo
 import { Button } from '@/components/common/Button'
 import { Input, Label } from '@/components/common/Input'
 import { formatCurrency } from '@/utils/format'
-import { DEFAULT_DATA_RETENTION, DEFAULT_PLATFORM_FEES, type DataRetentionSettings, type SubscriptionPlan } from '@/types/platformSettings'
+import {
+  DEFAULT_DATA_RETENTION,
+  DEFAULT_PLATFORM_FEES,
+  type DataRetentionSettings,
+  type PaymentsProvider,
+  type SubscriptionPlan,
+} from '@/types/platformSettings'
 import { PLAN_TIERS, type PlanFeatureKey, type PlanLimitKey, type PlanTier } from '@/types/entitlements'
 import { AccountSecuritySection } from '@/components/account/AccountSecuritySection'
 import type { TrackVisibility } from '@/types/track'
@@ -70,6 +76,8 @@ export function AdminSettingsPage() {
   const [seeding, setSeeding] = useState(false)
   const [feeForm, setFeeForm] = useState({ platformFeePercent: '', artistAllocationPercent: '', djServiceFeePercent: '' })
   const [savingFees, setSavingFees] = useState(false)
+  const [paymentsProvider, setPaymentsProvider] = useState<PaymentsProvider>('stripe')
+  const [savingPaymentsProvider, setSavingPaymentsProvider] = useState(false)
   const [trackDefaultsForm, setTrackDefaultsForm] = useState({
     defaultTrackVisibility: 'followers' as TrackVisibility,
   })
@@ -107,6 +115,7 @@ export function AdminSettingsPage() {
       setTrackDefaultsForm({
         defaultTrackVisibility: settings?.defaultTrackVisibility ?? 'followers',
       })
+      setPaymentsProvider(settings?.paymentsProvider ?? 'stripe')
     })
     void getDataRetentionSettings().then((settings) => {
       setRetentionForm(Object.fromEntries(Object.entries(settings).map(([k, v]) => [k, String(v)])) as Record<
@@ -180,6 +189,18 @@ export function AdminSettingsPage() {
       setSaved('Platform settings saved.')
     } finally {
       setSavingFees(false)
+    }
+  }
+
+  async function handleSavePaymentsProvider(next: PaymentsProvider) {
+    setSavingPaymentsProvider(true)
+    setSaved(null)
+    try {
+      await adminUpdatePlatformSettings({ paymentsProvider: next })
+      setPaymentsProvider(next)
+      setSaved('Payments provider updated.')
+    } finally {
+      setSavingPaymentsProvider(false)
     }
   }
 
@@ -387,6 +408,28 @@ export function AdminSettingsPage() {
               Save plan
             </Button>
           </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-lg font-semibold text-ink-0">Payments provider</h2>
+        <p className="mb-3 text-xs text-ink-2">
+          Stripe has restricted this account and is cutting off payment service. Switch to "Paused" to show
+          fans/DJs/artists an honest "temporarily unavailable" message instead of a broken checkout, until the
+          replacement provider is live.
+        </p>
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-surface-border bg-surface-1 p-4">
+          <select
+            value={paymentsProvider}
+            onChange={(e) => void handleSavePaymentsProvider(e.target.value as PaymentsProvider)}
+            disabled={savingPaymentsProvider}
+            className="rounded-lg border border-surface-border bg-surface-0 px-3 py-2 text-sm text-ink-0"
+          >
+            <option value="stripe">Stripe (normal operation)</option>
+            <option value="paused">Paused (checkout disabled, honest message shown)</option>
+            <option value="ryft">Ryft</option>
+          </select>
+          {savingPaymentsProvider ? <span className="text-xs text-ink-3">Saving…</span> : null}
         </div>
       </section>
 

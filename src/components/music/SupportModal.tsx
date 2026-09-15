@@ -19,11 +19,15 @@ export function SupportModal({ artistId, artistName, onClose }: { artistId: stri
   const [amountMinor, setAmountMinor] = useState(1000)
   const [customValue, setCustomValue] = useState('')
   const [platformFeePercent, setPlatformFeePercent] = useState<number | null>(null)
+  const [paymentsPaused, setPaymentsPaused] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    void getPlatformSettings().then((settings) => setPlatformFeePercent(settings?.platformFeePercent ?? null))
+    void getPlatformSettings().then((settings) => {
+      setPlatformFeePercent(settings?.platformFeePercent ?? null)
+      setPaymentsPaused(settings?.paymentsProvider === 'paused')
+    })
   }, [])
 
   function handlePresetClick(minor: number) {
@@ -51,6 +55,22 @@ export function SupportModal({ artistId, artistName, onClose }: { artistId: stri
   const feePercent = platformFeePercent ?? 20
   const platformFeeMinor = Math.round(amountMinor * (feePercent / 100))
   const artistNetMinor = amountMinor - platformFeeMinor
+
+  if (paymentsPaused) {
+    return (
+      <Modal title={`Support ${artistName}`} onClose={onClose}>
+        <div className="flex flex-col gap-4">
+          <p className="flex items-center gap-2 text-sm text-ink-2">
+            <Heart className="h-4 w-4 text-support-400" /> Support payments are temporarily unavailable while
+            we switch payment providers. Please check back soon.
+          </p>
+          <Button onClick={onClose} variant="secondary" className="w-full">
+            Close
+          </Button>
+        </div>
+      </Modal>
+    )
+  }
 
   return (
     <Modal title={`Support ${artistName}`} onClose={onClose}>

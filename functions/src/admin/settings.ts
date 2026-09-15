@@ -88,9 +88,12 @@ export const adminUpsertSubscriptionPlan = onCall(async (request) => {
   return { ok: true }
 })
 
+const VALID_PAYMENTS_PROVIDERS = ['stripe', 'paused', 'ryft']
+
 export const adminUpdatePlatformSettings = onCall(async (request) => {
   const adminId = await requireAdmin(request)
-  const { platformFeePercent, artistAllocationPercent, djServiceFeePercent, defaultTrackVisibility } = request.data ?? {}
+  const { platformFeePercent, artistAllocationPercent, djServiceFeePercent, defaultTrackVisibility, paymentsProvider } =
+    request.data ?? {}
 
   const percentages = [platformFeePercent, artistAllocationPercent, djServiceFeePercent]
   if (percentages.some((value) => typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100)) {
@@ -110,6 +113,12 @@ export const adminUpdatePlatformSettings = onCall(async (request) => {
       throw new HttpsError('invalid-argument', 'defaultTrackVisibility must be a valid track visibility.')
     }
     update.defaultTrackVisibility = defaultTrackVisibility
+  }
+  if (typeof paymentsProvider === 'string') {
+    if (!VALID_PAYMENTS_PROVIDERS.includes(paymentsProvider)) {
+      throw new HttpsError('invalid-argument', `paymentsProvider must be one of ${VALID_PAYMENTS_PROVIDERS.join(', ')}.`)
+    }
+    update.paymentsProvider = paymentsProvider
   }
 
   await db.collection('platformSettings').doc('default').set(update, { merge: true })

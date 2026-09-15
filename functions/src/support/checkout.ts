@@ -2,7 +2,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { db } from '../admin.js'
 import { requireActiveUser } from '../roles.js'
 import { enforceRateLimit } from '../rateLimit.js'
-import { getPlatformSettings } from '../platformSettings.js'
+import { getPlatformSettings, requirePaymentsAvailable } from '../platformSettings.js'
 import { getStripe, stripeSecretKey } from '../stripe/client.js'
 
 /** Smallest/largest one-off support amount we'll create a Checkout Session for — a sanity bound, not a business decision. */
@@ -22,6 +22,7 @@ const MAX_SUPPORT_MINOR = 100_000
 export const createSupportCheckoutSession = onCall({ secrets: [stripeSecretKey] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   await requireActiveUser(request.auth.uid)
+  await requirePaymentsAvailable()
   const fanId = request.auth.uid
   await enforceRateLimit(`createSupportCheckoutSession_${fanId}`, 20, 3600)
 

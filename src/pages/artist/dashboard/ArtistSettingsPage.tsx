@@ -8,6 +8,7 @@ import { uploadArtistCover, uploadArtistPhoto } from '@/services/profileMediaSer
 import { signOut } from '@/services/authService'
 import { removeRole } from '@/services/userService'
 import { openBillingPortal, subscribeToOwnSubscription, subscribeToPlan } from '@/services/subscriptionService'
+import { getPlatformSettings } from '@/services/platformSettingsService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
 import { LoadingState, EmptyState } from '@/components/common/StateViews'
@@ -374,8 +375,12 @@ function MembershipSection({ uid }: { uid: string }) {
   const [membership, setMembership] = useState<SubscriptionDoc | null | undefined>(undefined)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [paymentsPaused, setPaymentsPaused] = useState(false)
 
   useEffect(() => subscribeToOwnSubscription(uid, setMembership, undefined, 'artist'), [uid])
+  useEffect(() => {
+    void getPlatformSettings().then((settings) => setPaymentsPaused(settings?.paymentsProvider === 'paused'))
+  }, [])
 
   const isActive = membership?.status === 'active' || membership?.status === 'trialing'
 
@@ -401,6 +406,14 @@ function MembershipSection({ uid }: { uid: string }) {
         <Button variant="secondary" size="sm" onClick={openBillingPortal}>
           Manage billing
         </Button>
+      </div>
+    )
+  }
+
+  if (paymentsPaused && membership?.status !== 'past_due') {
+    return (
+      <div className="rounded-xl border border-warning-500/25 bg-warning-500/[0.06] px-4 py-3 text-sm leading-6 text-ink-1">
+        <p>New Artist Memberships are temporarily unavailable while we switch payment providers. Please check back soon.</p>
       </div>
     )
   }

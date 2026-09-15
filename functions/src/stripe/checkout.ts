@@ -2,6 +2,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { db } from '../admin.js'
 import { requireActiveUser } from '../roles.js'
 import type { PlanDoc } from '../entitlements.js'
+import { requirePaymentsAvailable } from '../platformSettings.js'
 import { getStripe, stripeSecretKey } from './client.js'
 
 /**
@@ -17,6 +18,7 @@ import { getStripe, stripeSecretKey } from './client.js'
 export const createCheckoutSession = onCall({ secrets: [stripeSecretKey] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   await requireActiveUser(request.auth.uid)
+  await requirePaymentsAvailable()
   const uid = request.auth.uid
   const planId = request.data?.planId as string | undefined
   const role = request.data?.role as string | undefined

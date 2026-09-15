@@ -4,6 +4,7 @@ import { useSmartBack } from '@/hooks/useSmartBack'
 import { AlertTriangle, ArrowLeft, CreditCard, Download, PenLine, Printer } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { createLicencePaymentSession, downloadLicensedTrack, getSignatureImageUrls, subscribeAgreement } from '@/services/licenceService'
+import { getPlatformSettings } from '@/services/platformSettingsService'
 import { submitReport } from '@/services/moderationService'
 import { useArtistSummary } from '@/hooks/useArtistSummary'
 import { getTrack } from '@/services/trackService'
@@ -48,12 +49,17 @@ export function ContractPage() {
   const [showReportModal, setShowReportModal] = useState(false)
   const [signatureImages, setSignatureImages] = useState<Record<'artist' | 'dj', string | null>>({ artist: null, dj: null })
   const [signaturesReady, setSignaturesReady] = useState(false)
+  const [paymentsPaused, setPaymentsPaused] = useState(false)
   const artist = useArtistSummary(agreement?.artistId ?? null)
 
   useEffect(() => {
     if (!agreementId) return
     return subscribeAgreement(agreementId, setAgreement, () => setLoadError(true))
   }, [agreementId])
+
+  useEffect(() => {
+    void getPlatformSettings().then((settings) => setPaymentsPaused(settings?.paymentsProvider === 'paused'))
+  }, [])
 
   useEffect(() => {
     if (!agreement) return
@@ -183,6 +189,10 @@ export function ContractPage() {
             </div>
           ) : isSignable ? (
             <p className="text-sm text-ink-1">You have signed. Waiting for the other party to sign.</p>
+          ) : agreement.status === 'awaiting_payment' && isDj && paymentsPaused ? (
+            <p className="text-sm text-ink-1">
+              Contract signed — payment is temporarily unavailable while we switch payment providers. Please check back soon.
+            </p>
           ) : agreement.status === 'awaiting_payment' && isDj ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
