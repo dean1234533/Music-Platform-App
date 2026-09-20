@@ -11,7 +11,7 @@ import {
   where,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import type { ArtistProfile } from '@/types/artist'
+import type { ArtistCreatorType, ArtistProfile } from '@/types/artist'
 import type { TrackDoc } from '@/types/track'
 import { slugify } from '@/utils/slug'
 
@@ -28,6 +28,7 @@ export interface CreateArtistProfileInput {
   bio: string
   genres: string[]
   location: string
+  creatorType?: ArtistCreatorType
 }
 
 export class SlugTakenError extends Error {
@@ -74,6 +75,7 @@ export async function createArtistProfile(
     tx.set(artistRef(artistId), {
       artistId,
       slug: candidate,
+      creatorType: input.creatorType ?? 'musician',
       name: input.name,
       nameLower: input.name.toLowerCase(),
       bio: input.bio,

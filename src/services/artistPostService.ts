@@ -8,17 +8,18 @@ export function newPostId(): string {
 
 export async function createArtistPost(
   artistId: string,
-  input: { title: string; body: string; visibility: ArtistPost['visibility'] },
+  input: { title: string; body: string; visibility: ArtistPost['visibility']; videoUrl?: string },
 ): Promise<void> {
   const postId = newPostId()
+  const hasVideo = Boolean(input.videoUrl?.trim())
   await setDoc(doc(db, 'artistPosts', postId), {
     postId,
     artistId,
     visibility: input.visibility,
-    type: 'text',
+    type: hasVideo ? 'video' : 'text',
     title: input.title,
     body: input.body,
-    mediaURL: null,
+    mediaURL: hasVideo ? input.videoUrl!.trim() : null,
     createdAt: serverTimestamp(),
   })
 }

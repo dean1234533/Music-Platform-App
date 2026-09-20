@@ -35,6 +35,8 @@ export interface NavItem {
   to: string
   icon: LucideIcon
   end?: boolean
+  /** Hidden for a dancer creatorType — the track-upload/DJ-licensing side of the artist role doesn't apply to them. */
+  musicianOnly?: boolean
 }
 
 export const fanNavItems: NavItem[] = [
@@ -61,16 +63,21 @@ export const fanMobileNavItems: NavItem[] = [
 
 export const artistDashboardNavItems: NavItem[] = [
   { label: 'Overview', to: '/dashboard/artist', icon: BarChart3, end: true },
-  { label: 'Music', to: '/dashboard/artist/music', icon: Disc3 },
-  { label: 'Upload', to: '/dashboard/artist/upload', icon: UploadCloud },
+  { label: 'Music', to: '/dashboard/artist/music', icon: Disc3, musicianOnly: true },
+  { label: 'Upload', to: '/dashboard/artist/upload', icon: UploadCloud, musicianOnly: true },
   { label: 'Stories', to: '/dashboard/artist/stories', icon: Sparkles },
   { label: 'Community', to: '/dashboard/artist/community', icon: Users },
-  { label: 'DJ Requests', to: '/dashboard/artist/dj-requests', icon: MessageSquare },
-  { label: 'DJ Deals', to: '/dashboard/artist/deals', icon: Handshake },
-  { label: 'Agreements', to: '/agreements', icon: FileText },
+  { label: 'DJ Requests', to: '/dashboard/artist/dj-requests', icon: MessageSquare, musicianOnly: true },
+  { label: 'DJ Deals', to: '/dashboard/artist/deals', icon: Handshake, musicianOnly: true },
+  { label: 'Agreements', to: '/agreements', icon: FileText, musicianOnly: true },
   { label: 'Revenue', to: '/dashboard/artist/revenue', icon: Wallet },
   { label: 'Settings', to: '/dashboard/artist/settings', icon: Settings },
 ]
+
+export function artistNavItemsFor(creatorType: 'musician' | 'dancer' | undefined): NavItem[] {
+  if (creatorType !== 'dancer') return artistDashboardNavItems
+  return artistDashboardNavItems.filter((item) => !item.musicianOnly)
+}
 
 export const djNavItems: NavItem[] = [
   { label: 'Discover', to: '/dj/discover', icon: Radar, end: true },

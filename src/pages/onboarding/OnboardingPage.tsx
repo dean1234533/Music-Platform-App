@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Disc3, Headphones, Radio } from 'lucide-react'
+import { Disc3, Headphones, PersonStanding, Radio } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { completeOnboarding } from '@/services/userService'
 import { createArtistProfile } from '@/services/artistService'
@@ -8,10 +8,11 @@ import { createDJProfile } from '@/services/djService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
 import type { UserRole } from '@/types/user'
+import type { ArtistCreatorType } from '@/types/artist'
 
 const ROLE_OPTIONS: { role: UserRole; title: string; description: string; icon: typeof Headphones }[] = [
   { role: 'fan', title: 'Listen to music', description: 'Discover and follow independent artists.', icon: Headphones },
-  { role: 'artist', title: 'Release music', description: 'Upload tracks and build recurring income.', icon: Disc3 },
+  { role: 'artist', title: 'Release music or dance content', description: 'Upload tracks, post videos, and build recurring income.', icon: Disc3 },
   { role: 'dj', title: 'Use music professionally as a DJ', description: 'Discover, request, and licence tracks.', icon: Radio },
 ]
 
@@ -25,6 +26,7 @@ export function OnboardingPage() {
   const [error, setError] = useState<string | null>(null)
 
   const [artistForm, setArtistForm] = useState({ name: profile?.displayName ?? '', bio: '', genres: '', location: '' })
+  const [creatorType, setCreatorType] = useState<ArtistCreatorType>('musician')
   const [djForm, setDjForm] = useState({ name: profile?.displayName ?? '', bio: '', genres: '', country: '', city: '' })
 
   const remainingSteps = useMemo(() => {
@@ -75,6 +77,7 @@ export function OnboardingPage() {
           bio: artistForm.bio,
           genres: artistForm.genres.split(',').map((g) => g.trim()).filter(Boolean),
           location: artistForm.location,
+          creatorType,
         })
       }
 
@@ -138,9 +141,36 @@ export function OnboardingPage() {
           <>
             <h1 className="text-xl font-semibold text-ink-0">Set up your artist profile</h1>
             <p className="mt-1 text-sm text-ink-2">You can refine everything later from your dashboard.</p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setCreatorType('musician')}
+                className={`flex items-center gap-2 rounded-xl border p-3 text-left transition-colors ${
+                  creatorType === 'musician' ? 'border-brand-500 bg-brand-500/10' : 'border-surface-border bg-surface-2 hover:bg-surface-3'
+                }`}
+              >
+                <Disc3 className={`h-4 w-4 shrink-0 ${creatorType === 'musician' ? 'text-brand-400' : 'text-ink-2'}`} />
+                <span className="text-sm font-medium text-ink-0">Musician</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreatorType('dancer')}
+                className={`flex items-center gap-2 rounded-xl border p-3 text-left transition-colors ${
+                  creatorType === 'dancer' ? 'border-brand-500 bg-brand-500/10' : 'border-surface-border bg-surface-2 hover:bg-surface-3'
+                }`}
+              >
+                <PersonStanding className={`h-4 w-4 shrink-0 ${creatorType === 'dancer' ? 'text-brand-400' : 'text-ink-2'}`} />
+                <span className="text-sm font-medium text-ink-0">Dancer</span>
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-ink-3">
+              {creatorType === 'musician'
+                ? 'Upload tracks and licence them to DJs.'
+                : 'Share your dance videos and build a supporter base — no track upload needed.'}
+            </p>
             <div className="mt-6 flex flex-col gap-4">
               <div>
-                <Label htmlFor="artist-name">Artist name</Label>
+                <Label htmlFor="artist-name">{creatorType === 'musician' ? 'Artist name' : 'Dancer name'}</Label>
                 <Input
                   id="artist-name"
                   value={artistForm.name}

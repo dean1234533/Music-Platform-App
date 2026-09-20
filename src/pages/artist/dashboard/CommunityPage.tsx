@@ -4,6 +4,8 @@ import { createArtistPost, subscribeArtistPosts } from '@/services/artistPostSer
 import { Button } from '@/components/common/Button'
 import { Input, TextArea } from '@/components/common/Input'
 import { EmptyState, LoadingState } from '@/components/common/StateViews'
+import { YouTubeEmbed } from '@/components/common/YouTubeEmbed'
+import { isYouTubeUrl } from '@/utils/youtube'
 import type { ArtistPost } from '@/types/artist'
 
 export function CommunityPage() {
@@ -11,8 +13,10 @@ export function CommunityPage() {
   const [posts, setPosts] = useState<ArtistPost[] | null>(null)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  const [videoUrl, setVideoUrl] = useState('')
   const [visibility, setVisibility] = useState<ArtistPost['visibility']>('everyone')
   const [posting, setPosting] = useState(false)
+  const [videoUrlError, setVideoUrlError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!firebaseUser) return
@@ -21,11 +25,17 @@ export function CommunityPage() {
 
   async function handlePost() {
     if (!firebaseUser || !title.trim()) return
+    if (videoUrl.trim() && !isYouTubeUrl(videoUrl)) {
+      setVideoUrlError("That doesn't look like a YouTube link.")
+      return
+    }
+    setVideoUrlError(null)
     setPosting(true)
     try {
-      await createArtistPost(firebaseUser.uid, { title, body, visibility })
+      await createArtistPost(firebaseUser.uid, { title, body, visibility, videoUrl })
       setTitle('')
       setBody('')
+      setVideoUrl('')
     } finally {
       setPosting(false)
     }
@@ -43,6 +53,17 @@ export function CommunityPage() {
       <div className="flex flex-col gap-3 rounded-xl border border-surface-border bg-surface-1 p-4">
         <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
         <TextArea placeholder="What's new?" rows={3} value={body} onChange={(e) => setBody(e.target.value)} />
+        <div>
+          <Input
+            placeholder="YouTube video link (optional)"
+            value={videoUrl}
+            onChange={(e) => {
+              setVideoUrl(e.target.value)
+              setVideoUrlError(null)
+            }}
+          />
+          {videoUrlError ? <p className="mt-1 text-xs text-danger-500">{videoUrlError}</p> : null}
+        </div>
         <div className="flex items-center justify-between">
           <select
             value={visibility}
@@ -74,6 +95,7 @@ export function CommunityPage() {
                 </span>
               </div>
               {post.body ? <p className="mt-2 text-sm text-ink-1">{post.body}</p> : null}
+              {post.mediaURL ? <YouTubeEmbed url={post.mediaURL} title={post.title} /> : null}
             </div>
           ))}
         </div>

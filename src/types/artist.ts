@@ -12,9 +12,13 @@ export interface SocialLinks {
 
 export type DJRequestPolicy = 'anyone' | 'verified_only' | 'approved_only' | 'disabled'
 
+/** 'dancer' skips the track-upload/DJ-licensing side of the artist role entirely — everything else (Stories, posts, followers, supporter subscriptions) is identical. */
+export type ArtistCreatorType = 'musician' | 'dancer'
+
 export interface ArtistProfile {
   artistId: string
   slug: string
+  creatorType: ArtistCreatorType
   name: string
   /** Lowercased copy of `name`, kept in sync for prefix search. */
   nameLower: string

@@ -3,6 +3,7 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { PlayerProvider } from '@/contexts/PlayerContext'
 import { ProtectedRoute, RequireOnboarding } from '@/components/auth/ProtectedRoute'
 import { RoleRoute } from '@/components/auth/RoleRoute'
+import { RequireMusician } from '@/components/auth/RequireMusician'
 import { InstallBanner } from '@/components/pwa/InstallBanner'
 
 import { LandingPage } from '@/pages/marketing/LandingPage'
@@ -179,13 +180,13 @@ function App() {
               }
             >
               <Route index element={<OverviewPage />} />
-              <Route path="music" element={<MusicPage />} />
-              <Route path="upload" element={<UploadTrackPage />} />
+              <Route path="music" element={<RequireMusician><MusicPage /></RequireMusician>} />
+              <Route path="upload" element={<RequireMusician><UploadTrackPage /></RequireMusician>} />
               <Route path="stories" element={<StoriesPage />} />
               <Route path="stories/analytics" element={<StoryAnalyticsPage />} />
               <Route path="community" element={<CommunityPage />} />
-              <Route path="dj-requests" element={<ArtistDJRequestsPage />} />
-              <Route path="deals" element={<DjDealsPage />} />
+              <Route path="dj-requests" element={<RequireMusician><ArtistDJRequestsPage /></RequireMusician>} />
+              <Route path="deals" element={<RequireMusician><DjDealsPage /></RequireMusician>} />
               <Route path="revenue" element={<RevenuePage />} />
               <Route path="plan" element={<Navigate replace to="/dashboard/artist" />} />
               <Route path="settings" element={<ArtistSettingsPage />} />

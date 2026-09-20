@@ -3,7 +3,7 @@
 ## Accounts and creator profiles
 
 - `users/{uid}` stores identity, roles (`fan`, `artist`, `dj`), fan subscription status, Stripe customer ID and moderation state.
-- `artistProfiles/{uid}` stores the public artist profile, DJ request policy, supporter perks and server-maintained audience/track counters.
+- `artistProfiles/{uid}` stores the public artist profile, DJ request policy, supporter perks and server-maintained audience/track counters. `creatorType` (`'musician'` | `'dancer'`) is a UI-only distinction — a dancer skips track upload/DJ licensing and posts YouTube video links via `artistPosts` instead, but is otherwise a normal artist (Stories, followers, supporter subscriptions). It is not security-enforced: Firestore rules/Functions for tracks and licensing don't check it, since it's a UX choice, not a permission boundary.
 - `djProfiles/{uid}` stores the public DJ profile, verification state, discovery preferences and bulk-outreach opt-in.
 
 Artist and DJ profiles are free. There are no creator plan tiers, upload caps, monthly DJ-request counters or feature entitlements. Legacy creator-plan fields may remain on old documents during migration but are ignored by clients, rules and Functions.

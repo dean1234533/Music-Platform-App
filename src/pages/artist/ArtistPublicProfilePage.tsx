@@ -13,6 +13,7 @@ import { ErrorState, LoadingState } from '@/components/common/StateViews'
 import { UpgradePrompt } from '@/components/common/UpgradePrompt'
 import { BrandMark } from '@/components/common/BrandMark'
 import { ShareButton } from '@/components/common/ShareButton'
+import { YouTubeEmbed } from '@/components/common/YouTubeEmbed'
 import { StoryViewer, type StoryGroup } from '@/components/stories/StoryViewer'
 import { subscribeActiveStoriesForArtist, subscribeArtistPublicHighlights } from '@/services/storyService'
 import { formatCount } from '@/utils/format'
@@ -202,40 +203,53 @@ export function ArtistPublicProfilePage() {
           </div>
         ) : null}
 
-        <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1.6fr)_minmax(17rem,.7fr)]">
-          <div>
-            <div className="mb-4 flex items-end justify-between border-b border-white/[0.08] pb-4">
-              <div><p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-ink-3">Catalogue</p><h2 className="mt-1 text-2xl font-medium tracking-[-0.03em] text-ink-0">Tracks</h2></div>
-              <span className="text-sm tabular-nums text-ink-3">{publicTracks.length.toString().padStart(2, '0')} releases</span>
-            </div>
-            {publicTracks.length === 0 ? (
-              <div className="relative overflow-hidden rounded-[1.75rem] border border-white/[0.08] bg-gradient-to-br from-white/[0.055] to-white/[0.015] px-7 py-12 sm:px-10 sm:py-16">
-                <div className="absolute -right-12 -top-16 h-52 w-52 rounded-full bg-brand-500/[0.08] blur-3xl" />
-                <span className="flex h-12 w-12 items-center justify-center rounded-full border border-brand-400/20 bg-brand-400/[0.08] text-brand-400"><Disc3 className="h-5 w-5" /></span>
-                <h3 className="mt-7 text-2xl font-medium tracking-[-0.03em] text-ink-0">The first release is coming.</h3>
-                <p className="mt-3 max-w-md text-base leading-7 text-ink-2">Follow {artist.name} and their next public track will appear in your feed as soon as it lands.</p>
-                <div className="mt-7 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-brand-400"><Sparkles className="h-3.5 w-3.5" /> Be here from the beginning</div>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-4">
-                {publicTracks.map((track) => (
-                  <TrackCard key={track.trackId} track={track} queue={publicTracks} />
-                ))}
-              </div>
-            )}
-          </div>
-
-          <aside className="space-y-4">
+        {artist.creatorType === 'dancer' ? (
+          <div className="mt-8 grid gap-4 sm:grid-cols-2">
             <div className="rounded-[1.5rem] border border-white/[0.08] bg-white/[0.025] p-6">
               <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-ink-3">About</p>
-              <p className="mt-4 text-base leading-7 text-ink-1">{artist.bio || `${artist.name} is building their Wavelength profile. Follow along for new music and artist updates.`}</p>
+              <p className="mt-4 text-base leading-7 text-ink-1">{artist.bio || `${artist.name} is building their Wavelength profile. Follow along for new videos and updates.`}</p>
             </div>
             <div className="rounded-[1.5rem] border border-brand-400/15 bg-brand-400/[0.055] p-6">
               <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-brand-400">Direct support</p>
-              <p className="mt-3 text-sm leading-6 text-ink-1">Support goes beyond a play. Help independent music keep moving.</p>
+              <p className="mt-3 text-sm leading-6 text-ink-1">Support goes beyond a view. Help independent creators keep moving.</p>
             </div>
-          </aside>
-        </div>
+          </div>
+        ) : (
+          <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1.6fr)_minmax(17rem,.7fr)]">
+            <div>
+              <div className="mb-4 flex items-end justify-between border-b border-white/[0.08] pb-4">
+                <div><p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-ink-3">Catalogue</p><h2 className="mt-1 text-2xl font-medium tracking-[-0.03em] text-ink-0">Tracks</h2></div>
+                <span className="text-sm tabular-nums text-ink-3">{publicTracks.length.toString().padStart(2, '0')} releases</span>
+              </div>
+              {publicTracks.length === 0 ? (
+                <div className="relative overflow-hidden rounded-[1.75rem] border border-white/[0.08] bg-gradient-to-br from-white/[0.055] to-white/[0.015] px-7 py-12 sm:px-10 sm:py-16">
+                  <div className="absolute -right-12 -top-16 h-52 w-52 rounded-full bg-brand-500/[0.08] blur-3xl" />
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full border border-brand-400/20 bg-brand-400/[0.08] text-brand-400"><Disc3 className="h-5 w-5" /></span>
+                  <h3 className="mt-7 text-2xl font-medium tracking-[-0.03em] text-ink-0">The first release is coming.</h3>
+                  <p className="mt-3 max-w-md text-base leading-7 text-ink-2">Follow {artist.name} and their next public track will appear in your feed as soon as it lands.</p>
+                  <div className="mt-7 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-brand-400"><Sparkles className="h-3.5 w-3.5" /> Be here from the beginning</div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-4">
+                  {publicTracks.map((track) => (
+                    <TrackCard key={track.trackId} track={track} queue={publicTracks} />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <aside className="space-y-4">
+              <div className="rounded-[1.5rem] border border-white/[0.08] bg-white/[0.025] p-6">
+                <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-ink-3">About</p>
+                <p className="mt-4 text-base leading-7 text-ink-1">{artist.bio || `${artist.name} is building their Wavelength profile. Follow along for new music and artist updates.`}</p>
+              </div>
+              <div className="rounded-[1.5rem] border border-brand-400/15 bg-brand-400/[0.055] p-6">
+                <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-brand-400">Direct support</p>
+                <p className="mt-3 text-sm leading-6 text-ink-1">Support goes beyond a play. Help independent music keep moving.</p>
+              </div>
+            </aside>
+          </div>
+        )}
 
         {posts.length > 0 ? (
           <div className="mt-10">
@@ -250,6 +264,7 @@ export function ArtistPublicProfilePage() {
                     </span>
                   </div>
                   {post.body ? <p className="mt-2 text-sm text-ink-1">{post.body}</p> : null}
+                  {post.mediaURL ? <YouTubeEmbed url={post.mediaURL} title={post.title} /> : null}
                 </div>
               ))}
             </div>

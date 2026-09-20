@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Disc3, PersonStanding } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { completeOnboarding } from '@/services/userService'
 import { createArtistProfile } from '@/services/artistService'
 import { createDJProfile } from '@/services/djService'
 import { Button } from '@/components/common/Button'
 import { Input, Label, TextArea } from '@/components/common/Input'
+import type { ArtistCreatorType } from '@/types/artist'
 
 /** Lets an existing account add the artist or DJ role later, per the multi-role requirement. */
 export function AddRolePage() {
@@ -19,6 +21,7 @@ export function AddRolePage() {
   const [genres, setGenres] = useState('')
   const [location, setLocation] = useState('')
   const [city, setCity] = useState('')
+  const [creatorType, setCreatorType] = useState<ArtistCreatorType>('musician')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -29,7 +32,7 @@ export function AddRolePage() {
     try {
       const genreList = genres.split(',').map((g) => g.trim()).filter(Boolean)
       if (role === 'artist') {
-        await createArtistProfile(firebaseUser.uid, { name, bio, genres: genreList, location })
+        await createArtistProfile(firebaseUser.uid, { name, bio, genres: genreList, location, creatorType })
       } else {
         await createDJProfile(firebaseUser.uid, { name, bio, genres: genreList, country: location, city })
       }
@@ -48,8 +51,34 @@ export function AddRolePage() {
       <h1 className="text-xl font-semibold text-ink-0">
         {role === 'artist' ? 'Add your artist profile' : 'Add your DJ profile'}
       </h1>
+      {role === 'artist' ? (
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => setCreatorType('musician')}
+            className={`flex items-center gap-2 rounded-xl border p-3 text-left transition-colors ${
+              creatorType === 'musician' ? 'border-brand-500 bg-brand-500/10' : 'border-surface-border bg-surface-2 hover:bg-surface-3'
+            }`}
+          >
+            <Disc3 className={`h-4 w-4 shrink-0 ${creatorType === 'musician' ? 'text-brand-400' : 'text-ink-2'}`} />
+            <span className="text-sm font-medium text-ink-0">Musician</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setCreatorType('dancer')}
+            className={`flex items-center gap-2 rounded-xl border p-3 text-left transition-colors ${
+              creatorType === 'dancer' ? 'border-brand-500 bg-brand-500/10' : 'border-surface-border bg-surface-2 hover:bg-surface-3'
+            }`}
+          >
+            <PersonStanding className={`h-4 w-4 shrink-0 ${creatorType === 'dancer' ? 'text-brand-400' : 'text-ink-2'}`} />
+            <span className="text-sm font-medium text-ink-0">Dancer</span>
+          </button>
+        </div>
+      ) : null}
       <div>
-        <Label htmlFor="name">{role === 'artist' ? 'Artist name' : 'DJ name'}</Label>
+        <Label htmlFor="name">
+          {role === 'dj' ? 'DJ name' : creatorType === 'musician' ? 'Artist name' : 'Dancer name'}
+        </Label>
         <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
       </div>
       <div>
