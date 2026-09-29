@@ -1,244 +1,322 @@
 # BackTheVibes — independent music platform
 
-React + TypeScript + Tailwind CSS frontend, Firebase backend (Auth, Firestore,
-Storage, Cloud Functions), Stripe + Stripe Connect for payments, deployed to
-Cloudflare Pages. "BackTheVibes" is the current brand name and can be renamed
-(search/replace in `index.html`, `src/components/layout/Sidebar.tsx`,
-`src/components/layout/TopBar.tsx`, `src/pages/marketing/LandingPage.tsx`,
-`src/pages/auth/AuthLayout.tsx`, and `vite.config.ts`'s PWA manifest).
+**Discover independent artists, support them directly, and license their music, all in one place.**
 
-## Status: all 5 phases implemented
+[![Live site](https://img.shields.io/badge/live-backthevibes.com-1db954?style=flat-square)](https://www.backthevibes.com/)
+![React](https://img.shields.io/badge/React_19-20232A?style=flat-square&logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=flat-square&logo=firebase&logoColor=black)
+![Stripe Connect](https://img.shields.io/badge/Stripe_Connect-635BFF?style=flat-square&logo=stripe&logoColor=white)
+![Cloudflare](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=flat-square&logo=cloudflare&logoColor=white)
+![PWA](https://img.shields.io/badge/PWA-5A0FC8?style=flat-square&logo=pwa&logoColor=white)
 
-See `docs/FIRESTORE_SCHEMA.md` for the full data model. What's real and wired
-end-to-end, not stubbed:
+**Live:** [www.backthevibes.com](https://www.backthevibes.com/)
 
-- **Phase 1** — Firebase Auth (email/password + Google, verification, reset),
-  multi-role accounts (fan/artist/dj) with onboarding, artist profiles at
-  `/artist/{slug}`, track upload with a protected-original / public-preview
-  split, the persistent player, following, liking, playlists, search,
-  discovery.
-- **Phase 2** — platform subscriptions via Stripe Checkout + webhooks, fan
-  allocation of support across followed artists (server-validated against
-  the actual subscription amount), supporter-gated content, artist revenue
-  ledger (subscription income transactions).
-- **Phase 3** — DJ discovery, `submitLicenceRequest`/`respondToLicenceRequest`
-  workflow, in-app messaging scoped to a licence request, artist DJ-request
-  board grouped by status.
-- **Phase 4** — digital licence agreements (propose/sign, immutable once both
-  parties accept, versioned on change), Stripe Checkout for paid licences,
-  secure downloads via short-lived signed Storage URLs issued only after
-  every server-side check (role, ownership, signatures, payment, expiry,
-  revocation) passes.
-- **Phase 5** — Stripe Connect Express onboarding, pending/available/paid
-  artist balances with a daily clearing-period job, payout requests via
-  Stripe Transfers, artist/DJ verification review queue, copyright claim +
-  general report review, user suspension (enforced by an auth blocking
-  function, not just a UI flag), admin dashboard, audit log.
+BackTheVibes is a full-stack music platform with separate experiences for
+**fans**, **artists**, **DJs/businesses**, and **admins**. Fans discover music
+and pay artists directly. Artists publish tracks, gate them behind access tiers,
+and track their growth. DJs and businesses negotiate and sign licence agreements
+with artists. Anything involving money, access, or trust is enforced on the
+server.
 
-Nothing here fakes success — every write that affects money, licensing,
-counts, or trust happens in a Cloud Function using the Admin SDK, and
-Firestore rules reject the equivalent client write. Where the rules file
-below says "written only via `<functionName>`", that's enforced, not just
-documented.
+---
 
-## Local setup
+## Contents
 
-1. **Create a Firebase project** (console.firebase.google.com) on the **Blaze
-   plan** (required for Cloud Functions, outbound network calls to Stripe,
-   and the scheduled payout-clearing job). Enable:
-   - Authentication → Email/Password and Google sign-in providers
-   - Firestore (production mode)
-   - Storage
-   - Functions
+- [Screenshots](#screenshots)
+- [Features](#features)
+- [Tech stack](#tech-stack)
+- [Architecture](#architecture)
+- [Security model](#security-model)
+- [Getting started](#getting-started)
+- [Deployment](#deployment)
+- [Project structure](#project-structure)
+- [Testing](#testing)
+- [Known limitations](#known-limitations)
+- [Further documentation](#further-documentation)
 
-2. **Web app config** — Project settings → General → Your apps → add a web
-   app, copy the config into `.env` (copy `.env.example` first):
+---
 
-   ```
-   cp .env.example .env
-   ```
+## Screenshots
 
-3. **Install and run**:
+<!-- Add screenshots to docs/screenshots/ and uncomment the lines below. -->
+<!--
+| Discover | Artist dashboard | Track page |
+|---|---|---|
+| ![Discover](docs/screenshots/discover.png) | ![Artist dashboard](docs/screenshots/artist-dashboard.png) | ![Track](docs/screenshots/track.png) |
+-->
 
-   ```
-   npm install
-   npm run dev
-   ```
+_Screenshots coming soon. For now, see the [live site](https://www.backthevibes.com/)._
 
-4. **Deploy Firestore/Storage rules and indexes**:
+---
 
-   ```
-   npm install -g firebase-tools   # if not already installed
-   firebase login
-   # edit .firebaserc with your project id, then:
-   firebase deploy --only firestore:rules,firestore:indexes,storage
-   ```
+## Features
 
-5. **Stripe setup**:
-   - Create a Stripe account (test mode is fine for trying this out) and at
-     least one recurring Price for the platform subscription.
-   - Set Cloud Functions secrets:
-     ```
-     firebase functions:secrets:set STRIPE_SECRET_KEY
-     firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
-     firebase functions:secrets:set STRIPE_CONNECT_WEBHOOK_SECRET
-     ```
-   - After first deploy, create **two** webhook endpoints in the Stripe
-     dashboard:
-     - one at the `stripeWebhook` function URL, listening for
-       `checkout.session.completed`, `customer.subscription.*`,
-       `invoice.paid`, `invoice.payment_failed`
-     - one at the `stripeConnectWebhook` function URL, listening for
-       `account.updated` (set this one's "Listen to" to Connect events)
-   - Use the signing secret Stripe gives each endpoint for the matching
-     secret above.
+### Fans
+- Discover, search, follow, like, and build playlists
+- A persistent player that plays tracks through the official **YouTube IFrame
+  Player API**. It is click-to-load and uses `youtube-nocookie.com`.
+- **Direct support.** Fans make one-off payments that go straight to the
+  artist's Stripe Connect account and see the exact fee split before checkout.
+- Supporter-only and follower-only content, fan offers, and artist stories
+- Push notifications and an installable PWA
 
-6. **Cloud Functions**:
+### Artists
+- Public profile at `/artist/{slug}` with posts, stories, and a track catalogue
+- **Access tiers** per track: public, followers, supporters, DJ-only, early
+  access, and private. The video ID is only sent after a server-side access check.
+- Dashboards for music, growth analytics, revenue history, fan offers,
+  community, and DJ requests
+- Stripe Connect Express onboarding. Payouts run on Stripe's own schedule, and
+  the platform never holds artist money.
 
-   ```
-   cd functions
-   npm install
-   npm run build
-   firebase deploy --only functions
-   ```
+### DJs and businesses
+- Browse tracks that are open to licensing, save them to crates, and request access
+- Negotiate proposals with artists, then **sign digital licence agreements**.
+  Agreements are versioned, become immutable once both parties sign, and
+  include a drawn e-signature.
+- Licence fees are paid by Stripe destination charge, straight to the artist
 
-7. **Publish at least one subscription plan and platform settings.** Nothing
-   writes these by default — they're admin-only in Firestore rules. Bootstrap
-   the very first admin manually (Firestore console → `users/{yourUid}` →
-   set `roles: ["admin", ...]`; this is the one place a human, not the app,
-   sets the admin role), then use `/admin/settings` to create a plan (needs
-   its Stripe Price ID) and set fee percentages, or call
-   `adminUpsertSubscriptionPlan` / `adminUpdatePlatformSettings` directly.
+### Admins
+- Verification queue for artists and DJs, copyright claims, and user and track
+  reports
+- User suspension, enforced on the server as well as in the UI
+- Platform settings for fees, plans, retention, and the payments provider
+- Audit log and security incident tracking
 
-8. **Stripe Connect**: artists onboard themselves from Revenue → Connect
-   Stripe, no admin setup needed beyond the webhook above.
+---
 
-## Push notifications setup
+## Tech stack
 
-1. Firebase Console → Project settings → Cloud Messaging → **Web Push
-   certificates** → generate a key pair. Put it in `.env` as
-   `VITE_FIREBASE_VAPID_KEY` (already public info, same as the rest of the
-   Firebase config).
-2. The same project config is hardcoded a second time in `sw-src/sw.ts` —
-   the service worker is bundled standalone outside the app's module graph,
-   so it can't read `.env` at build time. Update both places together if
-   you ever change Firebase projects.
-3. Deploy functions (`onNotificationCreatePush` needs to be live) —
-   included in the normal `firebase deploy --only functions` from step 6.
-4. From `/app/settings`, click "Enable" under Push notifications. Every
-   existing notification-writing code path (DJ requests, messages,
-   agreements, payments, verification, etc.) now reaches the device
-   automatically — nothing else to wire up per-feature.
-5. Requires HTTPS (Cloudflare Pages gives you this) or `localhost` for
-   local testing. Desktop Chrome/Firefox/Edge support this fully; Safari
-   only supports it for a PWA actually added to the home screen (iOS
-   16.4+), not a regular browser tab — that's a platform limitation, not
-   something fixable in this codebase.
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS 4, React Router 7, lucide-react |
+| Backend | Firebase Auth, Cloud Firestore, Cloud Storage, Cloud Functions (TypeScript) |
+| Payments | Stripe Checkout and Stripe Connect Express destination charges (a Ryft migration is planned, see below) |
+| Playback | YouTube IFrame Player API (no hosted audio) |
+| Notifications | Firebase Cloud Messaging and a custom Workbox service worker |
+| Hosting | Cloudflare Workers static assets, SPA routing, and an edge worker for share previews |
+| Tooling | oxlint, the Node test runner, and the Firestore rules emulator tests |
 
-## Keeping this at $0
+> **Payments status:** Stripe is being phased out in favour of **Ryft**. An
+> admin-controlled `platformSettings/default.paymentsProvider` flag
+> (`stripe | paused | ryft`) can pause all new checkouts. While paused, users
+> see an honest "temporarily unavailable" message instead of an error.
 
-Cloud Functions require the Blaze plan, which is pay-as-you-go rather than a
-hard-capped free plan like Spark — so nothing here is *guaranteed* free, but
-at hobby scale it should cost nothing in practice:
+---
 
-- **Set a budget in Google Cloud Console** (Billing → Budgets & alerts) for
-  the Firebase project — do this before you invite real users, not after.
-- Functions have no `minInstances` set, so they scale to zero and cost
-  nothing while idle — you only pay per invocation beyond the free monthly
-  quota (2M invocations/month as of writing).
-- Stripe has no monthly fee; it only takes its cut when money actually
-  moves, so it costs $0 with zero transactions.
-- Cloudflare Pages hosting is free at this scale.
-- Audio uploads are capped at 40MB and restricted to compressed formats
-  (MP3/AAC/OGG — WAV/FLAC/AIFF are rejected by `storage.rules`, not just
-  discouraged) specifically to keep Storage size — and the download egress
-  that costs more than storage itself — predictable. See
-  `src/utils/uploadLimits.ts` for the client-side mirror of that same limit.
+## Architecture
 
-## Deploying the frontend to Cloudflare
+```
+          ┌────────────────────────────┐
+Browser ─▶│ React SPA (Cloudflare edge)│──────── YouTube IFrame API (click-to-load)
+          └─────────────┬──────────────┘
+                        │ Firebase SDK (reads) / callable functions (writes)
+          ┌─────────────▼──────────────┐       ┌──────────────────────┐
+          │  Cloud Functions (Admin SDK)│◀────▶│ Stripe / Stripe Connect│
+          └─────────────┬──────────────┘ webhook└──────────────────────┘
+                        │
+          ┌─────────────▼──────────────┐
+          │ Firestore + Storage (rules) │
+          └────────────────────────────┘
+```
 
-Connecting this repo in the Cloudflare dashboard now defaults to the newer
-Workers-based static-asset deployment (`wrangler deploy`) rather than
-classic Pages — `wrangler.jsonc` at the project root is already configured
-for that (`assets.directory: "dist"`, `not_found_handling:
-"single-page-application"` for SPA routing on deep links like
-`/artist/some-artist`). There's deliberately no `public/_redirects` file —
-that's the old Pages-only mechanism, and shipping both causes Cloudflare to
-reject the deploy ("infinite loop detected" on the redirect rule).
+- **Services layer:** every Firestore, Storage, and Functions call lives in
+  `src/services/`. Components never call Firestore directly, so the
+  security-sensitive logic for each collection can be audited in one place.
+- **Server-authoritative writes:** anything that affects money, licensing,
+  counts, roles, or moderation goes through a Cloud Function.
+- **Split track media:** `tracks/{id}` is public so locked tracks can still show
+  their title and artwork. The YouTube video ID lives in `trackMedia/{id}`,
+  which only the Admin SDK can read, and is disclosed by `getTrackYoutubeInfo`
+  after an entitlement check.
 
-1. Connect the repo in the Cloudflare dashboard (build command `npm run
-   build`, output directory `dist`, Node version 20+), or deploy directly:
-   ```
-   npm run build
-   npx wrangler deploy
-   ```
-2. Add the same `VITE_FIREBASE_*` variables from `.env` as environment
-   variables in the Cloudflare project settings. These are public client
-   identifiers, safe to expose.
-3. Custom domain + HTTPS are handled by Cloudflare automatically.
+See [`docs/FIRESTORE_SCHEMA.md`](docs/FIRESTORE_SCHEMA.md) for the full data model.
+
+---
+
+## Security model
+
+Firestore rules enforce these rules directly:
+
+- `playCount`, `followerCount`, `supporterCount`, `verified`, and
+  `subscriptionStatus` cannot be changed by client writes.
+- `licenceRequests`, `licenceAgreements`, `transactions`, and `auditLogs` are
+  `write: if false`. Every write goes through a callable function.
+- Users can never grant themselves `admin` or set `suspended` or
+  `stripeCustomerId`.
+- `subscriptionPlans` and `platformSettings` are public-read and admin-write only.
+  Pricing and fees are never hard-coded.
+- Platform fees are calculated on the server from admin settings. They are
+  never taken from the client and are collected through Stripe's
+  `application_fee_amount`.
+- Checkout webhooks are idempotent on the Stripe Checkout Session ID.
+
+Suspension is enforced, not just shown. `requireActiveUser`
+(`functions/src/roles.ts`) rejects state-changing callables for suspended
+accounts, and the sign-in page signs them straight back out. See [`SECURITY_AUDIT.md`](SECURITY_AUDIT.md) and
+[`SECURITY_INCIDENT_RESPONSE.md`](SECURITY_INCIDENT_RESPONSE.md) for more.
+
+---
+
+## Getting started
+
+### Prerequisites
+- Node.js **20+**
+- A Firebase project on the **Blaze** plan, with Auth (email/password and
+  Google), Firestore, Storage, and Functions enabled
+- The Firebase CLI: `npm install -g firebase-tools`
+- A Stripe account (test mode is fine)
+
+### 1. Install and configure
+
+```bash
+git clone https://github.com/dean1234533/Music-Platform-App.git
+cd Music-Platform-App
+cp .env.example .env      # fill in your Firebase web app config + VAPID key
+npm install
+npm run dev
+```
+
+All `VITE_*` values are public client identifiers. Never put secret keys in `.env`.
+
+### 2. Deploy rules and indexes
+
+```bash
+firebase login
+# set your project id in .firebaserc, then:
+firebase deploy --only firestore:rules,firestore:indexes,storage
+```
+
+### 3. Configure Stripe and deploy Cloud Functions
+
+```bash
+firebase functions:secrets:set STRIPE_SECRET_KEY
+firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
+firebase functions:secrets:set STRIPE_CONNECT_WEBHOOK_SECRET
+
+cd functions && npm install && npm run build && cd ..
+firebase deploy --only functions
+```
+
+Then create two webhook endpoints in the Stripe dashboard:
+
+| Endpoint | Events |
+|---|---|
+| `stripeWebhook` function URL | `checkout.session.completed`, `customer.subscription.*`, `invoice.paid`, `invoice.payment_failed`, `charge.refunded` |
+| `stripeConnectWebhook` function URL (listen to **Connect** events) | `account.updated` |
+
+### 4. Bootstrap the first admin
+
+In the Firestore console, add `"admin"` to `users/{yourUid}.roles`. This is the
+only time a person sets the admin role instead of the app. Next, open
+`/admin/settings` to publish plans and set fee percentages.
+
+### 5. Push notifications (optional)
+
+1. Go to Firebase Console, then **Cloud Messaging**, then **Web Push
+   certificates**. Generate a key pair and set `VITE_FIREBASE_VAPID_KEY`.
+2. The Firebase config is repeated in `sw-src/sw.ts` because the service worker
+   is bundled separately. Keep both copies in sync.
+3. Enable push from `/app/settings`. Every existing in-app notification is also
+   sent as a push through `onNotificationCreatePush`.
+
+On iOS, web push only works when the PWA has been added to the home screen
+(iOS 16.4+).
+
+---
+
+## Deployment
+
+The frontend deploys to **Cloudflare Workers static assets**. `wrangler.jsonc`
+is already set up with `assets.directory: "dist"` and SPA fallback, so there is
+no `_redirects` file.
+
+```bash
+npm run build
+npx wrangler deploy
+```
+
+Or connect the repo in the Cloudflare dashboard with build command
+`npm run build`, output directory `dist`, and Node 20+. Add the `VITE_FIREBASE_*`
+variables to the project settings.
+
+### Keeping costs near £0 at hobby scale
+- Set a **budget alert** in Google Cloud Billing before inviting real users.
+- Functions have no `minInstances`, so they scale to zero when idle.
+- Tracks are YouTube links rather than hosted audio, so Storage only holds
+  artwork, story media, and documents.
+- Stripe charges only per transaction. Cloudflare's free tier covers hosting.
+
+---
 
 ## Project structure
 
 ```
 src/
-  components/   reusable UI (layout, player, music cards, auth guards, form inputs, licence/track modals)
-  contexts/     AuthContext (Firebase Auth + user profile), PlayerContext (persistent player)
-  hooks/        small cross-cutting hooks (e.g. cached artist summary lookups)
-  lib/          Firebase client SDK initialisation, typed Cloud Functions callable wrapper
-  pages/        route components, grouped by area (marketing, auth, onboarding, fan, artist, dj, track, requests, admin)
-  services/     all Firestore/Storage/Functions calls — no Firestore calls in components
-  types/        shared TypeScript types mirroring the Firestore schema
-  utils/        formatting, slugs, auth error mapping, upload format/size limits
-sw-src/sw.ts  custom service worker (Workbox precache + FCM background push) — bundled via vite-plugin-pwa's injectManifest, kept outside src/ so its WebWorker types don't clash with the app's DOM types
-functions/
-  src/
-    stripe/       checkout, billing portal, subscription webhook, Connect onboarding + webhook, licence payment
-    support/      allocation callable + supporter-count trigger
-    licensing/    licence requests, agreements/signing, secure downloads
-    messaging/    conversation messages
-    payouts/      payout requests, daily pending→available balance promotion
-    admin/        verification review, copyright/report review, moderation, platform settings, audit log
-    notifications/ single Firestore trigger that turns every notifications/{id} write into a push
-firestore.rules, storage.rules, firestore.indexes.json, firebase.json
-docs/FIRESTORE_SCHEMA.md
+  components/   UI: layout, player, music cards, licence/track modals, auth guards
+  contexts/     AuthContext, PlayerContext (persistent YouTube player), ToastContext
+  hooks/        entitlements, media upload, install prompt, unread counts
+  lib/          Firebase init, typed callable wrapper, SEO, YouTube IFrame loader
+  pages/        routes: marketing, auth, fan, artist, dj, agreements, legal, admin, blog
+  services/     every Firestore/Storage/Functions call
+  types/        shared types mirroring the Firestore schema
+  utils/        formatting, slugs, YouTube URL validation, password policy
+sw-src/         custom service worker (Workbox precache + FCM background push)
+worker/         Cloudflare edge worker (share/OG previews, public JSON API)
+functions/src/
+  stripe/       checkout, billing portal, Connect onboarding, webhooks, licence payments
+  support/      one-off fan → artist support checkout + triggers
+  licensing/    requests, offers, agreements/signing, events
+  admin/        verification, copyright, reports, moderation, settings, incidents
+  account/      data export + account deletion
+  notifications/, stories/, retention/, legal/
+tests/          flow-contract tests + Firestore rules emulator tests
+wordpress-plugin/  BackTheVibes embed plugin for WordPress
 ```
 
-Business logic lives in `services/`; components call services and render
-state — kept separate on purpose so the security-sensitive logic (who can
-write what) is easy to audit in one place per collection.
+---
 
-## Security model
+## Testing
 
-Anything involving money, licensing, counts, or trust is written only by
-Cloud Functions using the Admin SDK — never trusted from the client. A few
-examples enforced directly in `firestore.rules`:
+```bash
+npm run lint        # oxlint
+npm test            # flow-contract tests
+npm run test:rules  # Firestore security rules tests
+npm run check       # build + lint + all tests + functions build
+```
 
-- `playCount`, `followerCount`, `supporterCount`, `verified`, `subscriptionStatus` are frozen on client writes.
-- `licenceRequests`, `licenceAgreements`, `transactions`, `payouts`, `auditLogs` are entirely `write: if false` — every write goes through a callable.
-- A user can never set their own `roles` to include `admin`, nor set `suspended`/`stripeCustomerId` themselves.
-- `subscriptionPlans` and `platformSettings` are public-read, admin-write-only — pricing and fees are never hard-coded in the app.
+---
 
-A `suspended: true` flag is also *enforced*, not just displayed: a
-`beforeUserSignedIn` blocking function (`functions/src/admin/enforceSuspension.ts`)
-rejects sign-in for suspended accounts.
+## Known limitations
 
-## Known simplifications (documented, not hidden)
+- **Search** uses Firestore prefix search on denormalised lowercase fields. For
+  typo-tolerant search, swap in Algolia or Typesense behind `searchService.ts`.
+- **DJ allowlist.** The "DJs I approve" setting currently applies the same rule
+  as "verified DJs only".
+- **Master and stem exchange** happens outside the platform. The legacy download
+  endpoint returns HTTP 410 with an explanation.
+- **Contract export** uses the browser's print-to-PDF.
 
-- **DJ allowlist**: an artist's "DJs I approve" policy currently enforces the
-  same bar as "verified DJs only" — a genuine per-artist allowlist UI is a
-  natural follow-up, not built here.
-- **Preview generation**: artists upload a separate preview file rather than
-  the platform auto-trimming the original — adding automatic trimming would
-  mean running audio processing (e.g. ffmpeg) in a Cloud Function.
-- **Search**: Firestore-native prefix search on denormalised lowercase
-  fields. Swap in a dedicated provider (e.g. Algolia/Typesense) behind
-  `searchService.ts` if typo-tolerant/ranked search is needed later.
-- **Balance clearing period**: a fixed 7-day pending→available window via a
-  daily scheduled function, not a configurable per-transaction hold.
-- **Messaging**: text messages with per-request scoping and notifications
-  are in; read receipts beyond `readBy: [senderId]` on send, block, and file
-  attachments are not — the schema documents them for a follow-up pass.
-- **Push notifications**: implemented via Firebase Cloud Messaging. Every
-  in-app notification (already written to Firestore by existing functions)
-  now also triggers a real push through `onNotificationCreatePush`, with no
-  changes needed at each call site. See "Push notifications setup" below.
+---
+
+## Further documentation
+
+| Document | Purpose |
+|---|---|
+| [`PRODUCT_FLOW.md`](PRODUCT_FLOW.md) | End-to-end journey for every role |
+| [`docs/FIRESTORE_SCHEMA.md`](docs/FIRESTORE_SCHEMA.md) | Data model |
+| [`MIGRATION_REPORT.md`](MIGRATION_REPORT.md) | Move from hosted audio to YouTube, and to Connect destination charges |
+| [`SECURITY_AUDIT.md`](SECURITY_AUDIT.md) | Security review |
+| [`COMPLIANCE_CHECKLIST.md`](COMPLIANCE_CHECKLIST.md) | Legal and compliance items |
+
+---
+
+## Author
+
+Built by **Dean Da Dev**, a UK full-stack developer building web apps, websites,
+and AI tools.
+
+🌐 [dean-da-dev.co.uk](https://www.dean-da-dev.co.uk/) · 💼 [More projects](https://www.dean-da-dev.co.uk/portfolio) · 🐙 [GitHub](https://github.com/dean1234533)
